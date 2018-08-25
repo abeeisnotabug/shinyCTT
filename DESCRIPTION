@@ -8,6 +8,7 @@ Authors@R: c(
     person("Michael", "Eid", email = "michael.eid@fu-berlin.de",
     role = "aut"))
 URL: https://github.com/abeeisnotabug/shinyCTT
+BugReports: https://github.com/abeeisnotabug/shinyCTT/issues
 Description: Provides a Shiny App to analyze datasets in the framework of
     classical test theory by providing wrapper functions for the lavaan
     package. Most importantly, the main function rigorously checks the model
