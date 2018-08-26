@@ -23,6 +23,7 @@ LazyData: true
 Depends: R (>= 3.5.1),
     lavaan (>= 0.6-2)
 Imports: MVN (>= 5.5),
-    moments (>= 0.14)
+    moments (>= 0.14),
+    corrplot (>= 0.84)
 Suggests: shiny (>= 1.1.0)
 RoxygenNote: 6.1.0
