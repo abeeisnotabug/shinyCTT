@@ -26,6 +26,10 @@ function(input, output) {
         eval(parse(text = input$itemColsString))
     })
 
+    numericCols <- reactive({
+        colnames(userData())[sapply(userData(), is.numeric)]
+    })
+
     output$dataOverview <- renderTable({
 
         # Limit max number of columns to display --------
@@ -44,9 +48,15 @@ function(input, output) {
     })
 
     observeEvent(input$descrStats, {
+        output$caption1 <- renderText({"Mean, standard deviation, skewness, excess, covariance matrix:"})
         output$descrTable <- renderTable({
-            input$descrStats
-            head(userData()[, isolate({itemCols()})])
-        })
+            isolate({
+                t(apply(userData()[, itemCols()], 2, function(col) c(Mean = mean(col),
+                                                                     Sd = sd(col),
+                                                                     Skew = moments::skewness(col),
+                                                                     Excess = moments::kurtosis(col) - 3)))
+            })
+        },
+        rownames = TRUE)
     })
 }

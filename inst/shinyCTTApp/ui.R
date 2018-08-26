@@ -49,6 +49,7 @@ fluidPage(
         column(9,
                h3("Overview of the data:"),
                tableOutput("dataOverview"),
+               h3(textOutput("caption1", container = span)),
                tableOutput("descrTable"))
     )
 )
