@@ -42,7 +42,8 @@ function(input, output, session) {
         checkboxGroupInput("itemCols",
                            "Select which columns contain items",
                            choices = possibleItemColumns(),
-                           selected = possibleItemColumns())
+                           selected = possibleItemColumns(),
+                           inline = TRUE)
     })
 
     output$groupColChooser <- renderUI({
@@ -53,18 +54,80 @@ function(input, output, session) {
     })
 
     observeEvent(input$goDescrStats, {
+
+        observe({
+            if ("showDescrTable" %in% input$toggleStats) {
+                output$descrTable <- renderTable({
+                    isolate({
+                        t(apply(userData()[, input$itemCols], 2, function(col) c(Mean = mean(col),
+                                                                                 Sd = sd(col),
+                                                                                 Skew = moments::skewness(col),
+                                                                                 Excess = moments::kurtosis(col) - 3)))
+                    })
+                }, digits = 3, rownames = TRUE)
+
+                output$descrTableUI <- renderUI({
+                    tagList(
+                        h3("Mean, Standard Deviation, Skewness, Excess:"),
+                        div(align = "center",
+                            tableOutput("descrTable"))
+                    )
+                })
+            } else {
+                output$descrTableUI <- NULL
+            }
+
+            if ("showCorrPlot" %in% input$toggleStats) {
+                output$corrPlot <- renderPlot({corrplot::corrplot.mixed(cor(userData()[, input$itemCols]),
+                                                                        number.digits = 3)
+                    })
+
+                output$corrPlotUI <- renderUI({
+                    tagList(
+                        h3("Correlation table and plot:"),
+                        plotOutput("corrPlot")
+                    )
+                })
+            } else {
+                output$corrPlotUI <- NULL
+            }
+
+            if ("showCovMat" %in% input$toggleStats) {
+                output$covMat <- renderTable({
+                    cov(userData()[, input$itemCols])
+                }, digits = 3, rownames = TRUE)
+
+                output$covMatUI <- renderUI({
+                    tagList(
+                        h3("Covariance Matrix:"),
+                        div(align = "center",
+                            tableOutput("covMat")
+                        )
+                    )
+                })
+            } else {
+                output$covMatUI <- NULL
+            }
+        })
+
         appendTab(inputId = "navbar",
             tabPanel("Descriptive Statistics",
                      value = "panelDescrStats",
                 sidebarLayout(
                      sidebarPanel(
+                         checkboxGroupInput("toggleStats",
+                                            "Show statistics:",
+                                            choices = c("Mean, Standard Deviation, Skewness, Excess" = "showDescrTable",
+                                                        "Correlation table and plot" = "showCorrPlot",
+                                                        "Covariance Matrix" = "showCovMat"),
+                                            selected = c("showDescrTable",
+                                                         "showCorrPlot",
+                                                         "showCovMat"))
                      ),
                      mainPanel(
-                         h3("Mean, standard deviation, skewness, excess:"),
-                         #uiOutput("descrWarning"),
-                         tableOutput("descrTable"),
-                         h3("Correlation Plot:"),
-                         plotOutput("corrPlot")
+                         uiOutput("descrTableUI"),
+                         uiOutput("corrPlotUI"),
+                         uiOutput("covMatUI")
                      )
                 )
             ),
@@ -73,15 +136,6 @@ function(input, output, session) {
 
         removeTab(inputId = "navbar",
                   target = "panelDataInput")
-
-        output$descrTable <- renderTable({
-            isolate({
-                t(apply(userData()[, input$itemCols], 2, function(col) c(Mean = mean(col),
-                                                                     Sd = sd(col),
-                                                                     Skew = moments::skewness(col),
-                                                                     Excess = moments::kurtosis(col) - 3)))
-            })
-        }, rownames = TRUE)
 
         # Warning message to be implemented later!! ------------------
 
@@ -99,8 +153,6 @@ function(input, output, session) {
         #        }
         #    }
         #})
-
-        output$corrPlot <- renderPlot({corrplot::corrplot.mixed(cor(userData()[, input$itemCols]))})
     })
 
     # Descr. statistics -------------------------------------------------------------------------------
