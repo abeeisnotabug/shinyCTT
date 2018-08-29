@@ -12,8 +12,11 @@ descrPanel <- tabPanel("Descriptive Statistics",
                                                                "showCorrPlot",
                                                                "showCovMat")),
                                hr(),
-                               actionButton("goMVN",
-                                            "Test for multivariate normality!")
+                               conditionalPanel(condition = "input.goMVN == 0",
+                                                actionButton("goMVN",
+                                                             "Test for multivariate normality!")),
+                               conditionalPanel(condition = "input.goMVN > 0",
+                                                helpText("Test on MVN has been performed."))
                            ),
                            mainPanel(
                                uiOutput("descrTableUI"),
@@ -27,13 +30,24 @@ mvnPanel <- tabPanel("MVN",
                      value = "panelMVN",
                      sidebarLayout(
                          sidebarPanel(
-                             radioButtons("estimator",
-                                          "Choose estimator based on test result:",
-                                          choices = c("Maximum Likelihood" = "ML",
-                                                      "Robust Maximum Likelihood" = "MLR"),
-                                          selected = "ML"),
-                             actionButton("goCorrInd",
-                                          HTML("Calculate the models and</br>test for correlative independence!"))
+                             conditionalPanel(condition = "input.goCorrInd == 0",
+                                              radioButtons("estimator",
+                                                           "Choose estimator based on test result:",
+                                                           choices = c("Maximum Likelihood" = "ML",
+                                                                       "Robust Maximum Likelihood" = "MLR"),
+                                                           selected = "ML")),
+                             conditionalPanel(condition = "input.goCorrInd > 0",
+                                              #helpText("The following estimator has been chosen:"),
+                                              textOutput("selectedEstimator")),
+                             hr(),
+                             conditionalPanel(condition = "input.goCorrInd == 0",
+                                              actionButton("goCorrInd",
+                                                           HTML("Calculate the models and</br>test for correlative independence!")),
+                                              div(align = "center",
+                                                  helpText("This may take a few seconds."))),
+                             conditionalPanel(condition = "input.goCorrInd > 0",
+                                              helpText("The models have been calculated and the test
+                                                            for correlative independence has been performed."))
                          ),
                          mainPanel(
                              h3("Tests on Univariate Normality:"),
@@ -42,7 +56,8 @@ mvnPanel <- tabPanel("MVN",
                              h3("Test on Multivariate Normality:"),
                              div(align = "center",
                                  tableOutput("mvnTableMV")),
-                             textOutput("mvnComment")
+                             textOutput("mvnComment"),
+                             verbatimTextOutput("buttonValue")
                          )
                      )
 )
@@ -54,14 +69,37 @@ corrIndPanel <- tabPanel("Corr. Ind.",
                                  textInput("corrIndSigLvl",
                                            "Enter the desired significance level",
                                            value = "0.05"),
-                                 actionButton("goTauModel",
-                                              "Test the tau-kongeneric model!")
+                                 conditionalPanel(condition = "input.goModels == 0",
+                                                  actionButton("goModels",
+                                                               "Test the models!"),
+                                                  div(align = "center",
+                                                      helpText("This may take a few seconds."))),
+                                 conditionalPanel(condition = "input.goModels > 0",
+                                                  helpText("The models have been printed."))
                              ),
                              mainPanel(
+                                 withMathJax(),
+                                 h3("Correlation Table with Confidence Intervals:"),
+                                 tableOutput("corTableWithCIs"),
                                  h3("Test on Correlative Independence:"),
-                                 htmlOutput("tkModelSum")
+                                 uiOutput("corrIndText")
                              )
                          )
+)
+
+modelTestPanel <- tabPanel("Models",
+                           value = "panelModelTests",
+                           tabsetPanel(
+                               tabPanel(HTML("&tau;-kongeneric"),
+                                        h3("Test on Model Fit:"),
+                                        uiOutput("tkModelFitText"),
+                                        h3("Estimated paramters with Standard Errors and Confidence Intervals:"),
+                                        uiOutput("tkTable")),
+                               tabPanel(HTML("essentially &tau;-equivalent")),
+                               tabPanel(HTML("&tau;-equivalent")),
+                               tabPanel(HTML("essentially &tau;-parallel")),
+                               tabPanel(HTML("&tau;-parallel"))
+                           )
 )
 
 function(input, output, session) {
@@ -254,6 +292,8 @@ function(input, output, session) {
                 updateRadioButtons(session,
                                    "estimator",
                                    selected = selectedEstimator)
+
+                output$selectedEstimator <- renderText({sprintf("The %s estimator has been chosen.", input$estimator)})
             })
 
             appendTab(inputId = "navbar",
@@ -262,47 +302,104 @@ function(input, output, session) {
         }
     })
 
+    # Initialise variables to use them later
+    fitted_models <- NULL
+    fit_params <- NULL
+
     observeEvent(input$goCorrInd, {
 
-        model_codes <- make_model_codes(data = userData(),
-                                        item_cols = input$itemCols,
+        model_codes <- make_model_codes(input_data = userData()[, input$itemCols],
                                         multi_group = FALSE)
 
-        fitted_models <- reactive({lapply(model_codes,
+        fitted_models <<- reactive({lapply(model_codes,
                                           FUN = cfa,
-                                          data = rtdata,
+                                          data = userData(),
                                           meanstructure = T,
                                           estimator = input$estimator)})
 
-        fit_params <- reactive({lapply(fitted_models(),
+        fit_params <<- reactive({lapply(fitted_models(),
                                        lavInspect,
                                        what = "fit")})
 
-        corr_ind <- extract_corr_ind(fit_params()[["tau-kongeneric"]],
-                                     estimator = input$estimator)
+        corr_ind <- extract_fit_params(fit_params()[["tau-kongeneric"]],
+                                       estimator = input$estimator,
+                                       what = "corr_ind")
 
         observe({
             req(input$corrIndSigLvl)
-            if (corr_ind[3] < as.numeric(input$corrIndSigLvl)) {
-                output$tkModelSum <- renderText(HTML(
-                    sprintf("The hypothesis that all correlations between the items are equal to zero
-                        has to be discarded on a significance level of %s (%s).",
+
+            output$corrIndText <- renderUI({
+                if (corr_ind[3] < as.numeric(input$corrIndSigLvl)) {#HTML(
+                    withMathJax(tags$p(sprintf("The hypothesis that all correlations between the items are equal to zero
+                        has to be discarded on a significance level of %s. Test result: %s",
+                            #"0.05",
                             input$corrIndSigLvl,
-                            test_result_output(corr_ind[1], corr_ind[2], corr_ind[3]))
-                ))
-            } else {
-                output$tkModelSum <- renderText(HTML(
-                    sprintf("The hypothesis that all correlations between the items are equal to zero
-                        can be maintained on a significance level of %s, (%s). It is thus not advised to
-                        conduct any further analysis.",
+                            test_result_output(corr_ind[1], corr_ind[2], corr_ind[3], input$estimator))))
+                } else {
+                    withMathJax(tags$p(sprintf("The hypothesis that all correlations between the items are equal to zero
+                        can be maintained on a significance level of %s. Test result: %s
+
+                        It is thus not advised to conduct any further analysis.",
+                            #"0.05",
                             input$corrIndSigLvl,
-                            test_result_output(corr_ind[1], corr_ind[2], corr_ind[3]))
-                ))
-            }
+                            test_result_output(corr_ind[1], corr_ind[2], corr_ind[3], input$estimator))))
+                }
+            })
+
+            #output$corrIndTextUI <- renderUI({
+            #    ))
+            #})
+
+            output$corTableWithCIs <- renderTable({create_corr_table_with_cis(userData()[, input$itemCols],
+                                                                              alpha = as.numeric(input$corrIndSigLvl))},
+                                                  rownames = TRUE)
         })
 
         appendTab(inputId = "navbar",
                   corrIndPanel,
+                  select = TRUE)
+    })
+
+    observeEvent(input$goModels, {
+
+        # Tau-kongeneric ---------------------------------------------------------------------------------
+        #output$tkTable <- renderTable({
+        #    extract_parameters(fitted_models()[["tau-kongeneric"]])
+        #}, digits = 3)
+
+        output$tkTable <- renderUI({
+            M <- print(xtable::xtable(extract_parameters(fitted_models()[["tau-kongeneric"]]), digits = 3),
+                                      floating = FALSE,
+                       tabular.environment = "array",
+                       comment = FALSE,
+                       print.results = FALSE,
+                       sanitize.text.function = identity)
+
+            withMathJax(HTML(M))
+        })
+
+        tk_fit <- extract_fit_params(fit_params()[["tau-kongeneric"]],
+                                     what = "model_fit",
+                                     estimator = input$estimator)
+
+        observe({
+            output$tkModelFitText <- renderUI({
+                if (tk_fit[3] < as.numeric(input$corrIndSigLvl)) {
+                    withMathJax(HTML(sprintf("The hypothesis that the model implied covariance matrix and the meanstructure
+                            match the empirical ones has to be discarded on a significance level of %s. Test result: %s",
+                            input$corrIndSigLvl,
+                            test_result_output(tk_fit[1], tk_fit[2], tk_fit[3], input$estimator))))
+                } else {
+                    withMathJax(HTML(sprintf("The hypothesis that the model implied covariance matrix and the meanstructure
+                            match the empirical ones can be maintained on a significance level of %s. Test result: %s",
+                            input$corrIndSigLvl,
+                            test_result_output(tk_fit[1], tk_fit[2], tk_fit[3], input$estimator))))
+                }
+            })
+        })
+
+        appendTab(inputId = "navbar",
+                  modelTestPanel,
                   select = TRUE)
     })
 }

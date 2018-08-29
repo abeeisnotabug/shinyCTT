@@ -1,6 +1,6 @@
 #' @export
-make_model_codes <- function(data, item_cols, multi_group = FALSE) {
-  item_names <- names(data[, item_cols])
+make_model_codes <- function(input_data, multi_group = FALSE) {
+  item_names <- colnames(input_data)
   n_items <- length(item_names)
 
   models <- c("tau-kongeneric",
@@ -29,8 +29,8 @@ make_model_codes <- function(data, item_cols, multi_group = FALSE) {
                   "essentially tau-parallel" = mult_eas,
                   "tau-parallel" = one_eas)
 
-  one_err_var <- rep("errvar", n_items)
-  mult_err_var <- paste("errvar", 1:n_items, sep = "_")
+  one_err_var <- rep("varepsilon", n_items)
+  mult_err_var <- paste("varepsilon", 1:n_items, sep = "_")
 
   err_var <- list("tau-kongeneric" = mult_err_var,
                   "essentially tau-equivalent" = mult_err_var,
@@ -55,7 +55,7 @@ make_model_codes <- function(data, item_cols, multi_group = FALSE) {
                                 err_var[[model]],
                                 item_names),
                         collapse = "\n")
-      eta_var <- "eta ~~ c(etavar_g1, etavar_g2) * eta"
+      eta_var <- "eta ~~ c(sigma_g1, sigma_g2) * eta"
 
       paste(eta_dep, err_vars, alphas, eta_var, sep = "\n")
     } else {
@@ -64,12 +64,12 @@ make_model_codes <- function(data, item_cols, multi_group = FALSE) {
                                 err_var[[model]],
                                 item_names),
                         collapse = "\n")
-      eta_var <- "eta ~~ etavar * eta"
+      eta_var <- "eta ~~ sigma * eta"
 
       # Item reliabilities:
       item_rels_names <- paste("rel", 1:n_items, sep = "_")
       def_names <- gsub("lambda_1", "1", disc_par[[model]])
-      item_rels <- paste(sprintf("rel_%i := 1 / (1 + %s / (%s^2 * etavar))",
+      item_rels <- paste(sprintf("rel_%i := 1 / (1 + %s / (%s^2 * sigma))",
                                  1:n_items,
                                  err_var[[model]],
                                  def_names),
@@ -79,14 +79,14 @@ make_model_codes <- function(data, item_cols, multi_group = FALSE) {
                                       paste(def_names,
                                             collapse = " + "),
                                       ")^2")
-      err_var_sum_div_by_etavar <- paste0("(",
+      err_var_sum_div_by_sigma <- paste0("(",
                                           paste(err_var[[model]],
                                                 collapse = " + "),
-                                          ") / etavar")
+                                          ") / sigma")
       sum_rel <- sprintf("rel_sum := %s / (%s + %s)",
                          disc_par_sum_squared,
                          disc_par_sum_squared,
-                         err_var_sum_div_by_etavar)
+                         err_var_sum_div_by_sigma)
 
       paste(eta_dep, err_vars, alphas, eta_var, item_rels, sum_rel, sep = "\n")
     }
@@ -98,15 +98,24 @@ make_model_codes <- function(data, item_cols, multi_group = FALSE) {
 }
 
 #' @export
-extract_corr_ind <- function(fitted_model_fit_params, estimator) {
+extract_fit_params <- function(fitted_model_fit_params, estimator, what) {
+  par_names <- switch(what,
+                      "model_fit" = c("chisq", "df", "pvalue"),
+                      "corr_ind" = c("baseline.chisq", "baseline.df", "baseline.pvalue"),
+                      "rmsea" = c("rmsea", "rmsea.pvalue"))
+
   scaled_addon <- switch(estimator,
                          "MLR" = ".scaled",
                          "ML" = "")
-  to_extract <- paste0(c("baseline.chisq", "baseline.df", "baseline.pvalue"), scaled_addon)
+
+  to_extract <- paste0(par_names, scaled_addon)
 
   out_vec <- c(fitted_model_fit_params[to_extract])
 
-  names(out_vec) <- c("&chi;&sup2;", "df", "p")
+  names(out_vec) <- switch(what,
+                           "model_fit" = c("\\chi^2", "df", "p"),
+                           "corr_ind" = c("\\chi^2", "df", "p"),
+                           "rmsea" = c("\\text{RMSEA}", "p"))
 
   out_vec
 }
@@ -131,7 +140,8 @@ extract_parameters <- function(fitted_model, alpha = 0.05) {
   par_est_df$ci.lower[grep("rel", par_est_df$label)] <- rels_ci_l
   par_est_df$ci.upper[grep("rel", par_est_df$label)] <- rels_ci_u
 
-  par_est_df[grep("errvar|alpha|lambda|etavar|rel",
-                      par_est_df$label),
-                 -c(1, 2, 3)]
+  par_est_df$label[grep("epsilon|alpha|lambda|sigma", par_est_df$label)] <-
+    sprintf("\\%s", par_est_df$label[grep("epsilon|alpha|lambda|sigma", par_est_df$label)])
+
+  par_est_df[grep("epsilon|alpha|lambda|sigma|rel", par_est_df$label), -c(1, 2, 3)]
 }

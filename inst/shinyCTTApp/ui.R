@@ -42,11 +42,7 @@ inputPanel <- tabPanel("Data input",
 fluidPage(
 
     # To be updated later: nice alignment of item checkbox group! ---------------------
-    tags$head(tags$style(".checkbox-inline {margin: 0 !important;}"),
-              tags$script(src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML-full", type = 'text/javascript'),
-              tags$script("MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});", type='text/x-mathjax-config')
-
-    ),
+    tags$head(tags$style(".checkbox-inline {margin: 0 !important;}")),
     # ---------------------------------------------------------------------------------
 
     navbarPage("shinyCTT",
