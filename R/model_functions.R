@@ -1,3 +1,4 @@
+#' @export
 make_model_codes <- function(data, item_cols, multi_group = FALSE) {
   item_names <- names(data[, item_cols])
   n_items <- length(item_names)
@@ -96,6 +97,21 @@ make_model_codes <- function(data, item_cols, multi_group = FALSE) {
   model_codes
 }
 
+#' @export
+extract_corr_ind <- function(fitted_model_fit_params, estimator) {
+  scaled_addon <- switch(estimator,
+                         "MLR" = ".scaled",
+                         "ML" = "")
+  to_extract <- paste0(c("baseline.chisq", "baseline.df", "baseline.pvalue"), scaled_addon)
+
+  out_vec <- c(fitted_model_fit_params[to_extract])
+
+  names(out_vec) <- c("&chi;&sup2;", "df", "p")
+
+  out_vec
+}
+
+#' @export
 extract_parameters <- function(fitted_model, alpha = 0.05) {
   par_est_df <- parameterEstimates(fitted_model,
                                        zstat = F,
