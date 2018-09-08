@@ -1,23 +1,39 @@
 #' @export
-test_result_output <- function(statistic,  parameter = FALSE, pvalue, estimator) {
-  if (isFALSE(parameter)) {
+makeKable <- function(table,
+                      digits = 3,
+                      full_width = FALSE,
+                      position = "center",
+                      bootstrap_options = "striped",
+                      col.names = NA,
+                      ...) {
+  kableExtra::kable_styling(
+    kableExtra::kable(table,
+                      digits = digits,
+                      escape = FALSE,
+                      col.names = col.names),
+    full_width = full_width,
+    position = position,
+    bootstrap_options = bootstrap_options,
+    ...)
+}
+
+#' @export
+test_result_output <- function(test_vector, estimator) {
+  if (length(test_vector) == 2) {
     parameter_string <- ""
   } else {
-    names(parameter) <- gsub(".scaled", "", names(parameter))
     parameter_string <- sprintf(" %s = %i,\\",
-                                names(parameter),
-                                round(parameter, 3))
+                                names(test_vector)[2],
+                                test_vector[2])
   }
-
-  names(statistic) <- gsub(".scaled", "", names(statistic))
 
   sprintf("$$\\text{%s-}%s = %.3f,\\ %s p %s %.3f$$",
           estimator,
-          names(statistic),
-          round(statistic, 3),
+          names(test_vector)[1],
+          round(test_vector[1], 3),
           parameter_string,
-          if (pvalue < 0.001) {"<"} else {"="},
-          if (pvalue < 0.001) {0.001} else {round(pvalue, 3)})
+          if (test_vector[3] < 0.001) {"<"} else {"="},
+          if (test_vector[3] < 0.001) {0.001} else {round(test_vector[3], 3)})
 }
 
 #' @export
@@ -31,7 +47,7 @@ create_corr_table_with_cis <- function(input_data, alpha = 0.05) {
 
   for (i in 1:n_items) {
     for (j in 1:i) {
-      out_table[i, j] <- sprintf("%.3f [%.3f; %.3f]", cor_table[i, j], CIs$lowCI[i, j], CIs$uppCI[i, j])
+      out_table[i, j] <- sprintf("%.3f<p>[%.3f; %.3f]", cor_table[i, j], CIs$lowCI[i, j], CIs$uppCI[i, j])
     }
   }
 
