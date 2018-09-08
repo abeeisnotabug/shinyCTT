@@ -120,7 +120,9 @@ corr_ind_test <- function(input_data, estimator, latex = TRUE) {
 }
 
 #' @export
-extract_fit_parameters <- function(fitted_model, estimator, what) {
+extract_fit_parameters <- function(fitted_model, what) {
+  estimator <- fitted_model@options$estimator
+
   raw_params <- lavInspect(fitted_model, what = "fit")
 
   par_names <- switch(what,

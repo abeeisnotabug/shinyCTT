@@ -328,8 +328,7 @@ function(input, output, session) {
 
             if (class(fittedDummyModel)[1] == "lavaan") {
                 corrInd <- extract_fit_parameters(fittedDummyModel,
-                                                  what = "model_fit",
-                                                  estimator = input$estimator)
+                                                  what = "model_fit")
 
                 if (corrInd[3] < input$sigLvl) {
                     corrIndCheck <- "&#10003;"
@@ -518,7 +517,6 @@ function(input, output, session) {
         fits <- lapply(goodModels,
                        function(model) {
                            extract_fit_parameters(fittedModelsWarns[[model]],
-                                                  estimator = input$estimator,
                                                   what = "model_fit")
                        })
 
@@ -597,8 +595,7 @@ function(input, output, session) {
         if (F) {
         # Tau-kongeneric ---------------------------------------------------------------------------------------------------
         tkFit <- extract_fit_parameters(fittedModelsWarns[["tau-kongeneric"]],
-                                        what = "model_fit",
-                                        estimator = input$estimator)
+                                        what = "model_fit")
 
         output$tkModelFitText <- renderUI({
             if (tkFit[3] < input$sigLvl) {
