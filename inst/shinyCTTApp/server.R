@@ -1,10 +1,13 @@
 function(input, output, session) {
 
-    # Data input -----------------------------------------------------------------------------------------------------------
+    ########################################################################################################################
+    ## ------------------------------------------------- Data input ----------------------------------------------------- ##
+    ########################################################################################################################
     output$objectsInWorkspace <- renderUI({
         selectInput("objectFromWorkspace",
                     "Choose data object from Workspace:",
-                    Filter(function(object) !is.null(dim(get(object))), ls(envir = globalenv())))
+                    Filter(function(object) !is.null(dim(get(object))) && typeof(get(object)) != "character",
+                           ls(envir = globalenv())))
     })
 
     userData <- reactive({
@@ -27,13 +30,7 @@ function(input, output, session) {
     output$dataOverview <- renderDataTable({userData()})
 
     output$itemColsChooser <- renderUI({
-        possibleItemColumns <- {
-            if (mode(userData()) == "list") {
-                colnames(userData())[sapply(userData(), is.numeric)]
-            } else {
-                colnames(userData())
-            }
-        }
+        possibleItemColumns <- colnames(userData())[sapply(userData(), is.numeric)]
 
         checkboxGroupInput("itemCols",
                            "Select which columns contain items",
@@ -42,10 +39,16 @@ function(input, output, session) {
                            inline = TRUE)
     })
 
+    userDataItems <- reactive({
+        tryCatch(userData()[, input$itemCols],
+                 warning = function(w) NULL,
+                 error = function(e) NULL)
+    })
+
     output$groupColChooser <- renderUI({
         selectInput("groupCol",
                     "Select which column contains the group",
-                    choices = c("Data does not contain group" = "no",
+                    choices = c("No group column selected" = "no",
                                 colnames(userData())[!(colnames(userData()) %in% input$itemCols)]))
     })
 
@@ -57,50 +60,89 @@ function(input, output, session) {
         }
     })
 
+    # Update comparison logicals if deactivated ----------------------------------------------------------------------------
+    modelsLong <- c("&tau;-kongeneric",
+                    "essentially &tau;-equivalent",
+                    "&tau;-equivalent",
+                    "essentially &tau;-parallel",
+                    "&tau;-parallel")
+    models <- c("tko", "ete", "teq", "etp", "tpa")
+
+    names(models) <- names(modelsLong) <- models
+
+    possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
+
+    lapply(
+        models,
+        function(thisModel) {
+            observeEvent(input[[thisModel]], {
+                lapply(
+                    possComps[grep(thisModel, possComps)],
+                    function(thisComp) {
+                        if ((substr(thisComp, 1, 3) == thisModel && input[[substr(thisComp, 4, 6)]]) ||
+                            (substr(thisComp, 4, 6) == thisModel && input[[substr(thisComp, 1, 3)]]))
+                            updateCheckboxInput(
+                                session,
+                                thisComp,
+                                value = input[[thisModel]]
+                            )
+                    }
+                )
+            })
+        }
+    )
+
+    ########################################################################################################################
+    ## ------------------------------------ Generate content in overview panels ----------------------------------------- ##
+    ########################################################################################################################
+
     # Descriptives ---------------------------------------------------------------------------------------------------------
     output$descrTable <- renderText({
-        if (all(any(input$itemCols %in% colnames(userData())),
-                length(input$itemCols) <= ncol(userData()),
-                length(input$itemCols) > 1)) {
+        req(userDataItems())
 
-            table <- t(apply(userData()[, input$itemCols], 2, function(col) c(Mean = mean(col),
-                                                                              Sd = sd(col),
-                                                                              Skew = moments::skewness(col),
-                                                                              Excess = moments::kurtosis(col) - 3)))
+        table <- t(apply(
+            userDataItems(),
+            2,
+            function(col) c(Mean = mean(col),
+                            Sd = sd(col),
+                            Skew = moments::skewness(col),
+                            Excess = moments::kurtosis(col) - 3))
+        )
 
-            makeKable(table)
-        }
+        makeKable(table)
     })
 
     output$covMat <- renderText({
-        if (all(any(input$itemCols %in% colnames(userData())),
-                length(input$itemCols) <= ncol(userData()),
-                length(input$itemCols) > 1)) {
+        req(userDataItems())
 
-            table <- cov(userData()[, input$itemCols])
-            table[upper.tri(table)] <- NA
+        table <- cov(userDataItems())
+        table[upper.tri(table)] <- NA
 
-            kableExtra::column_spec(
-                makeKable(table),
-                1, bold = TRUE
-            )
-        }
+        kableExtra::column_spec(
+            makeKable(table),
+            1, bold = TRUE
+        )
     })
 
     corrTableWithCIsRaw <- reactive({
-        req(input$sigLvl)
+        req(userDataItems())
 
-        if (all(any(input$itemCols %in% colnames(userData())),
-                length(input$itemCols) <= ncol(userData()),
-                length(input$itemCols) > 1,
-                input$sigLvl > 0 & input$sigLvl < 1)) {
+        list(cor = cor(userDataItems()),
+             test = tryCatch(
+                 corrplot::cor.mtest(userDataItems(),
+                                     conf.level = (1 - input$sigLvl)),
+                 warning = function(w) w,
+                 error = function(e) e
+             )
+        )
+    })
 
-            corrTableRaw <- cor(userData()[, input$itemCols])
+    output$corrTableWithCIs <- renderUI({
+        CIs <- corrTableWithCIsRaw()$test
 
-            CIs <- corrplot::cor.mtest(userData()[, input$itemCols],
-                                       conf.level = (1 - input$sigLvl))
-
-            corrTable <- matrix("", nrow = length(input$itemCols), ncol = length(input$itemCols))
+        if (class(CIs)[1] == "list") {
+            corrTableRaw <- corrTableWithCIsRaw()$cor
+            corrTable <- matrix("", nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
 
             for (i in 2:length(input$itemCols)) {
                 for (j in 1:(i-1)) {
@@ -123,15 +165,8 @@ function(input, output, session) {
 
             diag(corrTable) <- sprintf("<span style=\"font-weight:bold;\">%s<hr>CI</span>", input$itemCols)
 
-            corrTable
-        }
-    })
-
-    output$corrTableWithCIs <- renderUI({
-        if (length(input$itemCols) > 1) {
-
             tagList(
-                HTML(makeKable(corrTableWithCIsRaw())),
+                HTML(makeKable(corrTable)),
                 h5("Legend:"),
                 HTML(makeKable(matrix(c("Sign. pos. cor.",
                                         "<span style=\"color:red;\">Sign. neg. cor.</span>",
@@ -144,27 +179,22 @@ function(input, output, session) {
         }
     })
 
-    corrCheck <- reactive({
-        list(neg = !any(grep("red|coral", corrTableWithCIsRaw())),
-             insig = !any(grep("light", corrTableWithCIsRaw())))
-    })
-
     # Calculate test on MVN ------------------------------------------------------------------------------------------------
-    mvnTestResult <- reactive({
-        MVN::mvn(userData()[, input$itemCols])
+    mvnTestResultRaw <- reactive({
+        tryCatch(
+            MVN::mvn(userDataItems()),
+            warning = function(w) w,
+            error = function(e) e
+        )
     })
 
     output$mvnTableUV <- renderText({
-        req(input$sigLvl)
+        if (class(mvnTestResultRaw())[1] == "list") {
 
-        if (all(any(input$itemCols %in% colnames(userData())),
-                length(input$itemCols) <= ncol(userData()),
-                length(input$itemCols) > 1)) {
-
-            mvnUV <- data.frame(Test = as.character(mvnTestResult()$univariateNormality$Test),
-                                Item = as.character(mvnTestResult()$univariateNormality$Variable),
-                                Statistic = as.numeric(mvnTestResult()$univariateNormality$Statistic),
-                                p = suppressWarnings(as.numeric(mvnTestResult()$univariateNormality$`p value`)),
+            mvnUV <- data.frame(Test = as.character(mvnTestResultRaw()$univariateNormality$Test),
+                                Item = as.character(mvnTestResultRaw()$univariateNormality$Variable),
+                                Statistic = as.numeric(mvnTestResultRaw()$univariateNormality$Statistic),
+                                p = suppressWarnings(as.numeric(mvnTestResultRaw()$univariateNormality$`p value`)),
                                 stringsAsFactors = F)
 
             mvnUV$p[is.na(mvnUV$p)] <- 0
@@ -176,60 +206,61 @@ function(input, output, session) {
         }
     })
 
-    mvnTestResultMV <- reactive({
-        req(input$sigLvl)
-
-        if (all(any(input$itemCols %in% colnames(userData())),
-                length(input$itemCols) <= ncol(userData()),
-                length(input$itemCols) > 1)) {
-
-            mvnMV <- data.frame(Test = as.character(mvnTestResult()$multivariateNormality$Test),
-                                Statistic = as.numeric(as.character(mvnTestResult()$multivariateNormality$Statistic)),
-                                p = as.numeric(as.character(mvnTestResult()$multivariateNormality$`p value`)),
-                                Signif. = as.character(mvnTestResult()$multivariateNormality$Result),
-                                stringsAsFactors = F)[-3,]
-
-            mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
-            mvnMV$p <- sapply(mvnMV$p,
-                              function(value) if (value < 0.001) "< 0.001" else sprintf("%.3f", round(value, 3)))
-
-            mvnMV
-        }
-    })
-
     observe({
-        updateRadioButtons(session,
-                           "estimator",
-                           selected = if ("*" %in% mvnTestResultMV()$Signif.) "MLR" else "ML")
+        if (class(mvnTestResultRaw())[1] == "list") {
+            req(input$sigLvl)
+
+            if (any(as.numeric(as.character(mvnTestResultRaw()$multivariateNormality$`p value`[-3])) < input$sigLvl)) {
+                updateEst <- "MLR"
+            } else {
+                updateEst <- "ML"
+            }
+
+            updateRadioButtons(session,
+                               "estimator",
+                               selected = updateEst)
+        }
     })
 
     output$mvnComment <- renderUI({
-        req(input$sigLvl)
+        mvnMV <- data.frame(Test = as.character(mvnTestResultRaw()$multivariateNormality$Test),
+                            Statistic = as.numeric(as.character(mvnTestResultRaw()$multivariateNormality$Statistic)),
+                            p = as.numeric(as.character(mvnTestResultRaw()$multivariateNormality$`p value`)),
+                            Signif. = as.character(mvnTestResultRaw()$multivariateNormality$Result),
+                            stringsAsFactors = F)[-3,]
 
-        if ("*" %in% mvnTestResultMV()$Signif.) {
-            tagList(
-                sprintf("At least one of the hypotheses that Mardia's Skewness statistic
+        mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
+        mvnMV$p <- sapply(mvnMV$p,
+                          function(value) if (value < 0.001) "< 0.001" else sprintf("%.3f", round(value, 3)))
+
+        if (is.null(mvnTestResultRaw()$multivariateNormality)) {
+            tagList()
+        } else {
+            if ("*" %in% mvnMV$Signif.) {
+                tagList(
+                    sprintf("At least one of the hypotheses that Mardia's Skewness statistic
                             or Mardias' Kurtosis statistic matches one of a
                             normal distribution has to be discarded on a significance
-                            level of %s Test result:", input$sigLvl),
-                HTML(makeKable(mvnTestResultMV(), bootstrap_options = "basic")),
-                HTML("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator.")
-            )
-        } else if (!("*" %in% mvnTestResultMV()$Signif.)){
-            tagList(
-                sprintf("The hypotheses that Mardia's Skewness statistic
+                            level of %s. Test result:", input$sigLvl),
+                    HTML(makeKable(mvnMV, bootstrap_options = "basic")),
+                    HTML("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator.")
+                )
+            } else {
+                tagList(
+                    sprintf("The hypotheses that Mardia's Skewness statistic
                         and Mardias' Kurtosis statistic match those of a
                         normal distribution can be maintained on a significance
-                        level of %s", input$sigLvl),
-                HTML(makeKable(mvnTestResultMV(), bootstrap_options = "basic")),
-                HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator.")
-            )
-        } else {
-            tagList()
+                        level of %s. Test result:", input$sigLvl),
+                    HTML(makeKable(mvnMV, bootstrap_options = "basic")),
+                    HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator.")
+                )
+            }
         }
     })
 
-    # Control data before analysis -----------------------------------------------------------------------------------------
+    ########################################################################################################################
+    ## ----------------------------------------- Check data before analysis --------------------------------------------- ##
+    ########################################################################################################################
     observe({
         # Check the number of items ----------------------------------------------------------------------------------------
         if (length(input$itemCols) == 1) {
@@ -238,6 +269,12 @@ function(input, output, session) {
             itemTag <- sprintf("ERROR: Only one item selected. No analysis possible.")
 
             output$oneItem <- reactive({FALSE})
+
+            for (model in models) {
+                updateCheckboxInput(session,
+                                    model,
+                                    value = FALSE)
+            }
         } else if (length(input$itemCols) == 2) {
             itemCheck <- "(&#10003;)"
             itemColor <- "orange"
@@ -245,6 +282,12 @@ function(input, output, session) {
                                         the essentially &tau;-equivalt model can not be tested."))
 
             output$oneItem <- reactive({TRUE})
+
+            for (model in c("tko", "ete")) {
+                updateCheckboxInput(session,
+                                    model,
+                                    value = FALSE)
+            }
         } else if (length(input$itemCols) == 3) {
             itemCheck <- "(&#10003;)"
             itemColor <- "orange"
@@ -252,16 +295,20 @@ function(input, output, session) {
                                         model can not be tested."))
 
             output$oneItem <- reactive({TRUE})
+
+            updateCheckboxInput(session,
+                                "tko",
+                                value = FALSE)
         } else if (length(input$itemCols) >= 4) {
             itemCheck <- "&#10003;"
             itemColor <- "black"
-            itemTag <- sprintf("%i items selected. All models can be tested.", length(input$itemCols))
+            itemTag <- NULL
 
             output$oneItem <- reactive({TRUE})
         } else {
-            itemCheck <- ""
+            itemCheck <- NULL
             itemColor <- "black"
-            itemTag <- ""
+            itemTag <- NULL
         }
 
         # Check the number of observations ---------------------------------------------------------------------------------
@@ -271,7 +318,7 @@ function(input, output, session) {
             if (input$groupCol == "no") {
                 enoughObsCheck <- "&#10003;"
                 enoughObsColor <- "black"
-                enoughObsTag <- "There are more observations than items."
+                enoughObsTag <- NULL
 
                 output$obsOk <- reactive({TRUE})
             } else if (input$groupCol %in% colnames(userData())) {
@@ -280,13 +327,14 @@ function(input, output, session) {
                 if (all(length(input$itemCols) < nObsInGroups)) {
                     enoughObsCheck <- "&#10003;"
                     enoughObsColor <- "black"
-                    enoughObsTag <- "There are more observations than items in all groups."
+                    enoughObsTag <- NULL
 
                     output$obsOk <- reactive({TRUE})
                 } else {
                     enoughObsCheck <- "&#10005;"
                     enoughObsColor <- "red"
-                    enoughObsTag <- "ERROR: There are fewer observations than items in some groups."
+                    enoughObsTag <- "ERROR: There are fewer observations than items in some groups.
+                    Multigroupanalysis not possible. Please deselect the group column to continue."
 
                     output$obsOk <- reactive({FALSE})
                 }
@@ -296,161 +344,156 @@ function(input, output, session) {
             enoughObsColor <- "red"
             enoughObsTag <- "ERROR: There are fewer observations than items."
 
-            output$obsOk <- reactive({TRUE})
+            output$obsOk <- reactive({FALSE})
         }
 
         # Check for correlations (neg/insig) -------------------------------------------------------------------------------
-        if (corrCheck()$neg & corrCheck()$insig) {
-            corrNegSigCheck <- "&#10003;"
-            corrNegSigColor <- "black"
-            corrNegSigTag <- "All correlations are positive and no confidence interval contains 0."
+        if (class(corrTableWithCIsRaw()$test)[1] == "list") {
+            ps <- corrTableWithCIsRaw()$test$p
+            cors <- corrTableWithCIsRaw()$cor
+
+            if (any(ps >= input$sigLvl) && any(cors < 0)) {
+                corrNegSigCheck <- "?"
+                corrNegSigColor <- "orange"
+                corrNegSigTag <- "WARNING: There appear to be insignificant and negative correlations. Recheck items."
+            } else if (any(ps >= input$sigLvl) && any(cors >= 0)) {
+                corrNegSigCheck <- "?"
+                corrNegSigColor <- "orange"
+                corrNegSigTag <- "WARNING: There appear to be insignificant correlations. Recheck items."
+            } else if (all(ps < input$sigLvl) && any(cors < 0)) {
+                corrNegSigCheck <- "&#10005;"
+                corrNegSigColor <- "red"
+                corrNegSigTag <- "WARNING: There appear to be negative correlations. Recheck items."
+            } else {
+                corrNegSigCheck <- "&#10003;"
+                corrNegSigColor <- "black"
+                corrNegSigTag <- NULL
+            }
+
+            output$corrNegNoErr <- reactive({TRUE})
         } else {
-            corrNegSigCheck <- "?"
-            corrNegSigColor <- "orange"
-            corrNegSigTag <- "WARNING: There appear to be negative and/or insignificant correlations. Recheck items."
+            corrNegSigCheck <- "&#10005;"
+            corrNegSigColor <- "red"
+            corrNegSigTag <- paste("WARNING/ERROR:", corrTableWithCIsRaw()$test$message)
+
+            output$corrNegNoErr <- reactive({FALSE})
         }
 
         # Check for correlative independence -------------------------------------------------------------------------------
-        req(input$sigLvl)
+        dummyModel <- paste(sprintf("%s ~ 1", colnames(userDataItems()), collapse = "\n"))
 
-        if (all(any(input$itemCols %in% colnames(userData())),
-                length(input$itemCols) <= ncol(userData()),
-                length(input$itemCols) > 1,
-                input$sigLvl > 0 & input$sigLvl < 1)) {
+        fittedDummyModel <- tryCatch(cfa(model = dummyModel,
+                                         data = userData(),
+                                         estimator = input$estimator),
+                                     warning = function(w) w,
+                                     error = function(e) e)
 
-            dummyModel <- paste(sprintf("%s ~ 1", colnames(userData()[, input$itemCols]), collapse = "\n"))
+        if (class(fittedDummyModel)[1] == "lavaan") {
+            req(input$sigLvl)
 
-            fittedDummyModel <- tryCatch(cfa(model = dummyModel,
-                                             data = userData(),
-                                             estimator = input$estimator),
-                                         warning = function(w) w,
-                                         error = function(e) e)
+            corrInd <- extractFitParameters(fittedDummyModel)$chisq
 
-            if (class(fittedDummyModel)[1] == "lavaan") {
-                corrInd <- extract_fit_parameters(fittedDummyModel,
-                                                  what = "model_fit")
-
-                if (corrInd[3] < input$sigLvl) {
-                    corrIndCheck <- "&#10003;"
-                    corrIndColor <- "black"
-                    corrIndTag <- tagList(
-                        sprintf("The hypothesis that all correlations between the items are equal to zero
+            if (corrInd[3] < input$sigLvl) {
+                corrIndCheck <- "&#10003;"
+                corrIndColor <- "black"
+                corrIndTag <- tagList(
+                    sprintf("The hypothesis that all correlations between the items are equal to zero
                                     has to be discarded on a significance level of %s. Test result:",
-                                input$sigLvl),
-                        withMathJax(test_result_output(corrInd, input$estimator))
-                    )
-                    output$isCorrInd <- reactive({TRUE})
-                } else {
-                    corrIndCheck <- "&#10005;"
-                    corrIndColor <- "red"
-                    corrIndTag <- tagList(
-                        div(style = "color:red",
-                            sprintf("ERROR: The hypothesis that all correlations between the items are equal to zero
-                                    can be maintained on a significance level of %s. Test result:",
-                                    input$sigLvl),
-                            withMathJax(
-                                paste0("$$\\color{red}",
-                                       substring(test_result_output(corrInd, input$estimator), 3))),
-                            "It is thus not advised to conduct any further analysis.")
-                    )
-                    output$isCorrInd <- reactive({FALSE})
-                }
+                            input$sigLvl),
+                    withMathJax(test_result_output(corrInd, input$estimator))
+                )
+                output$isCorrInd <- reactive({TRUE})
             } else {
                 corrIndCheck <- "&#10005;"
                 corrIndColor <- "red"
                 corrIndTag <- tagList(
-                    div(style = "color:red",
-                        sprintf("Lavaan produced an ERROR/WARNING: %s",
-                                fittedDummyModel$message))
+                    sprintf("ERROR: The hypothesis that all correlations between the items are equal to zero
+                                    can be maintained on a significance level of %s. Test result:",
+                            input$sigLvl),
+                    withMathJax(
+                        paste0("$$\\color{red}",
+                               substring(test_result_output(corrInd, input$estimator), 3)))
                 )
-                output$isCorrInd <- reactive({TRUE})
+                output$isCorrInd <- reactive({FALSE})
             }
         } else {
-            corrIndCheck <- ""
-            corrIndColor <- "black"
-            corrIndTag <- ""
+            corrIndCheck <- "&#10005;"
+            corrIndColor <- "red"
+            corrIndTag <- paste("WARNING/ERROR:", fittedDummyModel$message)
+
+            output$isCorrInd <- reactive({FALSE})
         }
 
         output$checks <- renderUI({
-            if (all(any(input$itemCols %in% colnames(userData())),
-                    input$groupCol %in% colnames(userData()) | input$groupCol == "no",
-                    length(input$itemCols) <= ncol(userData()))) {
-
-                tagList(
-                    div(style = paste0("color:", itemColor),
-                        h4(HTML(paste("Number of items:", itemCheck))),
-                        itemTag
-                    ),
-                    div(style = paste0("color:", enoughObsColor),
-                        h4(HTML(paste("Number of observations:", enoughObsCheck))),
-                        enoughObsTag
-                    ),
-                    div(style = paste0("color:", corrNegSigColor),
-                        h4(HTML(paste("Item correlations:", corrNegSigCheck))),
-                        corrNegSigTag
-                    ),
-                    div(style = paste0("color:", corrIndColor),
-                        h4(HTML(paste("Test on correlative independence:", corrIndCheck))),
-                        corrIndTag
-                    )
+            tagList(
+                div(style = paste0("color:", itemColor),
+                    h5(HTML(paste("Number of items:", itemCheck))),
+                    itemTag
+                ),
+                div(style = paste0("color:", enoughObsColor),
+                    h5(HTML(paste("Number of observations:", enoughObsCheck))),
+                    enoughObsTag
+                ),
+                div(style = paste0("color:", corrNegSigColor),
+                    h5(HTML(paste("Item correlations:", corrNegSigCheck))),
+                    corrNegSigTag
+                ),
+                div(style = paste0("color:", corrIndColor),
+                    h5(HTML(paste("Test on correlative independence:", corrIndCheck))),
+                    corrIndTag
                 )
-            }
-        })
-
-        output$allExist <- reactive({
-            req(mvnTestResultMV())
-            TRUE
+            )
         })
 
         outputOptions(output, "isCorrInd", suspendWhenHidden = FALSE)
         outputOptions(output, "obsOk", suspendWhenHidden = FALSE)
         outputOptions(output, "oneItem", suspendWhenHidden = FALSE)
-        outputOptions(output, "allExist", suspendWhenHidden = FALSE)
+        outputOptions(output, "corrNegNoErr", suspendWhenHidden = FALSE)
     })
 
-    # Generate the models --------------------------------------------------------------------------------------------------
+    ########################################################################################################################
+    ## --------------------------------------------- Generate the models ------------------------------------------------ ##
+    ########################################################################################################################
     observeEvent(input$goModels, {
-        modelsLong <- c("tk" = "&tau;-kongeneric",
-                        "ete" = "essentially &tau;-equivalent",
-                        "te" = "&tau;-equivalent",
-                        "etp" = "essentially &tau;-parallel",
-                        "tp" = "&tau;-parallel")
 
-        models <- c("tk", "ete", "te", "etp", "tp")
-        names(models) <- models
-        modelsToTest <- models[c(input$tk, input$ete, input$te, input$etp, input$tp)]
+        modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
 
+        # Try fitting and capture warning and error messages ---------------------------------------------------------------
         modelCodes <- make_model_codes(input_data = userData(),
                                        item_cols = input$itemCols,
                                        group = FALSE)
 
-        fittedModelsWarns <- lapply(modelCodes[modelsToTest],
-                                    FUN = function(model) {
-                                        tryCatch(cfa(model = model,
-                                                     data = userData(),
-                                                     meanstructure = TRUE,
-                                                     estimator = input$estimator),
-                                                 error = function(e) e,
-                                                 warning = function(w) w)
-                                    })
+        fittedModelsWarns <- lapply(
+            modelCodes[modelsToTest],
+            FUN = function(model) {
+                tryCatch(cfa(model = model,
+                             data = userData(),
+                             meanstructure = TRUE,
+                             estimator = input$estimator),
+                         error = function(e) e,
+                         warning = function(w) w)
+            }
+        )
 
-        fittedModelsErrs <- lapply(modelCodes[modelsToTest],
-                                   FUN = function(model) {suppressWarnings(
-                                       tryCatch(cfa(model = model,
-                                                    data = userData(),
-                                                    meanstructure = TRUE,
-                                                    estimator = input$estimator),
-                                                error = function(e) e)
-                                   )})
+        fittedModelsErrs <- lapply(
+            modelCodes[modelsToTest],
+            FUN = function(model) {
+                suppressWarnings(
+                    tryCatch(cfa(model = model,
+                                 data = userData(),
+                                 meanstructure = TRUE,
+                                 estimator = input$estimator),
+                             error = function(e) e)
+                )
+            }
+        )
 
         warns <- sapply(
-            lapply(fittedModelsWarns,
-                   class),
+            lapply(fittedModelsWarns, class),
             function(code) code[1] == "simpleWarning"
         )
         errs <- sapply(
-            lapply(fittedModelsErrs,
-                   class),
+            lapply(fittedModelsErrs, class),
             function(code) code[1] == "simpleError"
         )
 
@@ -461,18 +504,20 @@ function(input, output, session) {
         if (sum(warns) > 0) {
             output$lavWarnsMsg <- renderUI({
                 tagList(
-                    h5("The following models produced warnings:"),
-                    HTML(
-                        kableExtra::column_spec(
-                            kableExtra::kable(
-                                cbind(
-                                    paste0(modelsLong[warnModels],
-                                           ":&emsp;"),
-                                    sapply(fittedModelsWarns[warnModels],
-                                           function(model) model$message)),
-                                row.names = FALSE,
-                                escape = FALSE),
-                            1, bold = TRUE
+                    h6("The following models produced warnings:"),
+                    div(style = "color:orange",
+                        HTML(
+                            kableExtra::column_spec(
+                                kableExtra::kable(
+                                    cbind(
+                                        paste0(modelsLong[warnModels],
+                                               ":&emsp;"),
+                                        sapply(fittedModelsWarns[warnModels],
+                                               function(model) model$message)),
+                                    row.names = FALSE,
+                                    escape = FALSE),
+                                1, bold = TRUE
+                            )
                         )
                     )
                 )
@@ -481,89 +526,570 @@ function(input, output, session) {
         if (sum(errs) > 0) {
             output$lavErrsMsg <- renderUI({
                 tagList(
-                    h5("The following models produced errors:"),
-                    HTML(
-                        kableExtra::column_spec(
-                            kableExtra::kable(
-                                cbind(
-                                    paste0(modelsLong[errModels],
-                                           ":&emsp;"),
-                                    sapply(fittedModelsErrs[errModels],
-                                           function(model) model$message)),
-                                row.names = FALSE,
-                                escape = FALSE),
-                            1, bold = TRUE
+                    h6("The following models produced errors:"),
+                    div(style = "color:red",
+                        HTML(
+                            kableExtra::column_spec(
+                                kableExtra::kable(
+                                    cbind(
+                                        paste0(modelsLong[errModels],
+                                               ":&emsp;"),
+                                        sapply(fittedModelsErrs[errModels],
+                                               function(model) model$message)),
+                                    row.names = FALSE,
+                                    escape = FALSE),
+                                1, bold = TRUE
+                            )
                         )
                     )
                 )
             })
         }
 
-        appendTab(inputId = "navbar",
-                  tabPanel("Models",
-                           value = "panelModelTests",
-                           wellPanel(
-                               verbatimTextOutput("fits"),
-                               h4(HTML(sprintf("Lavaan status: %i warnings, %i errors.", sum(warns), sum(errs)))),
-                               htmlOutput("lavErrsMsg"),
-                               htmlOutput("lavWarnsMsg")
-                           ),
-                           tabsetPanel(id = "modelTabsets"
-                           )
-                  ),
-                  select = TRUE)
+        # Compare models in groups if specified ----------------------------------------------------------------------------
+        if (input$groupCol != "no") {
 
-        # Generate Paramter Tables -----------------------------------------------------------------------------------------
-        fits <- lapply(goodModels,
-                       function(model) {
-                           extract_fit_parameters(fittedModelsWarns[[model]],
-                                                  what = "model_fit")
-                       })
+            # Try fitting and capture warning and error messages in the multigroup models ----------------------------------
+            modelCodesMg <- make_model_codes(input_data = userData(),
+                                             item_cols = input$itemCols,
+                                             group = input$groupCol)
 
-        output$fits <- renderPrint({
-            fits
-        })
+            fittedModelsWarnsMg <- lapply(
+                modelCodesMg[modelsToTest],
+                FUN = function(model) {
+                    tryCatch(cfa(model = model,
+                                 data = userData(),
+                                 meanstructure = TRUE,
+                                 group = input$groupCol,
+                                 group.equal = c("loadings", "intercepts"),
+                                 estimator = input$estimator),
+                             error = function(e) e,
+                             warning = function(w) w)
+                }
+            )
 
+            fittedModelsErrsMg <- lapply(
+                modelCodesMg[modelsToTest],
+                FUN = function(model) {
+                    suppressWarnings(
+                        tryCatch(cfa(model = model,
+                                     data = userData(),
+                                     meanstructure = TRUE,
+                                     group = input$groupCol,
+                                     group.equal = c("loadings", "intercepts"),
+                                     estimator = input$estimator),
+                                 error = function(e) e)
+                    )
+                }
+            )
+
+            warnsMg <- sapply(
+                lapply(fittedModelsWarnsMg, class),
+                function(code) code[1] == "simpleWarning"
+            )
+            errsMg <- sapply(
+                lapply(fittedModelsErrsMg, class),
+                function(code) code[1] == "simpleError"
+            )
+
+            goodModelsMg <- modelsToTest[!warnsMg & !errsMg]
+            errModelsMg <- modelsToTest[errsMg]
+            warnModelsMg <- modelsToTest[warnsMg]
+
+            if (sum(warnsMg) > 0) {
+                output$lavWarnsMsgMg <- renderUI({
+                    tagList(
+                        h6("The following multigroup models produced warnings:"),
+                        div(style = "color:orange",
+                            HTML(
+                                kableExtra::column_spec(
+                                    kableExtra::kable(
+                                        cbind(
+                                            paste0(modelsLong[warnModelsMg],
+                                                   ":&emsp;"),
+                                            sapply(fittedModelsWarnsMg[warnModelsMg],
+                                                   function(model) model$message)),
+                                        row.names = FALSE,
+                                        escape = FALSE),
+                                    1, bold = TRUE
+                                )
+                            )
+                        )
+                    )
+                })
+            }
+            if (sum(errsMg) > 0) {
+                output$lavErrsMsgMg <- renderUI({
+                    tagList(
+                        h6("The following multigroup models produced errors:"),
+                        div(style = "color:red",
+                            HTML(
+                                kableExtra::column_spec(
+                                    kableExtra::kable(
+                                        cbind(
+                                            paste0(modelsLong[errModelsMg],
+                                                   ":&emsp;"),
+                                            sapply(fittedModelsErrsMg[errModelsMg],
+                                                   function(model) model$message)),
+                                        row.names = FALSE,
+                                        escape = FALSE),
+                                    1, bold = TRUE
+                                )
+                            )
+                        )
+                    )
+                })
+            }
+        } else {
+            warnsMg <- errsMg <- 0
+        }
+
+        # Print the error/warnings -----------------------------------------------------------------------------------------
+        appendTab(
+            inputId = "navbar",
+            tabPanel(
+                "Models",
+                value = "panelModelTests",
+                wellPanel(
+                    h5(HTML(sprintf("Lavaan status: %i warnings, %i errors.",
+                                    sum(warns) + sum(warnsMg),
+                                    sum(errs) + sum(errsMg)))),
+                    htmlOutput("lavErrsMsg"),
+                    htmlOutput("lavWarnsMsg"),
+                    htmlOutput("lavErrsMsgMg"),
+                    htmlOutput("lavWarnsMsgMg")
+                ),
+                tabsetPanel(id = "modelTabsets")
+            ),
+            select = TRUE
+        )
+
+        # Generate comparative fit table and tab  --------------------------------------------------------------------------
+        fits <- lapply(fittedModelsWarns[goodModels], extractFitParameters)
+        comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
+
+        if (input$groupCol != "no") {
+            fitsMg <- lapply(fittedModelsWarnsMg[goodModelsMg], extractFitParameters)
+            compsMg <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
+        }
+
+if (F) {
+        compTagList <- lapply(
+            compsWithThisModel,
+            function(thisComp) {
+                compTable <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
+                compFit <- unlist(compTable[2, c(5, 6, 7)])
+                names(compFit) <- c("chisq", "df", "p")
+
+                if (compFit[3] < input$sigLvl) {
+                    compFitColor <- "orange"
+                    compFitText <- HTML(sprintf(
+                        "The hypothesis that the %s model explains the data as good
+                                as the %s model has to be discarded on a significance level of %s.
+                                Test result:",
+                        modelsLong[thisModel],
+                        modelsLong[thisComp],
+                        input$sigLvl
+                    ))
+                    compFitParams <- withMathJax(
+                        paste0("$$\\color{orange}",
+                               substring(
+                                   test_result_output(compFit, input$estimator),
+                                   3))
+                    )
+                } else {
+                    compFitColor <- "black"
+                    compFitText <- HTML(sprintf(
+                        "The hypothesis that the %s model explains the data as good
+                                as the %s model can be maintained on a significance level of %s.
+                                Test result:",
+                        modelsLong[thisModel],
+                        modelsLong[thisComp],
+                        input$sigLvl
+                    ))
+                    compFitParams <- withMathJax(
+                        test_result_output(compFit,
+                                           input$estimator)
+                    )
+                }
+
+                tagList(
+                    div(style = paste0("color:", compFitColor),
+                        h5(HTML(sprintf(
+                            "Test on Model Fit against the <b>%s</b> model",
+                            modelsLong[thisComp]
+                        ))),
+                        compFitText,
+                        compFitParams
+                    )
+                )
+            }
+        )
+}
+        compTable <- matrix("", nrow = 5, ncol = 5)
+        rownames(compTable) <- colnames(compTable) <- models
+
+        # Generate Paramter Tables, Fits and Fit Tables --------------------------------------------------------------------
         for (model in goodModels) {
             local({
-                this_model <- model
-                output[[paste0(model, "Table")]] <- renderText({
+                thisModel <- model
+                output[[paste0(thisModel, "Table")]] <- renderText({
                     kableExtra::add_header_above(
                         kableExtra::row_spec(
                             kableExtra::column_spec(
                                 makeKable(
-                                    extract_parameters(fittedModelsWarns[[this_model]],
-                                                       alpha = input$sigLvl),
-                                    col.names = c("Item", rep(c("Par.", "Est.", paste0(input$estimator, "-SE"), "CI"), 4))
+                                    extractParameters(fittedModelsWarns[[thisModel]],
+                                                      alpha = input$sigLvl),
+                                    col.names = c("Item",
+                                                  rep(c("Par.", "Est.", paste0(input$estimator, "-SE"), "CI"), 4))
                                 ),
-                                1, bold = TRUE
-                            ), length(input$itemCols) + 1, bold = TRUE
-                        ),
+                                1,
+                                bold = TRUE),
+                            length(input$itemCols) + 1,
+                            bold = TRUE),
                         c(" ",
                           "Discrimination Parameters" = 4,
                           "Easiness Parameters" = 4,
                           "Variances" = 4,
                           "Reliabilities" = 4)
                     )
-
-                    output[[paste0(this_model,"ModelFitText")]] <- renderUI({
-
-                    })
                 })
 
-                appendTab("modelTabsets",
-                          tabPanel(HTML(modelsLong[this_model]),
-                                   h3("Test on Model Fit:"),
-                                   uiOutput(paste0(this_model,"ModelFitText")),
-                                   h3("Test on Model Fit in Subgroups:"),
-                                   uiOutput(paste0(this_model,"ModelFitMgText")),
-                                   h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                   htmlOutput(paste0(this_model,"Table"))),
-                          select = FALSE)
+                if (which(goodModels == thisModel) == 1 ||
+                    (goodModels[1] == "teq" && thisModel == "etp")) {
+
+                    output[[paste0(goodModels[thisModel], "ModelFitText")]] <- renderUI({
+                        if (fits[[goodModels[thisModel]]]$chisq[3] < input$sigLvl) {
+                            fitColor <- "orange"
+                            fitText <- sprintf(
+                                "The hypothesis that the model implied covariance matrix and the meanstructure
+                                match the empirical ones has to be discarded on a significance level of %s.
+                                Test result:",
+                                input$sigLvl
+                            )
+                            fitParams <- withMathJax(
+                                paste0("$$\\color{orange}",
+                                       substring(
+                                           test_result_output(fits[[goodModels[thisModel]]]$chisq, input$estimator),
+                                           3))
+                            )
+                        } else {
+                            fitColor <- "black"
+                            fitText <- sprintf(
+                                "The hypothesis that the model implied covariance matrix and the meanstructure
+                                match the empirical ones can be maintained on a significance level of %s.
+                                Test result:",
+                                input$sigLvl
+                            )
+                            fitParams <- withMathJax(
+                                test_result_output(fits[[goodModels[thisModel]]]$chisq, input$estimator)
+                            )
+                        }
+
+                        tagList(
+                            div(style = paste0("color:", fitColor),
+                                h4("Test on Model Fit:"),
+                                fitText,
+                                fitParams
+                            ),
+                            h5("Information and approximative fit indices:"),
+                            withMathJax(sprintf("$$\\text{%s-RMSEA} = %.3f, p = %.3f, CI = [%.3f; %.3f]$$",
+                                                input$estimator,
+                                                fits[[goodModels[thisModel]]]$rmsea[1],
+                                                fits[[goodModels[thisModel]]]$rmsea[2],
+                                                fits[[goodModels[thisModel]]]$rmsea[3],
+                                                fits[[goodModels[thisModel]]]$rmsea[4])),
+                            withMathJax(sprintf("$$\\text{%s-CFI} = %.3f$$",
+                                                input$estimator,
+                                                fits[[goodModels[thisModel]]]$cfi)),
+                            withMathJax(sprintf("$$\\text{SRMR} = %.3f$$",
+                                                fits[[goodModels[thisModel]]]$srmr))
+                        )
+                    })
+                }
+
+                compsWithThisModel <- substring(
+                    comps[grep(thisModel, substr(comps, 1, 3))],
+                    4,
+                    6
+                )
+
+                compsWithThisModel <- compsWithThisModel[compsWithThisModel %in% goodModels]
+                names(compsWithThisModel) <- compsWithThisModel
+
+                fitCompsWithThisModel <- lapply(
+                    compsWithThisModel,
+                    function(thisComp) {
+                        compTable <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
+                        compFit <- unlist(compTable[2, c(5, 6, 7)])
+                        names(compFit) <- c("\\Delta chisq", "\\Delta df", "p")
+
+                        compFit
+                    }
+                )
+
+                for (comp in compsWithThisModel) {
+                    compTable[thisModel, comp] <- fitCompsWithThisModel[[comp]][1]
+                }
+
+
+                output[[paste0(thisModel, "Comps")]] <- renderPrint({
+                    fitCompsWithThisModel
+                })
+
+                compTagList <- lapply(
+                    compsWithThisModel,
+                    function(thisComp) {
+#if (F) {
+                        if (fitCompsWithThisModel[[thisComp]][3] < input$sigLvl) {
+                            compFitColor <- "orange"
+                            compFitText <- HTML(sprintf(
+                                "The hypothesis that the %s model explains the data as good
+                                as the %s model has to be discarded on a significance level of %s.
+                                Test result:",
+                                modelsLong[thisModel],
+                                modelsLong[thisComp],
+                                input$sigLvl
+                            ))
+                            compFitParams <- withMathJax(
+                                paste0("$$\\color{orange}",
+                                       substring(
+                                           test_result_output(fitCompsWithThisModel[[thisComp]], input$estimator),
+                                           3))
+                            )
+                        } else {
+                            compFitColor <- "black"
+                            compFitText <- HTML(sprintf(
+                                "The hypothesis that the %s model explains the data as good
+                                as the %s model can be maintained on a significance level of %s.
+                                Test result:",
+                                modelsLong[thisModel],
+                                modelsLong[thisComp],
+                                input$sigLvl
+                            ))
+                            compFitParams <- withMathJax(
+                                test_result_output(fitCompsWithThisModel[[thisComp]],
+                                                   input$estimator)
+                            )
+                        }
+                        tagList(
+                            div(style = paste0("color:", compFitColor),
+                                h5(HTML(sprintf(
+                                    "Test on Model Fit against the <b>%s</b> model",
+                                    modelsLong[thisComp]
+                                ))),
+                                compFitText,
+                                compFitParams
+                            )
+                        )
+#}
+
+                    }
+                )
+
+                output[[paste0(thisModel, "compTable")]] <- renderText({
+                    infParams <- t(sapply(
+                        c(as.character(compsWithThisModel),
+                          if (thisModel == "teq" && "etp" %in% goodModels)
+                              "etp",
+                          if (thisModel == "etp" && "teq" %in% goodModels)
+                              "teq",
+                          thisModel),
+                        function(thisComp) {
+                            c(#fits[[goodModels[[thisComp]]]]$chisq[grep("df", names(fits[[goodModels[[thisComp]]]]$chisq))],
+                              fits[[goodModels[[thisComp]]]]$cfi,
+                              fits[[goodModels[[thisComp]]]]$aic,
+                              fits[[goodModels[[thisComp]]]]$bic)
+                        }
+                    ))
+
+                    rownames(infParams) <- modelsLong[rownames(infParams)]
+                    colnames(infParams)[1] <- paste0(input$estimator, "-CFI")
+                    colnames(infParams) <- toupper(colnames(infParams))
+
+                    kableExtra::row_spec(
+                        if ((thisModel == "teq" && "etp" %in% goodModels) ||
+                            (thisModel == "etp" && "teq" %in% goodModels)) {
+                            kableExtra::row_spec(
+                                kableExtra::column_spec(
+                                    makeKable(infParams),
+                                    1,
+                                    bold = TRUE
+                                ),
+                                length(compsWithThisModel) + 1,
+                                italic = TRUE
+                            )
+                        } else {
+                            kableExtra::column_spec(
+                                makeKable(infParams),
+                                1,
+                                bold = TRUE
+                            )
+                        },
+                        length(compsWithThisModel) + 1 +
+                            ((thisModel == "teq" && "etp" %in% goodModels) ||
+                                 (thisModel == "etp" && "teq" %in% goodModels)),
+                        extra_css = "background-color:grey; color:white;"
+                    )
+                })
+
+                # Do the same for the group if specified -------------------------------------------------------------------
+                if (input$groupCol != "no" && thisModel %in% goodModelsMg) {
+                    compsWithThisModelMg <- compsWithThisModel[compsWithThisModel %in% goodModelsMg]
+
+                    if (which(goodModels == thisModel) == 1 ||
+                        (goodModels[1] == "teq" && thisModel == "etp")) {
+
+                        output[[paste0(goodModelsMg[1], "ModelFitTextMg")]] <- renderUI({
+                            if (fitsMg[[goodModelsMg[1]]]$chisq[3] < input$sigLvl) {
+                                fitColor <- "orange"
+                                fitText <- sprintf(
+                                    "The hypothesis that [subgroups] has to be discarded
+                                    on a significance level of %s.
+                                    Test result:",
+                                    input$sigLvl
+                                )
+                                fitParams <- withMathJax(
+                                    paste0("$$\\color{red}",
+                                           substring(
+                                               test_result_output(fitsMg[[goodModelsMg[1]]]$chisq,
+                                                                  input$estimator),
+                                               3)
+                                    )
+                                )
+                            } else {
+                                fitColor <- "black"
+                                fitText <- sprintf(
+                                    "The hypothesis that [subgroups] can be maintained
+                                    on a significance level of %s.
+                                    Test result:",
+                                    input$sigLvl
+                                )
+                                fitParams <- withMathJax(
+                                    test_result_output(fitsMg[[goodModelsMg[1]]]$chisq,
+                                                       input$estimator)
+                                )
+                            }
+
+                            tagList(
+                                div(style = paste0("color:", fitColor),
+                                    h4("Test on Model Fit in Subgroups:"),
+                                    fitText,
+                                    fitParams
+                                )
+                            )
+                        })
+                    }
+
+                    compTagListMg <- lapply(
+                        compsWithThisModelMg,
+                        function(comp) {
+                            compTable <- lavTestLRT(fittedModelsWarnsMg[[thisModel]], fittedModelsWarnsMg[[comp]])
+                            compFit <- unlist(compTable[2, c(5, 6, 7)])
+                            names(compFit) <- c("chisq", "df", "p")
+
+                            if (compFit[3] < input$sigLvl) {
+                                compFitColor <- "orange"
+                                compFitText <- HTML(sprintf(
+                                    "The hypothesis that the %s model explains the data as good
+                                    as the <b>%s</b> model has to be discarded on a significance level of %s.
+                                    Test result:",
+                                    modelsLong[thisModel],
+                                    modelsLong[comp],
+                                    input$sigLvl
+                                ))
+                                compFitParams <- withMathJax(
+                                    paste0("$$\\color{orange}",
+                                           substring(
+                                               test_result_output(compFit, input$estimator),
+                                               3)
+                                    )
+                                )
+                            } else {
+                                compFitColor <- "black"
+                                compFitText <- HTML(sprintf(
+                                    "The hypothesis that the %s model explains the data as good
+                                    as the %s model can be maintained on a significance level of %s.
+                                    Test result:",
+                                    modelsLong[thisModel],
+                                    modelsLong[comp],
+                                    input$sigLvl
+                                ))
+                                compFitParams <- withMathJax(
+                                    test_result_output(compFit,
+                                                       input$estimator)
+                                )
+                            }
+
+                            tagList(
+                                div(style = paste0("color:", compFitColor),
+                                    h5(HTML(sprintf(
+                                        "Test on Model Fit in Subgroups against the <b>%s</b> Model",
+                                        modelsLong[comp]
+                                    ))),
+                                compFitText,
+                                compFitParams
+                                )
+                            )
+                        }
+                    )
+                } else {
+                    compTagListMg <- NULL
+                }
+
+                # Create Tab -----------------------------------------------------------------------------------------------
+                appendTab(
+                    inputId = "modelTabsets",
+                    tabPanel(
+                        title = HTML(modelsLong[thisModel]),
+                        verbatimTextOutput(paste0(thisModel, "Comps")),
+                        uiOutput(paste0(thisModel,"ModelFitText")),
+                        if (which(goodModels == thisModel) > 1 &&
+                            !(goodModels[1] == "teq" && thisModel == "etp")) {
+
+                            tagList(
+                                h4("Comparative Model Fit Tests:"),
+                                compTagList,
+                                h5("Information and approximative fit indices:"),
+                                htmlOutput(paste0(thisModel, "compTable"))
+                            )
+                        },
+                        uiOutput(paste0(thisModel,"ModelFitTextMg")),
+                        if (input$groupCol != "no" &&
+                            thisModel %in% goodModelsMg &&
+                            (which(goodModels == thisModel) > 1 &&
+                             !(goodModels[1] == "teq" && thisModel == "etp"))) {
+
+                            tagList(
+                                h4("Comparative Model Fit Tests in Subgroups:"),
+                                compTagListMg
+                            )
+                        },
+                        h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
+                        htmlOutput(paste0(thisModel, "Table"))
+                    ),
+                    select = FALSE
+                )
             })
         }
 
-        # Write the selected values! ---------------------------------------------------------------------------------------
+        output$compsByModel <- renderPrint({
+            compTable
+        })
+
+        if (length(goodModels) > 0)
+            prependTab(
+                inputId = "modelTabsets",
+                tabPanel(
+                    "Comparison overview",
+                    verbatimTextOutput("compsByModel")
+                    #HTML(makeKable(outer(goodModels, goodModels, function(one, two) sprintf("COMP%sV%s", one, two))))
+
+                ),
+                select = TRUE
+            )
+
+        # Write the selected values ----------------------------------------------------------------------------------------
         output$selectedData <- renderText({
             paste("The following data was used:",
                   switch(input$source,
@@ -591,108 +1117,5 @@ function(input, output, session) {
         output$selectedSigLvl <- renderText({
             paste("All tests have been performed on a significance level of", input$sigLvl)
         })
-
-        if (F) {
-        # Tau-kongeneric ---------------------------------------------------------------------------------------------------
-        tkFit <- extract_fit_parameters(fittedModelsWarns[["tau-kongeneric"]],
-                                        what = "model_fit")
-
-        output$tkModelFitText <- renderUI({
-            if (tkFit[3] < input$sigLvl) {
-                tagList(
-                    div(style = "color:red",
-                        sprintf("The hypothesis that the model implied covariance matrix and the meanstructure
-                                match the empirical ones has to be discarded on a significance level of %s. Test result:",
-                                input$sigLvl)
-                    ),
-                    withMathJax(test_result_output(tkFit, input$estimator)),
-                    div(style = "color:red",
-                        HTML("The &tau;-kongeneric model is the least restrictive model. Since it does not seem to fit
-                        the data it is advised not to continue with the more restrictive models.")
-                    )
-                )
-            } else {
-                withMathJax(
-                        sprintf("The hypothesis that the model implied covariance matrix and the meanstructure
-                                match the empirical ones can be maintained on a significance level of %s. Test result: %s",
-                                input$sigLvl,
-                                test_result_output(tkFit, input$estimator))
-                )
-            }
-        })
-
-        # essentially tau-equivalent ---------------------------------------------------------------------------------------
-        tkEteModelComp <- lavTestLRT(fittedModelsWarns[["tau-kongeneric"]],
-                                     fittedModelsWarns[["essentially tau-equivalent"]])
-
-        tkEteModelCompVec <- c("\\chi^2" = tkEteModelComp$`Chisq diff`[2],
-                               "df" = tkEteModelComp$`Df diff`[2],
-                               "p" = tkEteModelComp$`Pr(>Chisq)`[2])
-
-        output$tkEteModelCompText <- renderUI({
-            if (tkEteModelComp$`Pr(>Chisq)`[2] < input$sigLvl) {
-                tagList(
-                    div(style = "color:red",
-                        sprintf("The hypothesis that the essentially &tau;-equivalent model explains the
-                                data as good as the &tau;-kongeneric model has to be discarded on a
-                                significance level of %s. Test result:",
-                                input$sigLvl)
-                    ),
-                    withMathJax(test_result_output(tkEteModelCompVec,
-                                                   input$estimator)),
-                    div(style = "color:red",
-                        HTML("It is thus advised to stick with the &tau;-kongeneric model and not continue
-                             with the more restrictive models.")
-                    )
-                )
-            } else {
-                tagList(
-                    HTML(sprintf("The hypothesis that the essentially &tau;-equivalent model explains the
-                                data as good as the &tau;-kongeneric can be maintained on a
-                                significance level of %s. Test result:",
-                            input$sigLvl)),
-                    withMathJax(test_result_output(tkEteModelCompVec,
-                                                   input$estimator))
-                )
-            }
-        })
-
-        appendTab(inputId = "navbar",
-                  tabPanel("Models",
-                           value = "panelModelTests",
-                           tabsetPanel(
-                               tabPanel(HTML("&tau;-kongeneric"),
-                                        h3("Test on Model Fit:"),
-                                        uiOutput("tkModelFitText"),
-                                        h3("Test on Model Fit in Subgroups:"),
-                                        uiOutput("tkModelFitMgText"),
-                                        h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                        htmlOutput("tkTable")),
-                               tabPanel(HTML("essentially &tau;-equivalent"),
-                                        h3(HTML("Test on Model Fit against the &tau;-kongeneric Model:")),
-                                        uiOutput("tkEteModelCompText"),
-                                        h3(HTML("Test on Model Fit in Subgroups against the &tau;-kongeneric Model:")),
-                                        uiOutput("tkEteModelCompTextMg"),
-                                        h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                        htmlOutput("eteTable")),
-                               tabPanel(HTML("&tau;-equivalent"),
-                                        h3("Test on Model Fit:"),
-                                        uiOutput("teModelFitText"),
-                                        h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                        htmlOutput("teTable")),
-                               tabPanel(HTML("essentially &tau;-parallel"),
-                                        h3("Test on Model Fit:"),
-                                        uiOutput("etpModelFitText"),
-                                        h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                        htmlOutput("etpTable")),
-                               tabPanel(HTML("&tau;-parallel"),
-                                        h3("Test on Model Fit:"),
-                                        uiOutput("tpModelFitText"),
-                                        h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                        htmlOutput("tpTable"))
-                           )
-                  ),
-                  select = TRUE)
-        }
     })
 }
