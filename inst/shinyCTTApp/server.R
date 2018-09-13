@@ -266,7 +266,7 @@ function(input, output, session) {
         if (length(input$itemCols) == 1) {
             itemCheck <- "&#10005;"
             itemColor <- "red"
-            itemTag <- sprintf("ERROR: Only one item selected. No analysis possible.")
+            itemTag <- sprintf("ERROR: Only one or no item selected. No analysis possible.")
 
             output$oneItem <- reactive({FALSE})
 
@@ -673,61 +673,12 @@ function(input, output, session) {
             compsMg <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
         }
 
-if (F) {
-        compTagList <- lapply(
-            compsWithThisModel,
-            function(thisComp) {
-                compTable <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
-                compFit <- unlist(compTable[2, c(5, 6, 7)])
-                names(compFit) <- c("chisq", "df", "p")
-
-                if (compFit[3] < input$sigLvl) {
-                    compFitColor <- "orange"
-                    compFitText <- HTML(sprintf(
-                        "The hypothesis that the %s model explains the data as good
-                                as the %s model has to be discarded on a significance level of %s.
-                                Test result:",
-                        modelsLong[thisModel],
-                        modelsLong[thisComp],
-                        input$sigLvl
-                    ))
-                    compFitParams <- withMathJax(
-                        paste0("$$\\color{orange}",
-                               substring(
-                                   test_result_output(compFit, input$estimator),
-                                   3))
-                    )
-                } else {
-                    compFitColor <- "black"
-                    compFitText <- HTML(sprintf(
-                        "The hypothesis that the %s model explains the data as good
-                                as the %s model can be maintained on a significance level of %s.
-                                Test result:",
-                        modelsLong[thisModel],
-                        modelsLong[thisComp],
-                        input$sigLvl
-                    ))
-                    compFitParams <- withMathJax(
-                        test_result_output(compFit,
-                                           input$estimator)
-                    )
-                }
-
-                tagList(
-                    div(style = paste0("color:", compFitColor),
-                        h5(HTML(sprintf(
-                            "Test on Model Fit against the <b>%s</b> model",
-                            modelsLong[thisComp]
-                        ))),
-                        compFitText,
-                        compFitParams
-                    )
-                )
-            }
+        compTable <- reactiveValues(
+            df = matrix(NA, ncol = 5, nrow = 5),
+            chisq = matrix(NA, ncol = 5, nrow = 5)
         )
-}
-        compTable <- matrix("", nrow = 5, ncol = 5)
-        rownames(compTable) <- colnames(compTable) <- models
+
+        names(compTable$df) <- names(compTable$chisq) <- outer(models, models, sprintf, fmt = "%s%s")
 
         # Generate Paramter Tables, Fits and Fit Tables --------------------------------------------------------------------
         for (model in goodModels) {
@@ -755,11 +706,44 @@ if (F) {
                     )
                 })
 
+                if (fits[[thisModel]]$chisq[3] < 0.05) {
+                    sigAddon <- "*"
+                    sigColor <- "darkred"
+                    sigTxtColor <- "white"
+
+                    if (fits[[thisModel]]$chisq[3] < 0.01)
+                        sigAddon <- paste0(sigAddon, "*")
+                    if (fits[[thisModel]]$chisq[3] < 0.001)
+                        sigAddon <- paste0(sigAddon, "*")
+
+                } else {
+                    sigAddon <- ""
+                    sigColor <- "darkgreen"
+                    sigTxtColor <- "white"
+                }
+
+                compTable$chisq[
+                    paste0(thisModel, thisModel)
+                    ] <- kableExtra::cell_spec(
+                        sprintf(paste0("%.3f", sigAddon), fits[[thisModel]]$chisq[1]),
+                        background = sigColor,
+                        color = sigTxtColor,
+                        italic = TRUE
+                    )
+                compTable$df[
+                    paste0(thisModel, thisModel)
+                    ] <- kableExtra::cell_spec(
+                        sprintf("%i", fits[[thisModel]]$chisq[2]),
+                        background = sigColor,
+                        color = sigTxtColor,
+                        italic = TRUE
+                    )
+
                 if (which(goodModels == thisModel) == 1 ||
                     (goodModels[1] == "teq" && thisModel == "etp")) {
 
-                    output[[paste0(goodModels[thisModel], "ModelFitText")]] <- renderUI({
-                        if (fits[[goodModels[thisModel]]]$chisq[3] < input$sigLvl) {
+                    output[[paste0(thisModel, "ModelFitText")]] <- renderUI({
+                        if (fits[[thisModel]]$chisq[3] < input$sigLvl) {
                             fitColor <- "orange"
                             fitText <- sprintf(
                                 "The hypothesis that the model implied covariance matrix and the meanstructure
@@ -770,7 +754,7 @@ if (F) {
                             fitParams <- withMathJax(
                                 paste0("$$\\color{orange}",
                                        substring(
-                                           test_result_output(fits[[goodModels[thisModel]]]$chisq, input$estimator),
+                                           test_result_output(fits[[thisModel]]$chisq, input$estimator),
                                            3))
                             )
                         } else {
@@ -782,7 +766,7 @@ if (F) {
                                 input$sigLvl
                             )
                             fitParams <- withMathJax(
-                                test_result_output(fits[[goodModels[thisModel]]]$chisq, input$estimator)
+                                test_result_output(fits[[thisModel]]$chisq, input$estimator)
                             )
                         }
 
@@ -792,18 +776,28 @@ if (F) {
                                 fitText,
                                 fitParams
                             ),
-                            h5("Information and approximative fit indices:"),
-                            withMathJax(sprintf("$$\\text{%s-RMSEA} = %.3f, p = %.3f, CI = [%.3f; %.3f]$$",
-                                                input$estimator,
-                                                fits[[goodModels[thisModel]]]$rmsea[1],
-                                                fits[[goodModels[thisModel]]]$rmsea[2],
-                                                fits[[goodModels[thisModel]]]$rmsea[3],
-                                                fits[[goodModels[thisModel]]]$rmsea[4])),
-                            withMathJax(sprintf("$$\\text{%s-CFI} = %.3f$$",
-                                                input$estimator,
-                                                fits[[goodModels[thisModel]]]$cfi)),
-                            withMathJax(sprintf("$$\\text{SRMR} = %.3f$$",
-                                                fits[[goodModels[thisModel]]]$srmr))
+                            h5("Approximative fit indices:"),
+                            HTML(
+                                kableExtra::column_spec(
+                                    makeKable(
+                                        data.frame(
+                                            Index = c(fits[[goodModels[thisModel]]]$rmsea[1],
+                                                      fits[[thisModel]]$cfi,
+                                                      fits[[thisModel]]$srmr),
+                                            p = c(fits[[thisModel]]$rmsea[2], NA, NA),
+                                            CI = c(sprintf("[%.3f; %.3f]",
+                                                           fits[[thisModel]]$rmsea[3],
+                                                           fits[[thisModel]]$rmsea[4]),
+                                                   NA,
+                                                   NA),
+                                            row.names = c("RMSEA", paste0(input$estimator, "-CFI"), "SRMR")
+                                        ),
+                                        bootstrap_options = "basic"
+                                    ),
+                                    1,
+                                    bold = TRUE
+                                )
+                            )
                         )
                     })
                 }
@@ -817,30 +811,61 @@ if (F) {
                 compsWithThisModel <- compsWithThisModel[compsWithThisModel %in% goodModels]
                 names(compsWithThisModel) <- compsWithThisModel
 
-                fitCompsWithThisModel <- lapply(
+                fitCompsWithThisModel <- sapply(
                     compsWithThisModel,
                     function(thisComp) {
-                        compTable <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
-                        compFit <- unlist(compTable[2, c(5, 6, 7)])
-                        names(compFit) <- c("\\Delta chisq", "\\Delta df", "p")
+                        tmpTbl <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
+                        tmpFit <- unlist(tmpTbl[2, c(5, 6, 7)])
+                        names(tmpFit) <- c("\\Delta chisq", "\\Delta df", "p")
 
-                        compFit
+                        tmpFit
                     }
                 )
 
-                for (comp in compsWithThisModel) {
-                    compTable[thisModel, comp] <- fitCompsWithThisModel[[comp]][1]
+                for (thisComp in compsWithThisModel) {
+                    if (fitCompsWithThisModel[3, thisComp] < 0.05) {
+                        sigAddon <- "*"
+                        sigColor <- "darkred"
+                        sigTxtColor <- "white"
+
+                        if (fitCompsWithThisModel[3, thisComp] < 0.01)
+                            sigAddon <- paste0(sigAddon, "*")
+                        if (fitCompsWithThisModel[3, thisComp] < 0.001)
+                            sigAddon <- paste0(sigAddon, "*")
+
+                    } else {
+                        sigAddon <- ""
+                        sigColor <- "darkgreen"
+                        sigTxtColor <- "white"
+                    }
+
+                    compTable$chisq[
+                        paste0(thisModel, thisComp)
+                    ] <- kableExtra::cell_spec(
+                        sprintf(paste0("%.3f", sigAddon), fitCompsWithThisModel[1, thisComp]),
+                        background = sigColor,
+                        color = sigTxtColor
+                    )
+
+                    compTable$df[
+                        paste0(thisModel, thisComp)
+                    ] <- kableExtra::cell_spec(
+                        sprintf("%i", fitCompsWithThisModel[2, thisComp]),
+                        background = sigColor,
+                        color = sigTxtColor
+                    )
                 }
 
-
-                output[[paste0(thisModel, "Comps")]] <- renderPrint({
-                    fitCompsWithThisModel
-                })
+                #compTable$df[paste0(thisModel,
+                #                    compsWithThisModel)] <- sprintf(
+                #                        "+%i",
+                #                        fitCompsWithThisModel[2, compsWithThisModel]
+                #                    )
 
                 compTagList <- lapply(
                     compsWithThisModel,
                     function(thisComp) {
-#if (F) {
+if (F) {
                         if (fitCompsWithThisModel[[thisComp]][3] < input$sigLvl) {
                             compFitColor <- "orange"
                             compFitText <- HTML(sprintf(
@@ -882,7 +907,7 @@ if (F) {
                                 compFitParams
                             )
                         )
-#}
+}
 
                     }
                 )
@@ -896,8 +921,7 @@ if (F) {
                               "teq",
                           thisModel),
                         function(thisComp) {
-                            c(#fits[[goodModels[[thisComp]]]]$chisq[grep("df", names(fits[[goodModels[[thisComp]]]]$chisq))],
-                              fits[[goodModels[[thisComp]]]]$cfi,
+                            c(fits[[goodModels[[thisComp]]]]$cfi,
                               fits[[goodModels[[thisComp]]]]$aic,
                               fits[[goodModels[[thisComp]]]]$bic)
                         }
@@ -984,11 +1008,11 @@ if (F) {
                     compTagListMg <- lapply(
                         compsWithThisModelMg,
                         function(comp) {
-                            compTable <- lavTestLRT(fittedModelsWarnsMg[[thisModel]], fittedModelsWarnsMg[[comp]])
-                            compFit <- unlist(compTable[2, c(5, 6, 7)])
-                            names(compFit) <- c("chisq", "df", "p")
+                            tmpTable <- lavTestLRT(fittedModelsWarnsMg[[thisModel]], fittedModelsWarnsMg[[comp]])
+                            tmpFit <- unlist(tmpTable[2, c(5, 6, 7)])
+                            names(tmpFit) <- c("chisq", "df", "p")
 
-                            if (compFit[3] < input$sigLvl) {
+                            if (tmpFit[3] < input$sigLvl) {
                                 compFitColor <- "orange"
                                 compFitText <- HTML(sprintf(
                                     "The hypothesis that the %s model explains the data as good
@@ -1001,7 +1025,7 @@ if (F) {
                                 compFitParams <- withMathJax(
                                     paste0("$$\\color{orange}",
                                            substring(
-                                               test_result_output(compFit, input$estimator),
+                                               test_result_output(tmpFit, input$estimator),
                                                3)
                                     )
                                 )
@@ -1016,7 +1040,7 @@ if (F) {
                                     input$sigLvl
                                 ))
                                 compFitParams <- withMathJax(
-                                    test_result_output(compFit,
+                                    test_result_output(tmpFit,
                                                        input$estimator)
                                 )
                             }
@@ -1073,21 +1097,45 @@ if (F) {
             })
         }
 
-        output$compsByModel <- renderPrint({
-            compTable
-        })
+        if (length(goodModels) > 0) {
+            combCompTable <- matrix(NA, nrow = 5, ncol = 10)
 
-        if (length(goodModels) > 0)
+            combCompTable[, seq(1, 10, 2)] <- matrix(compTable$df, ncol = 5, nrow = 5)
+            combCompTable[, seq(2, 10, 2)] <- matrix(compTable$chisq, ncol = 5, nrow = 5)
+
+            modelsAbbrev <- c("&#964;-kong.",
+                              "ess. &#964;-equiv.",
+                              "&#964;-equiv.",
+                              "ess. &#964;-paral.",
+                              "&#964;-paral.")
+
+            rownames(combCompTable) <- modelsAbbrev
+
+            colnames(combCompTable) <- rep(c("&Delta;df", "&Delta;chisq"), 5)
+
+            headerNames <- c("", rep(2, 5))
+            names(headerNames) <- c("", modelsAbbrev)
+
             prependTab(
                 inputId = "modelTabsets",
                 tabPanel(
                     "Comparison overview",
-                    verbatimTextOutput("compsByModel")
-                    #HTML(makeKable(outer(goodModels, goodModels, function(one, two) sprintf("COMP%sV%s", one, two))))
-
+                    h4("Comparison Table:"),
+                    HTML(
+                        kableExtra::add_header_above(
+                            kableExtra::column_spec(
+                                makeKable(combCompTable),
+                                1,
+                                bold = TRUE
+                            ),
+                            headerNames,
+                            escape = FALSE
+                        )
+                    )
                 ),
                 select = TRUE
             )
+        }
 
         # Write the selected values ----------------------------------------------------------------------------------------
         output$selectedData <- renderText({
