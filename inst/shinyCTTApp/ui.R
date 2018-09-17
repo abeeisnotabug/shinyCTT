@@ -118,29 +118,17 @@ fluidPage(
                         ),
                         tabPanel(
                             "Statistics",
-                            uiOutput("corrWarnings"),
-                            h4("Mean, Standard Deviation, Skewness, Excess:"),
                             htmlOutput("descrTable"),
-                            h4("Correlation Table with Confidence Intervals:"),
                             htmlOutput("corrTableWithCIs"),
-                            uiOutput("corrTableLegend"),
-                            h4("Covariance Matrix:"),
                             htmlOutput("covMat")
                         ),
                         tabPanel(
                             "Multivariate Normality",
-                            h4("Test on Multivariate Normality:"),
                             htmlOutput("mvnComment"),
-                            div(align = "center",
-                                tableOutput("mvnTableMV")),
-                            h4("Tests on Univariate Normality:"),
-                            div(align = "center",
-                                tableOutput("mvnTableUV")),
-                            verbatimTextOutput("buttonValue")
+                            htmlOutput("mvnTableUV")
                         ),
                         tabPanel(
                             "Models to test",
-                            #verbatimTextOutput("compsByModel"),
                             h4("Choose models to test and compare:"),
                             fluidRow(
                                 column(2),

@@ -40,9 +40,13 @@ function(input, output, session) {
     })
 
     userDataItems <- reactive({
-        tryCatch(userData()[, input$itemCols],
-                 warning = function(w) NULL,
-                 error = function(e) NULL)
+        if (length(input$itemCols) > 1) {
+            tryCatch(userData()[, input$itemCols],
+                     warning = function(w) NULL,
+                     error = function(e) NULL)
+        } else {
+            NULL
+        }
     })
 
     output$groupColChooser <- renderUI({
@@ -97,7 +101,7 @@ function(input, output, session) {
     ########################################################################################################################
 
     # Descriptives ---------------------------------------------------------------------------------------------------------
-    output$descrTable <- renderText({
+    output$descrTable <- renderUI({
         req(userDataItems())
 
         table <- t(apply(
@@ -109,18 +113,26 @@ function(input, output, session) {
                             Excess = moments::kurtosis(col) - 3))
         )
 
-        makeKable(table)
+        tagList(
+            h4("Mean, Standard Deviation, Skewness, Excess:"),
+            HTML(makeKable(table))
+        )
     })
 
-    output$covMat <- renderText({
+    output$covMat <- renderUI({
         req(userDataItems())
 
         table <- cov(userDataItems())
         table[upper.tri(table)] <- NA
 
-        kableExtra::column_spec(
-            makeKable(table),
-            1, bold = TRUE
+        tagList(
+            h4("Covariance Matrix:"),
+            HTML(
+                kableExtra::column_spec(
+                    makeKable(table),
+                    1, bold = TRUE
+                )
+            )
         )
     })
 
@@ -166,6 +178,7 @@ function(input, output, session) {
             diag(corrTable) <- sprintf("<span style=\"font-weight:bold;\">%s<hr>CI</span>", input$itemCols)
 
             tagList(
+                h4("Correlation Table with Confidence Intervals:"),
                 HTML(makeKable(corrTable)),
                 h5("Legend:"),
                 HTML(makeKable(matrix(c("Sign. pos. cor.",
@@ -188,7 +201,7 @@ function(input, output, session) {
         )
     })
 
-    output$mvnTableUV <- renderText({
+    output$mvnTableUV <- renderUI({
         if (class(mvnTestResultRaw())[1] == "list") {
 
             mvnUV <- data.frame(Test = as.character(mvnTestResultRaw()$univariateNormality$Test),
@@ -202,7 +215,10 @@ function(input, output, session) {
             mvnUV$p <- sapply(mvnUV$p,
                               function(value) if (value < 0.001) "< 0.001" else sprintf("%.3f", round(value, 3)))
 
-            makeKable(mvnUV, bootstrap_options = "basic")
+            tagList(
+                h4("Tests on Univariate Normality:"),
+                HTML(makeKable(mvnUV, bootstrap_options = "basic"))
+            )
         }
     })
 
@@ -238,6 +254,7 @@ function(input, output, session) {
         } else {
             if ("*" %in% mvnMV$Signif.) {
                 tagList(
+                    h4("Test on Multivariate Normality:"),
                     sprintf("At least one of the hypotheses that Mardia's Skewness statistic
                             or Mardias' Kurtosis statistic matches one of a
                             normal distribution has to be discarded on a significance
@@ -247,6 +264,7 @@ function(input, output, session) {
                 )
             } else {
                 tagList(
+                    h4("Test on Multivariate Normality:"),
                     sprintf("The hypotheses that Mardia's Skewness statistic
                         and Mardias' Kurtosis statistic match those of a
                         normal distribution can be maintained on a significance
@@ -278,15 +296,15 @@ function(input, output, session) {
         } else if (length(input$itemCols) == 2) {
             itemCheck <- "(&#10003;)"
             itemColor <- "orange"
-            itemTag <- HTML(sprintf("WARNING: Only two items selected. The &tau;-kongeneric and
-                                        the essentially &tau;-equivalt model can not be tested."))
+            itemTag <- HTML("WARNING: Only two items selected. The &tau;-kongeneric and
+                                        the essentially &tau;-equivalt model can not be tested.")
 
             output$oneItem <- reactive({TRUE})
 
-            for (model in c("tko", "ete")) {
+            for (model in models) {
                 updateCheckboxInput(session,
                                     model,
-                                    value = FALSE)
+                                    value = !(model %in% c("tko", "ete")))
             }
         } else if (length(input$itemCols) == 3) {
             itemCheck <- "(&#10003;)"
@@ -296,15 +314,23 @@ function(input, output, session) {
 
             output$oneItem <- reactive({TRUE})
 
-            updateCheckboxInput(session,
-                                "tko",
-                                value = FALSE)
+            for (model in models) {
+                updateCheckboxInput(session,
+                                    model,
+                                    value = model != "tko")
+            }
         } else if (length(input$itemCols) >= 4) {
             itemCheck <- "&#10003;"
             itemColor <- "black"
             itemTag <- NULL
 
             output$oneItem <- reactive({TRUE})
+
+            for (model in models) {
+                updateCheckboxInput(session,
+                                    model,
+                                    value = TRUE)
+            }
         } else {
             itemCheck <- NULL
             itemColor <- "black"
@@ -380,9 +406,11 @@ function(input, output, session) {
         }
 
         # Check for correlative independence -------------------------------------------------------------------------------
-        dummyModel <- paste(sprintf("%s ~ 1", colnames(userDataItems()), collapse = "\n"))
+        dummyModel <- reactive({
+            paste(sprintf("%s ~ 1", colnames(userDataItems()), collapse = "\n"))
+        })
 
-        fittedDummyModel <- tryCatch(cfa(model = dummyModel,
+        fittedDummyModel <- tryCatch(cfa(model = dummyModel(),
                                          data = userData(),
                                          estimator = input$estimator),
                                      warning = function(w) w,
