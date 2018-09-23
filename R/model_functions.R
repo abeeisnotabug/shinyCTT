@@ -106,12 +106,32 @@ extractFitParameters <- function(fittedModel) {
   scaledAddon <- switch(length(fittedModel@test), "", ".scaled")
   rawParams <- lavInspect(fittedModel, what = "fit")
 
-  list(chisq = rawParams[paste0(c("chisq", "df", "pvalue"), scaledAddon)],
-       rmsea = rawParams[paste0(c("rmsea", "rmsea.pvalue", "rmsea.ci.lower", "rmsea.ci.upper"), scaledAddon)],
-       cfi = rawParams[paste0("cfi", scaledAddon)],
-       srmr = rawParams["srmr"],
-       aic = rawParams["aic"],
-       bic = rawParams["bic"])
+  paramsDfLeft <- as.data.frame(t(
+    rawParams[c(
+      paste0(c("df", "chisq", "pvalue"), scaledAddon),
+      paste0(c("rmsea", "rmsea.pvalue"), scaledAddon)
+    )]
+  ))
+
+  paramsDfRight <- as.data.frame(t(
+    rawParams[c(
+      paste0("cfi", scaledAddon),
+      "srmr",
+      "aic",
+      "bic"
+    )]
+  ))
+
+  paramsDf <- cbind(paramsDfLeft,
+                    rmsea.ci = sprintf("[%.3f, %.3f]",
+                                       rawParams[paste0("rmsea.ci.lower", scaledAddon)],
+                                       rawParams[paste0("rmsea.ci.upper", scaledAddon)]),
+                    paramsDfRight,
+                    stringsAsFactors = FALSE)
+
+  names(paramsDf) <- gsub(".scaled", "", names(paramsDf))
+
+  paramsDf
 }
 
 #' @export
@@ -136,29 +156,29 @@ extractParameters <- function(fittedModel, alpha = 0.05) {
   # ----------------------------------------------------------------------------
 
   par_est_df <- par_est_df[grep("epsilon|alpha|lambda|eta|rel", par_est_df$label), ]
-  par_est_df$CI <- sprintf("[%.3f; %.3f]", par_est_df$ci.lower, par_est_df$ci.upper)
+  par_est_df$CI <- sprintf("[%.3f, %.3f]", par_est_df$ci.lower, par_est_df$ci.upper)
   par_est_df <- par_est_df[, -c(4, 5)]
 
   # Prepare the names for HTML
   par_est_df$label <- gsub("sigma_epsilon_(\\d+)",
-                          "&sigma;&#x302;<sub>&epsilon;<sub>\\1</sub></sub>",
+                          "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>\\1</sub></sub>",
                           par_est_df$label)
   par_est_df$label <- gsub("lambda_(\\d+)",
-                          "&lambda;<sub>\\1</sub>",
+                          "&lambda;&#x302;<sub>\\1</sub>",
                           par_est_df$label)
   par_est_df$label <- gsub("alpha_(\\d+)",
-                          "&alpha;<sub>\\1</sub>",
+                          "&alpha;&#x302;<sub>\\1</sub>",
                           par_est_df$label)
-  par_est_df$label[grep("rel_", par_est_df$label)] <- sprintf("Rel(%s)", lavNames(fittedModel))
-  par_est_df$label[grep("sumrel", par_est_df$label)] <- "Rel(S)"
-  par_est_df$label[grep("sigma_eta", par_est_df$label)] <- "&sigma;&#x302;<sub>&eta;</sub>"
+  par_est_df$label[grep("rel_", par_est_df$label)] <- sprintf("R&#x302;<sub>%s</sub>", lavNames(fittedModel))
+  par_est_df$label[grep("sumrel", par_est_df$label)] <- "R&#x302;<sub>&Sigma;</sub>"
+  par_est_df$label[grep("sigma_eta", par_est_df$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
 
   # Bind all! -------------------------------------------------------------------------------
   rbind(cbind(Item = lavNames(fittedModel),
               par_est_df[grep("lambda", par_est_df$label), ],
               par_est_df[grep("alpha", par_est_df$label), ],
               par_est_df[grep("epsilon", par_est_df$label), ],
-              par_est_df[grep("Rel", par_est_df$label)[1:length(lavNames(fittedModel))], ]),
+              par_est_df[grep("R&#x302;", par_est_df$label)[1:length(lavNames(fittedModel))], ]),
         c(Item = NA,
           label = NA,
           est = NA,
@@ -169,6 +189,6 @@ extractParameters <- function(fittedModel, alpha = 0.05) {
           se = NA,
           CI = NA,
           par_est_df[grep("eta", par_est_df$label), ],
-          par_est_df[grep("Rel\\(S\\)", par_est_df$label), ])
+          par_est_df[grep("R&#x302;<sub>&Sigma;", par_est_df$label), ])
         )
 }

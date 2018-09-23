@@ -21,8 +21,9 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Depends: R (>= 3.5.1),
+    shiny (>= 1.1.0),
     lavaan (>= 0.6-2),
-    shiny (>= 1.1.0)
+    ggplot2 (>= 3.0.0)
 Imports: MVN (>= 5.5),
     moments (>= 0.14),
     corrplot (>= 0.84),

@@ -142,7 +142,8 @@ fluidPage(
                                 column(2, HTML("<b>&tau;-kong.</b>")),
                                 column(2,
                                        conditionalPanel(
-                                           "input.itemCols.length > 3",
+                                           "input.itemCols.length > 3 &&
+                                           input.goModels == 0",
                                            checkboxInput("tko",
                                                          "Include",
                                                          value = TRUE)
@@ -150,6 +151,15 @@ fluidPage(
                                        conditionalPanel(
                                            "input.itemCols.length <= 3",
                                            helpText("Too few items.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && input.tko",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && !input.tko &&
+                                           !(input.itemCols.length <= 3)",
+                                           helpText("Don't test.")
                                        )
                                 ),
                                 column(2),
@@ -162,20 +172,27 @@ fluidPage(
                                 column(2,
                                        conditionalPanel(
                                            "input.tko && input.ete &&
-                                           input.itemCols.length > 3",
+                                           input.itemCols.length > 3 &&
+                                           input.goModels == 0",
                                            checkboxInput("etetko",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
                                            "!(input.tko && input.ete) ||
-                                           input.itemCols.length <= 3",
+                                           input.itemCols.length <= 3 ||
+                                           (input.goModels > 0 && !input.etetko)",
                                            helpText("Don't test.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && input.etetko",
+                                           helpText("Tested.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
-                                           "input.itemCols.length > 2",
+                                           "input.itemCols.length > 2 &&
+                                           input.goModels == 0",
                                            checkboxInput("ete",
                                                          "Include",
                                                          value = TRUE)
@@ -183,6 +200,15 @@ fluidPage(
                                        conditionalPanel(
                                            "input.itemCols.length <= 2",
                                            helpText("Too few items.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && input.ete",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && !input.ete &&
+                                           !(input.itemCols.length <= 2)",
+                                           helpText("Don't test.")
                                        )
                                 ),
                                 column(2),
@@ -194,34 +220,47 @@ fluidPage(
                                 column(2,
                                        conditionalPanel(
                                            "input.tko && input.teq &&
-                                           input.itemCols.length > 3",
+                                           input.itemCols.length > 3 &&
+                                           input.goModels == 0",
                                            checkboxInput("teqtko",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.teqtko",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.tko && input.teq) ||
-                                           input.itemCols.length <= 3",
+                                           input.itemCols.length <= 3 ||
+                                           (input.goModels > 0 && !input.teqtko)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
                                            "input.ete && input.teq &&
-                                           input.itemCols.length > 2",
+                                           input.itemCols.length > 2 &&
+                                           input.goModels == 0",
                                            checkboxInput("teqete",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.teqete",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.ete && input.teq) ||
-                                           input.itemCols.length <= 2",
+                                           input.itemCols.length <= 2 ||
+                                           (input.goModels > 0 && !input.teqete)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
-                                           "input.itemCols.length > 1",
+                                           "input.itemCols.length > 1 &&
+                                           input.goModels == 0",
                                            checkboxInput("teq",
                                                          "Include",
                                                          value = TRUE)
@@ -229,6 +268,15 @@ fluidPage(
                                        conditionalPanel(
                                            "input.itemCols.length < 2",
                                            helpText("Too few items.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && input.teq",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && !input.teq &&
+                                           !(input.itemCols.length < 2)",
+                                           helpText("Don't test.")
                                        )
                                 ),
                                 column(2),
@@ -239,35 +287,48 @@ fluidPage(
                                 column(2,
                                        conditionalPanel(
                                            "input.tko && input.etp &&
-                                           input.itemCols.length > 3",
+                                           input.itemCols.length > 3 &&
+                                           input.goModels == 0",
                                            checkboxInput("etptko",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.etptko",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.tko && input.etp) ||
-                                           input.itemCols.length <= 3",
+                                           input.itemCols.length <= 3 ||
+                                           (input.goModels > 0 && !input.etptko)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
                                            "input.ete && input.etp &&
-                                           input.itemCols.length > 2",
+                                           input.itemCols.length > 2 &&
+                                           input.goModels == 0",
                                            checkboxInput("etpete",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.etpete",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.ete && input.etp) ||
-                                           input.itemCols.length <= 2",
+                                           input.itemCols.length <= 2 ||
+                                           (input.goModels > 0 && !input.etpete)",
                                            helpText("Don't test.")
                                        )
                                 ),
-                                column(2, helpText("Not comparable")),
+                                column(2, helpText("Not testable.")),
                                 column(2,
                                        conditionalPanel(
-                                           "input.itemCols.length > 1",
+                                           "input.itemCols.length > 1 &&
+                                           input.goModels == 0",
                                            checkboxInput("etp",
                                                          "Include",
                                                          value = TRUE)
@@ -275,6 +336,15 @@ fluidPage(
                                        conditionalPanel(
                                            "input.itemCols.length < 2",
                                            helpText("Too few items.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && input.etp",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && !input.etp &&
+                                           !(input.itemCols.length < 2)",
+                                           helpText("Don't test.")
                                        )
                                 ),
                                 column(2)
@@ -284,62 +354,87 @@ fluidPage(
                                 column(2,
                                        conditionalPanel(
                                            "input.tko && input.tpa &&
-                                           input.itemCols.length > 3",
+                                           input.itemCols.length > 3 &&
+                                           input.goModels == 0",
                                            checkboxInput("tpatko",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.tpatko",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.tko && input.tpa) ||
-                                           input.itemCols.length <= 3",
+                                           input.itemCols.length <= 3 ||
+                                           (input.goModels > 0 && !input.tpatko)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
                                            "input.ete && input.tpa &&
-                                           input.itemCols.length > 2",
+                                           input.itemCols.length > 2 &&
+                                           input.goModels == 0",
                                            checkboxInput("tpaete",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.tpaete",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.ete && input.tpa) ||
-                                           input.itemCols.length <= 2",
+                                           input.itemCols.length <= 2 ||
+                                           (input.goModels > 0 && !input.tpaete)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
                                            "input.teq && input.tpa &&
-                                           input.itemCols.length > 1",
+                                           input.itemCols.length > 1 &&
+                                           input.goModels == 0",
                                            checkboxInput("tpateq",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.tpateq",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.teq && input.tpa) ||
-                                           input.itemCols.length < 2",
+                                           input.itemCols.length < 2 ||
+                                           (input.goModels > 0 && !input.tpateq)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
                                            "input.etp && input.tpa &&
-                                           input.itemCols.length > 1",
+                                           input.itemCols.length > 1 &&
+                                           input.goModels == 0",
                                            checkboxInput("tpaetp",
                                                          "Compare",
                                                          value = TRUE)
                                        ),
                                        conditionalPanel(
+                                           "input.goModels > 0 && input.tpaetp",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
                                            "!(input.etp && input.tpa) ||
-                                           input.itemCols.length < 2",
+                                           input.itemCols.length < 2 ||
+                                           (input.goModels > 0 && !input.tpaetp)",
                                            helpText("Don't test.")
                                        )
                                 ),
                                 column(2,
                                        conditionalPanel(
-                                           "input.itemCols.length > 1",
+                                           "input.itemCols.length > 1 &&
+                                           input.goModels == 0",
                                            checkboxInput("tpa",
                                                          "Include",
                                                          value = TRUE)
@@ -347,6 +442,15 @@ fluidPage(
                                        conditionalPanel(
                                            "input.itemCols.length < 2",
                                            helpText("Too few items.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && input.tpa",
+                                           helpText("Tested.")
+                                       ),
+                                       conditionalPanel(
+                                           "input.goModels > 0 && !input.tpa &&
+                                           !(input.itemCols.length < 2)",
+                                           helpText("Don't test.")
                                        )
                                 )
                             )
