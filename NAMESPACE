@@ -3,6 +3,5 @@
 export(extractFitParameters)
 export(extractParameters)
 export(makeKable)
-export(make_model_codes)
+export(makeModelCodes)
 export(shinyCTTApp)
-export(test_result_output)

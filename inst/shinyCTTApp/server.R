@@ -1,4 +1,37 @@
 function(input, output, session) {
+    # Preparation: Names and colors ----------------------------------------------------------------------------------------
+    if (T) {
+        goodColor <- "darkgreen"
+        badColor <- "darkred"
+        textColor <- "white"
+        neutrColor <- "grey"
+    } else {
+        goodColor <- "white"
+        badColor <- "white"
+        textColor <- "black"
+        neutrColor <- "white"
+    }
+
+    modelsLong <- c("&tau;-kongeneric",
+                    "essentially &tau;-equivalent",
+                    "&tau;-equivalent",
+                    "essentially &tau;-parallel",
+                    "&tau;-parallel")
+    modelsExpr <- c("bold(\u03C4*'-kongeneric')",
+                    "bold(essentially~\u03C4*'-equivalent')",
+                    "bold(\u03C4*'-equivalent')",
+                    "bold(essentially~\u03C4*'-parallel')",
+                    "bold(\u03C4*'-parallel')")
+    modelsAbbrev <- c("&#964;-kong.",
+                      "ess. &#964;-equiv.",
+                      "&#964;-equiv.",
+                      "ess. &#964;-paral.",
+                      "&#964;-paral.")
+    models <- c("tko", "ete", "teq", "etp", "tpa")
+
+    names(models) <- names(modelsLong) <- names(modelsExpr) <- names(modelsAbbrev) <- models
+
+    possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
 
     ########################################################################################################################
     ## ------------------------------------------------- Data input ----------------------------------------------------- ##
@@ -65,27 +98,6 @@ function(input, output, session) {
     })
 
     # Update comparison logicals if deactivated ----------------------------------------------------------------------------
-    modelsLong <- c("&tau;-kongeneric",
-                    "essentially &tau;-equivalent",
-                    "&tau;-equivalent",
-                    "essentially &tau;-parallel",
-                    "&tau;-parallel")
-    modelsExpr <- c("bold(\u03C4*'-kongeneric')",
-                    "bold(essentially~\u03C4*'-equivalent')",
-                    "bold(\u03C4*'-equivalent')",
-                    "bold(essentially~\u03C4*'-parallel')",
-                    "bold(\u03C4*'-parallel')")
-    modelsAbbrev <- c("&#964;-kong.",
-                      "ess. &#964;-equiv.",
-                      "&#964;-equiv.",
-                      "ess. &#964;-paral.",
-                      "&#964;-paral.")
-    models <- c("tko", "ete", "teq", "etp", "tpa")
-
-    names(models) <- names(modelsLong) <- names(modelsExpr) <- names(modelsAbbrev) <- models
-
-    possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
-
     lapply(
         models,
         function(thisModel) {
@@ -164,40 +176,78 @@ function(input, output, session) {
 
         if (class(CIs)[1] == "list") {
             corrTableRaw <- corrTableWithCIsRaw()$cor
-            corrTable <- matrix(NA, nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
+            corrTableCors <- corrTableCIs <- matrix(NA, nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
+            corrTableComb <- rbind(corrTableCors, corrTableCIs)
 
-            corrTable[lower.tri(corrTable)] <- sprintf(
-                ifelse(
+            corrTableCors[lower.tri(corrTableCors)] <- kableExtra::cell_spec(
+                sprintf("%.3f", corrTableRaw[lower.tri(corrTableRaw)]),
+                color = textColor,
+                background = ifelse(
                     CIs$p[lower.tri(CIs$p)] < input$sigLvl,
                     ifelse(
                         corrTableRaw[lower.tri(corrTableRaw)] >= 0,
-                        "%.3f<hr>[%.3f, %.3f]",
-                        "<span style=\"color:red;\">%.3f<hr>[%.3f, %.3f]</span>"
+                        goodColor,
+                        badColor
                     ),
+                    neutrColor
+                )
+            )
+            diag(corrTableCors) <- 1
+
+            corrTableCIs[lower.tri(corrTableCIs)] <- kableExtra::cell_spec(
+                sprintf(
+                    "[%.3f, %.3f]",
+                    CIs$lowCI[lower.tri(CIs$lowCI)],
+                    CIs$uppCI[lower.tri(CIs$uppCI)]
+                ),
+                color = textColor,
+                background = ifelse(
+                    CIs$p[lower.tri(CIs$p)] < input$sigLvl,
                     ifelse(
                         corrTableRaw[lower.tri(corrTableRaw)] >= 0,
-                        "<span style=\"color:lightgrey;\">%.3f<hr>[%.3f, %.3f]</span>",
-                        "<span style=\"color:lightcoral;\">%.3f<hr>[%.3f, %.3f]</span>"
-                    )
-                ),
-                corrTableRaw[lower.tri(corrTableRaw)],
-                CIs$lowCI[lower.tri(CIs$lowCI)],
-                CIs$uppCI[lower.tri(CIs$uppCI)]
+                        goodColor,
+                        badColor
+                    ),
+                    neutrColor
+                )
             )
+            diag(corrTableCIs) <- "-"
 
-            diag(corrTable) <- sprintf("<span style=\"font-weight:bold;\">%s<hr>CI</span>", input$itemCols)
+            corrTableComb[seq(1, nrow(corrTableComb), 2), ] <- corrTableCors
+            corrTableComb[seq(2, nrow(corrTableComb), 2), ] <- corrTableCIs
+
+            colnames(corrTableComb) <- input$itemCols
+            rownames(corrTableComb) <- c(rbind(input$itemCols, "CI"))
 
             tagList(
                 h4("Correlation Table with Confidence Intervals:"),
-                HTML(makeKable(corrTable)),
+                HTML(kableExtra::column_spec(
+                    makeKable(corrTableComb),
+                    1,
+                    bold = TRUE
+                )),
                 h5("Legend:"),
-                HTML(makeKable(matrix(c("Sign. pos. cor.",
-                                        "<span style=\"color:red;\">Sign. neg. cor.</span>",
-                                        "<span style=\"color:lightgrey;\">Insign. pos. cor.</span>",
-                                        "<span style=\"color:lightcoral;\">Insign. neg. cor.</span>"),
-                                      ncol = 2),
-                               bootstrap_options = "bordered",
-                               position = "left"))
+                HTML(makeKable(
+                    cbind(
+                        kableExtra::cell_spec(
+                            "Sig. pos.",
+                            color = textColor,
+                            background = goodColor
+                        ),
+                        kableExtra::cell_spec(
+                            "Sig. neg.",
+                            color = textColor,
+                            background = badColor
+                        ),
+                        kableExtra::cell_spec(
+                            "Insig.",
+                            color = textColor,
+                            background = neutrColor
+                        )
+                    ),
+                    bootstrap_options = "bordered",
+                    position = "left"
+                ))
             )
         }
     })
@@ -239,15 +289,19 @@ function(input, output, session) {
         if (class(mvnTestResultRaw())[1] == "list") {
             req(input$sigLvl)
 
-            if (any(as.numeric(as.character(mvnTestResultRaw()$multivariateNormality[-3, "p value"])) < input$sigLvl)) {
-                updateEst <- "MLR"
-            } else {
-                updateEst <- "ML"
-            }
-
             updateRadioButtons(session,
                                "estimator",
-                               selected = updateEst)
+                               selected = ifelse(
+                                   any(
+                                       as.numeric(
+                                           as.character(
+                                               mvnTestResultRaw()$multivariateNormality[-3, "p value"]
+                                           )
+                                       ) < input$sigLvl
+                                   ),
+                                   "MLR",
+                                   "ML"
+                               ))
         }
     })
 
@@ -259,8 +313,9 @@ function(input, output, session) {
                             stringsAsFactors = F)[-3,]
 
         mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
-        mvnMV$p <- sapply(mvnMV$p,
-                          function(value) if (value < 0.001) "< 0.001" else sprintf("%.3f", round(value, 3)))
+        mvnMV$p <- ifelse(mvnMV$p < 0.001,
+                          "< 0.001",
+                          sprintf("%.3f", round(mvnMV$p, 3)))
 
         if (is.null(mvnTestResultRaw()$multivariateNormality)) {
             tagList()
@@ -394,15 +449,15 @@ function(input, output, session) {
             if (any(ps >= input$sigLvl) && any(cors < 0)) {
                 corrNegSigCheck <- "?"
                 corrNegSigColor <- "orange"
-                corrNegSigTag <- "WARNING: There appear to be insignificant and negative correlations. Recheck items."
+                corrNegSigTag <- "WARNING: Insignificant and negative correlations found."
             } else if (any(ps >= input$sigLvl) && any(cors >= 0)) {
                 corrNegSigCheck <- "?"
                 corrNegSigColor <- "orange"
-                corrNegSigTag <- "WARNING: There appear to be insignificant correlations. Recheck items."
+                corrNegSigTag <- "WARNING: Insignificant correlations found."
             } else if (all(ps < input$sigLvl) && any(cors < 0)) {
                 corrNegSigCheck <- "&#10005;"
                 corrNegSigColor <- "red"
-                corrNegSigTag <- "WARNING: There appear to be negative correlations. Recheck items."
+                corrNegSigTag <- "WARNING: Negative correlations found."
             } else {
                 corrNegSigCheck <- "&#10003;"
                 corrNegSigColor <- "black"
@@ -437,23 +492,27 @@ function(input, output, session) {
             if (corrInd[3] < input$sigLvl) {
                 corrIndCheck <- "&#10003;"
                 corrIndColor <- "black"
-                corrIndTag <- tagList(
-                    sprintf("The hypothesis that all correlations between the items are equal to zero
-                                    has to be discarded on a significance level of %s. Test result:",
-                            input$sigLvl),
-                    withMathJax(test_result_output(corrInd, input$estimator))
+                corrIndTag <- HTML(sprintf(
+                    "(Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s)",
+                    input$estimator,
+                    corrInd[1],
+                    corrInd[2],
+                    ifelse(corrInd[3] < 0.001,
+                           "< 0.001",
+                           sprintf("= %.3f", corrInd[3])))
                 )
                 output$isCorrInd <- reactive({TRUE})
             } else {
                 corrIndCheck <- "&#10005;"
                 corrIndColor <- "red"
-                corrIndTag <- tagList(
-                    sprintf("ERROR: The hypothesis that all correlations between the items are equal to zero
-                                    can be maintained on a significance level of %s. Test result:",
-                            input$sigLvl),
-                    withMathJax(
-                        paste0("$$\\color{red}",
-                               substring(test_result_output(corrInd, input$estimator), 3)))
+                corrIndTag <- HTML(sprintf(
+                    "(Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s)",
+                    input$estimator,
+                    corrInd[1],
+                    corrInd[2],
+                    ifelse(corrInd[3] < 0.001,
+                           "< 0.001",
+                           sprintf("= %.3f", corrInd[3])))
                 )
                 output$isCorrInd <- reactive({TRUE})#({FALSE})
             }
@@ -470,19 +529,19 @@ function(input, output, session) {
 
             tagList(
                 div(style = paste0("color:", itemColor),
-                    h5(HTML(paste("Number of items:", itemCheck))),
+                    h5(HTML(paste("Number of Items:", itemCheck))),
                     itemTag
                 ),
                 div(style = paste0("color:", enoughObsColor),
-                    h5(HTML(paste("Number of observations:", enoughObsCheck))),
+                    h5(HTML(paste("Number of Observations:", enoughObsCheck))),
                     enoughObsTag
                 ),
                 div(style = paste0("color:", corrNegSigColor),
-                    h5(HTML(paste("Item correlations:", corrNegSigCheck))),
+                    h5(HTML(paste("Item Correlations:", corrNegSigCheck))),
                     corrNegSigTag
                 ),
                 div(style = paste0("color:", corrIndColor),
-                    h5(HTML(paste("Test on correlative independence:", corrIndCheck))),
+                    h5(HTML(paste("Test on Correlative Independence:", corrIndCheck))),
                     corrIndTag
                 )
             )
@@ -511,9 +570,9 @@ function(input, output, session) {
         modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
 
         # Try fitting and capture warning and error messages ---------------------------------------------------------------
-        modelCodes <- make_model_codes(input_data = userData(),
-                                       item_cols = input$itemCols,
-                                       group = FALSE)
+        modelCodes <- makeModelCodes(inputData = userData(),
+                                     itemCols = input$itemCols,
+                                     group = FALSE)
 
         fittedModelsWarns <- lapply(
             modelCodes[modelsToTest],
@@ -598,137 +657,29 @@ function(input, output, session) {
             })
         }
 
-        # Compare models in groups if specified ----------------------------------------------------------------------------
-        if (input$groupCol != "no") {
-
-            # Try fitting and capture warning and error messages in the multigroup models ----------------------------------
-            modelCodesMg <- make_model_codes(input_data = userData(),
-                                             item_cols = input$itemCols,
-                                             group = input$groupCol)
-
-            fittedModelsWarnsMg <- lapply(
-                modelCodesMg[modelsToTest],
-                FUN = function(model) {
-                    tryCatch(cfa(model = model,
-                                 data = userData(),
-                                 meanstructure = TRUE,
-                                 group = input$groupCol,
-                                 group.equal = c("loadings", "intercepts"),
-                                 estimator = input$estimator),
-                             error = function(e) e,
-                             warning = function(w) w)
-                }
-            )
-
-            fittedModelsErrsMg <- lapply(
-                modelCodesMg[modelsToTest],
-                FUN = function(model) {
-                    suppressWarnings(
-                        tryCatch(cfa(model = model,
-                                     data = userData(),
-                                     meanstructure = TRUE,
-                                     group = input$groupCol,
-                                     group.equal = c("loadings", "intercepts"),
-                                     estimator = input$estimator),
-                                 error = function(e) e)
-                    )
-                }
-            )
-
-            warnsMg <- sapply(
-                lapply(fittedModelsWarnsMg, class),
-                function(code) code[1] == "simpleWarning"
-            )
-            errsMg <- sapply(
-                lapply(fittedModelsErrsMg, class),
-                function(code) code[1] == "simpleError"
-            )
-
-            goodModelsMg <- modelsToTest[!warnsMg & !errsMg]
-            errModelsMg <- modelsToTest[errsMg]
-            warnModelsMg <- modelsToTest[warnsMg]
-
-            if (sum(warnsMg) > 0) {
-                output$lavWarnsMsgMg <- renderUI({
-                    tagList(
-                        h6("The following multigroup models produced warnings:"),
-                        div(style = "color:orange",
-                            HTML(
-                                kableExtra::column_spec(
-                                    kableExtra::kable(
-                                        cbind(
-                                            paste0(modelsLong[warnModelsMg],
-                                                   ":&emsp;"),
-                                            sapply(fittedModelsWarnsMg[warnModelsMg],
-                                                   function(model) model$message)),
-                                        row.names = FALSE,
-                                        escape = FALSE),
-                                    1, bold = TRUE
-                                )
-                            )
-                        )
-                    )
-                })
-            }
-            if (sum(errsMg) > 0) {
-                output$lavErrsMsgMg <- renderUI({
-                    tagList(
-                        h6("The following multigroup models produced errors:"),
-                        div(style = "color:red",
-                            HTML(
-                                kableExtra::column_spec(
-                                    kableExtra::kable(
-                                        cbind(
-                                            paste0(modelsLong[errModelsMg],
-                                                   ":&emsp;"),
-                                            sapply(fittedModelsErrsMg[errModelsMg],
-                                                   function(model) model$message)),
-                                        row.names = FALSE,
-                                        escape = FALSE),
-                                    1, bold = TRUE
-                                )
-                            )
-                        )
-                    )
-                })
-            }
-        } else {
-            warnsMg <- errsMg <- 0
-        }
+        warnsMg <- errsMg <- 0
 
         # Print the error/warnings -----------------------------------------------------------------------------------------
         appendTab(
             inputId = "navbar",
             tabPanel(
-                "Models",
+                "Model Comparison Tests",
                 value = "panelModelTests",
-                wellPanel(
-                    h5(HTML(sprintf("Lavaan status: %i warnings, %i errors.",
-                                    sum(warns) + sum(warnsMg),
-                                    sum(errs) + sum(errsMg)))),
-                    htmlOutput("lavErrsMsg"),
-                    htmlOutput("lavWarnsMsg"),
-                    htmlOutput("lavErrsMsgMg"),
-                    htmlOutput("lavWarnsMsgMg")
-                ),
-                tabsetPanel(id = "modelTabsets")
+                tabsetPanel(id = "compTabsets")
             ),
             select = TRUE
         )
 
-        # Generate comparative fit table and tab  --------------------------------------------------------------------------
-        if (T) {
-            goodColor <- "darkgreen"
-            badColor <- "darkred"
-            textColor <- "white"
-            neutrColor <- "grey"
-        } else {
-            goodColor <- NULL
-            badColor <- NULL
-            textColor <- "black"
-            neutrColor <- NULL
-        }
+        appendTab(
+            inputId = "navbar",
+            tabPanel(
+                "Parameter Tables and Factor Scores",
+                value = "panelParTables",
+                tabsetPanel(id = "modelTabsets")
+            )
+        )
 
+        # Generate comparative fit table and tab  --------------------------------------------------------------------------
         fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], extractFitParameters))
         comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
 
@@ -785,7 +736,7 @@ function(input, output, session) {
         names(compTable$df) <-
             names(compTable$chisq) <-
             names(infCompTable$aic) <-
-            names(infCompTable$bic) <- outer(models, models, sprintf, fmt = "%s%s")
+            names(infCompTable$bic) <- outer(models, models, paste0)
 
         compTable$chisq[lower.tri(diag(5), diag = TRUE)] <-
             infCompTable$aic[lower.tri(diag(5), diag = TRUE)] <-
@@ -807,6 +758,7 @@ function(input, output, session) {
                                     col.names = c("Item",
                                                   "&lambda;&#x302;<sub>i</sub>",
                                                   "Est.", paste0(input$estimator, c("-SE", "-CI")),
+                                                  "Std. Est.", paste0(input$estimator, c("-SE", "-CI")),
                                                   "&alpha;&#x302;<sub>i</sub>",
                                                   "Est.", paste0(input$estimator, c("-SE", "-CI")),
                                                   "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
@@ -820,7 +772,7 @@ function(input, output, session) {
                             length(input$itemCols) + 1,
                             bold = TRUE),
                         c(" ",
-                          "Discrimination Parameters" = 4,
+                          "Discrimination Parameters (Factor Loadings)" = 7,
                           "Easiness Parameters" = 4,
                           "Variances" = 4,
                           "Reliabilities" = 4)
@@ -878,14 +830,32 @@ function(input, output, session) {
                     aicDiffs <- fits[thisModel, "aic"] - fits[1:(whichModel - 1), "aic"]
                     bicDiffs <- fits[thisModel, "bic"] - fits[1:(whichModel - 1), "bic"]
 
-                    infCompTable$aic[sprintf("%s%s", thisModel, rownames(fits)[1:(whichModel - 1)])] <-
-                        kableExtra::cell_spec(sprintf("%.3f", aicDiffs),
-                                              color = textColor,
-                                              background = ifelse(aicDiffs < 0, goodColor, badColor))
-                    infCompTable$bic[sprintf("%s%s", thisModel, rownames(fits)[1:(whichModel - 1)])] <-
-                        kableExtra::cell_spec(sprintf("%.3f", bicDiffs),
-                                              color = textColor,
-                                              background = ifelse(bicDiffs < 0, goodColor, badColor))
+                    infCompTable$aic[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
+                        kableExtra::cell_spec(
+                            sprintf(
+                                ifelse(
+                                    aicDiffs < 0,
+                                    "%.3f",
+                                    "+%.3f"
+                                ),
+                                aicDiffs
+                            ),
+                            color = textColor,
+                            background = ifelse(aicDiffs < 0, goodColor, badColor)
+                        )
+                    infCompTable$bic[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
+                        kableExtra::cell_spec(
+                            sprintf(
+                                ifelse(
+                                    bicDiffs < 0,
+                                    "%.3f",
+                                    "+%.3f"
+                                ),
+                                bicDiffs
+                            ),
+                            color = textColor,
+                            background = ifelse(bicDiffs < 0, goodColor, badColor)
+                        )
                 }
 
                 # Some stuff to be edited later ----------------------------------------------------------------------------
@@ -902,10 +872,7 @@ function(input, output, session) {
                     compsWithThisModel,
                     function(thisComp) {
                         tmpTbl <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
-                        tmpFit <- unlist(tmpTbl[2, c(5, 6, 7)])
-                        names(tmpFit) <- c("\\Delta chisq", "\\Delta df", "p")
-
-                        tmpFit
+                        unlist(tmpTbl[2, c(5, 6, 7)])
                     }
                 )
 
@@ -929,7 +896,7 @@ function(input, output, session) {
                     compTable$chisq[
                         paste0(thisModel, thisComp)
                     ] <- kableExtra::cell_spec(
-                        sprintf(paste0("%.3f", sigAddon), fitCompsWithThisModel[1, thisComp]),
+                        sprintf(paste0("+%.3f", sigAddon), fitCompsWithThisModel[1, thisComp]),
                         background = sigColor,
                         color = sigTxtColor
                     )
@@ -937,7 +904,7 @@ function(input, output, session) {
                     compTable$df[
                         paste0(thisModel, thisComp)
                     ] <- kableExtra::cell_spec(
-                        sprintf("%i", fitCompsWithThisModel[2, thisComp]),
+                        sprintf("+%i", fitCompsWithThisModel[2, thisComp]),
                         background = sigColor,
                         color = sigTxtColor
                     )
@@ -951,7 +918,7 @@ function(input, output, session) {
                         h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
                         htmlOutput(paste0(thisModel, "Table"))
                     ),
-                    select = FALSE
+                    select = as.logical(whichModel == 1)
                 )
             })
         }
@@ -1038,7 +1005,7 @@ function(input, output, session) {
                     hierTable <- hierTable[, c(6, 5, 7, 2, 3, 8)]
 
                     hierTable[-1, "Chisq diff"] <- kableExtra::cell_spec(
-                        sprintf("%.3f", hierTable[-1, "Chisq diff"]),
+                        sprintf("+%.3f", hierTable[-1, "Chisq diff"]),
                         color = textColor,
                         background = ifelse(
                             hierTable[-1, "Pr(>Chisq)"] < input$sigLvl,
@@ -1047,7 +1014,7 @@ function(input, output, session) {
                         )
                     )
                     hierTable[-1, "Df diff"] <- kableExtra::cell_spec(
-                        hierTable[-1, "Df diff"],
+                        sprintf("+%i", hierTable[-1, "Df diff"]),
                         color = textColor,
                         background = ifelse(
                             hierTable[-1, "Pr(>Chisq)"] < input$sigLvl,
@@ -1112,7 +1079,6 @@ function(input, output, session) {
                             bold = TRUE
                         ),
                         1,
-                        #color = textColor,
                         background = "lightgrey"
                     )
                 } else {
@@ -1121,7 +1087,7 @@ function(input, output, session) {
             })
 
             # Table with all fit indices -----------------------------------------------------------------------------------
-            fits$df <- kableExtra::cell_spec(fits$df,
+            fits$df <- kableExtra::cell_spec(sprintf("%i", fits$df),
                                              color = textColor,
                                              background = ifelse(fits$pvalue < input$sigLvl,
                                                                  badColor,
@@ -1169,15 +1135,6 @@ function(input, output, session) {
                                                                    badColor))
 
 
-            names(fits) <- c("df",
-                             paste0(input$estimator, "-&chi;&sup2;"),
-                             "p",
-                             "RMSEA",
-                             "p",
-                             "95%-CI",
-                             paste0(input$estimator, "-CFI"),
-                             "SRMR")
-
             rownames(fits) <- modelsAbbrev[rownames(fits)]
 
             # Chisq comparison table ---------------------------------------------------------------------------------------
@@ -1202,10 +1159,21 @@ function(input, output, session) {
                 modelsAbbrev
 
             # Put them in a tab --------------------------------------------------------------------------------------------
-            prependTab(
-                inputId = "modelTabsets",
+            appendTab(
+                inputId = "compTabsets",
                 tabPanel(
-                    "Comparison overview",
+                    "Singlegroup Comparison overview",
+                    wellPanel(
+                        h5(sprintf(
+                            "Lavaan status: %i warnings, %i errors.",
+                            sum(warns),
+                            sum(errs)
+                        )),
+                        htmlOutput("lavErrsMsg"),
+                        htmlOutput("lavWarnsMsg"),
+                        htmlOutput("lavErrsMsgMg"),
+                        htmlOutput("lavWarnsMsgMg")
+                    ),
                     h4("Hierarchical model comparison plot:"),
                     plotOutput("hierPlot"),
                     h4("Hierarchical model comparison table:"),
@@ -1219,7 +1187,17 @@ function(input, output, session) {
                     HTML(
                         kableExtra::column_spec(
                             kableExtra::column_spec(
-                                makeKable(fits[, -c(9, 10)]),
+                                makeKable(
+                                    fits[, -c(9, 10)],
+                                    col.names = c("df",
+                                                  paste0(input$estimator, "-&chi;&sup2;"),
+                                                  "p",
+                                                  "RMSEA",
+                                                  "p",
+                                                  "95%-CI",
+                                                  paste0(input$estimator, "-CFI"),
+                                                  "SRMR")
+                                ),
                                 1,
                                 bold = TRUE
                             ),
@@ -1240,19 +1218,27 @@ function(input, output, session) {
                         )
                     ),
                     h4("AIC/BIC-Comparison Table:"),
-                    HTML(paste0("<table align = \"center\", width = \"100%\"><tr><td><h5>AIC:</h5>",
+                    HTML(paste0("<table align = \"center\", width = \"100%\">
+                                <tr><td>
+                                <table align = \"center\">
+                                <tr><td><h5>AIC:</h5>",
                                 kableExtra::column_spec(
                                     makeKable(infCompTable$aic),
                                     1,
                                     bold = TRUE
                                 ),
-                                "</td><td>&nbsp;</td><td><h5>BIC:</h5>",
+                                "</td></tr></table>
+                                </td>
+                                <td>&nbsp;</td>
+                                <td><table align = \"center\">
+                                <tr><td><h5>BIC:</h5>",
                                 kableExtra::column_spec(
                                     makeKable(infCompTable$bic),
                                     1,
                                     bold = TRUE
                                 ),
-                                "</td></tr></table>")
+                                "</td></tr></table>
+                                </td></tr></table>")
                     )
                 ),
                 select = TRUE
