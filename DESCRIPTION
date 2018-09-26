@@ -27,5 +27,6 @@ Depends: R (>= 3.5.1),
 Imports: MVN (>= 5.5),
     moments (>= 0.14),
     corrplot (>= 0.84),
-    kableExtra (>= 0.9.0)
+    kableExtra (>= 0.9.0),
+    haven (>= 1.1.2)
 RoxygenNote: 6.1.0

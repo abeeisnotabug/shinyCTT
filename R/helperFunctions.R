@@ -91,7 +91,7 @@ extractParameters <- function(fittedModel, alpha = 0.05) {
   parDf$label <- gsub("alpha_(\\d+)",
                            "&alpha;&#x302;<sub>\\1</sub>",
                            parDf$label)
-  parDf$label[grep("rel_", parDf$label)] <- sprintf("R&#x302;<sub>%s</sub>", lavNames(fittedModel))
+  parDf$label[grep("rel_", parDf$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavNames(fittedModel)))
   parDf$label[grep("sumrel", parDf$label)] <- "R&#x302;<sub>&Sigma;</sub>"
   parDf$label[grep("sigma_eta", parDf$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
 

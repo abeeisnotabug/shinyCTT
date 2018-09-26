@@ -41,6 +41,14 @@ fluidPage(
                                                      "Single Quote" = "'"),
                                          selected = '"')
                         ),
+                        conditionalPanel(
+                            condition = "input.source == 'SPSS'",
+                            fileInput("SPSSFile", "Choose SPSS File",
+                                      multiple = FALSE,
+                                      accept = c(".sav",
+                                                 ".zsav",
+                                                 ".por"))
+                        ),
                         hr(),
                         uiOutput("itemColsChooser"),
                         hr(),
