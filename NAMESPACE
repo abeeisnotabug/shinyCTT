@@ -2,6 +2,7 @@
 
 export(extractFitParameters)
 export(extractParameters)
+export(makeCorrTableWithCIs)
 export(makeKable)
 export(makeModelCodes)
 export(shinyCTTApp)

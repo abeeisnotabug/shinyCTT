@@ -1,4 +1,55 @@
 #' @export
+makeCorrTableWithCIs <- function(rawTable, goodColor, badColor, neutrColor, textColor, sigLvl, itemCols) {
+  CIs <- rawTable$test
+
+  corrTableRaw <- rawTable$cor
+  corrTableCors <- corrTableCIs <- matrix(NA, nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
+  corrTableComb <- rbind(corrTableCors, corrTableCIs)
+
+  corrTableCors[lower.tri(corrTableCors)] <- kableExtra::cell_spec(
+    sprintf("%.3f", corrTableRaw[lower.tri(corrTableRaw)]),
+    color = textColor,
+    background = ifelse(
+      CIs$p[lower.tri(CIs$p)] < sigLvl,
+      ifelse(
+        corrTableRaw[lower.tri(corrTableRaw)] >= 0,
+        goodColor,
+        badColor
+      ),
+      neutrColor
+    )
+  )
+  diag(corrTableCors) <- 1
+
+  corrTableCIs[lower.tri(corrTableCIs)] <- kableExtra::cell_spec(
+    sprintf(
+      "[%.3f, %.3f]",
+      CIs$lowCI[lower.tri(CIs$lowCI)],
+      CIs$uppCI[lower.tri(CIs$uppCI)]
+    ),
+    color = textColor,
+    background = ifelse(
+      CIs$p[lower.tri(CIs$p)] < sigLvl,
+      ifelse(
+        corrTableRaw[lower.tri(corrTableRaw)] >= 0,
+        goodColor,
+        badColor
+      ),
+      neutrColor
+    )
+  )
+  diag(corrTableCIs) <- "-"
+
+  corrTableComb[seq(1, nrow(corrTableComb), 2), ] <- corrTableCors
+  corrTableComb[seq(2, nrow(corrTableComb), 2), ] <- corrTableCIs
+
+  colnames(corrTableComb) <- itemCols
+  rownames(corrTableComb) <- c(rbind(itemCols, "CI"))
+
+  corrTableComb
+}
+
+#' @export
 makeKable <- function(table,
                       digits = 3,
                       full_width = FALSE,

@@ -43,14 +43,15 @@ function(input, output, session) {
                            ls(envir = globalenv())))
     })
 
-    userData <- reactive({
+    userDataRaw <- reactive({
         if (input$source == "CSV") {
             req(input$CSVFile)
 
             userDataTmp <- read.csv(file = input$CSVFile$datapath,
                                     header = input$header,
                                     sep = input$sep,
-                                    quote = input$quote)
+                                    quote = input$quote,
+                                    stringsAsFactors = FALSE)
         } else if (input$source == "SPSS") {
             req(input$SPSSFile)
 
@@ -61,36 +62,105 @@ function(input, output, session) {
             userDataTmp <- get(input$objectFromWorkspace)
         }
 
-        as.data.frame(userDataTmp)
+        if (any(sapply(userDataTmp, is.factor)))
+            userDataTmp[sapply(userDataTmp, is.factor)] <- lapply(
+                userDataTmp[sapply(userDataTmp, is.factor)],
+                as.character
+            )
+
+        data.frame(
+            userDataTmp,
+            stringsAsFactors = FALSE
+        )
     })
 
-    output$dataOverview <- renderDataTable(userData())
+    userData <- reactive({
+        req(userDataRaw())
+        req(input$groupCol)
+
+        if (input$groupCol != "no" && input$groupCol %in% colnames(userDataRaw())) {
+            req(input$groups)
+
+            subset(userDataRaw(), userDataRaw()[, input$groupCol] %in% input$groups)
+        } else {
+            userDataRaw()
+        }
+    })
+
+    userDataItems <- reactive({
+        req(userData())
+
+        if (length(input$itemCols) > 1)
+            tryCatch(userData()[, input$itemCols],
+                     warning = function(w) NULL,
+                     error = function(e) NULL)
+        else
+            NULL
+    })
+
+    userDataGroup <- reactive({
+        req(userData())
+
+        if (input$groupCol %in% colnames(userData()))
+            userData()[, input$groupCol]
+        else
+            NULL
+    })
+
+    output$userDataExists <- reactive({
+        if (is.null(userData()))
+            FALSE
+        else
+            TRUE
+    })
+
+    outputOptions(output, "userDataExists", suspendWhenHidden = FALSE)
+
+    output$dataOverview <- renderDataTable(userDataRaw())
 
     output$itemColsChooser <- renderUI({
-        possibleItemColumns <- colnames(userData())[sapply(userData(), is.numeric)]
+        possibleItemColumns <- colnames(userDataRaw())[sapply(userDataRaw(), is.numeric)]
 
         checkboxGroupInput("itemCols",
-                           "Select which columns contain items",
+                           "Select the item columns",
                            choices = possibleItemColumns,
                            selected = possibleItemColumns,
                            inline = TRUE)
     })
 
-    userDataItems <- reactive({
-        if (length(input$itemCols) > 1) {
-            tryCatch(userData()[, input$itemCols],
-                     warning = function(w) NULL,
-                     error = function(e) NULL)
-        } else {
-            NULL
-        }
-    })
-
     output$groupColChooser <- renderUI({
         selectInput("groupCol",
-                    "Select which column contains the group",
+                    "Select the group column",
                     choices = c("No group column selected" = "no",
-                                colnames(userData())[!(colnames(userData()) %in% input$itemCols)]))
+                                colnames(userDataRaw())[!(colnames(userDataRaw()) %in% input$itemCols)]))
+    })
+
+    output$groupChooser <- renderUI({
+        req(input$groupCol)
+
+        if (input$groupCol != "no" && input$groupCol %in% colnames(userDataRaw())) {
+            possibleGroups <- unique(userDataRaw()[, input$groupCol])
+
+            if (any(c(table(userDataRaw()[, input$groupCol])) == 1)) {
+                groupWarning <- "There are groups with only one observation,
+                                 you may have selected an item as group column."
+                possibleGroups <- NULL
+            } else {
+                groupWarning <- ""
+            }
+        } else {
+            possibleGroups <- NULL
+            groupWarning <- ""
+        }
+
+        tagList(
+            checkboxGroupInput("groups",
+                               "Select which groups to include",
+                               choices = possibleGroups,
+                               selected = possibleGroups,
+                               inline = TRUE),
+            helpText(groupWarning)
+        )
     })
 
     observeEvent(input$sigLvl, {
@@ -172,7 +242,7 @@ function(input, output, session) {
     corrTableWithCIsRaw <- reactive({
         req(userDataItems())
 
-        list(cor = cor(userDataItems()),
+        list(cor = suppressWarnings(cor(userDataItems())),
              test = tryCatch(
                  corrplot::cor.mtest(userDataItems(),
                                      conf.level = (1 - input$sigLvl)),
@@ -183,60 +253,27 @@ function(input, output, session) {
     })
 
     output$corrTableWithCIs <- renderUI({
-        CIs <- corrTableWithCIsRaw()$test
-
-        if (class(CIs)[1] == "list") {
-            corrTableRaw <- corrTableWithCIsRaw()$cor
-            corrTableCors <- corrTableCIs <- matrix(NA, nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
-            corrTableComb <- rbind(corrTableCors, corrTableCIs)
-
-            corrTableCors[lower.tri(corrTableCors)] <- kableExtra::cell_spec(
-                sprintf("%.3f", corrTableRaw[lower.tri(corrTableRaw)]),
-                color = textColor,
-                background = ifelse(
-                    CIs$p[lower.tri(CIs$p)] < input$sigLvl,
-                    ifelse(
-                        corrTableRaw[lower.tri(corrTableRaw)] >= 0,
-                        goodColor,
-                        badColor
-                    ),
-                    neutrColor
-                )
-            )
-            diag(corrTableCors) <- 1
-
-            corrTableCIs[lower.tri(corrTableCIs)] <- kableExtra::cell_spec(
-                sprintf(
-                    "[%.3f, %.3f]",
-                    CIs$lowCI[lower.tri(CIs$lowCI)],
-                    CIs$uppCI[lower.tri(CIs$uppCI)]
-                ),
-                color = textColor,
-                background = ifelse(
-                    CIs$p[lower.tri(CIs$p)] < input$sigLvl,
-                    ifelse(
-                        corrTableRaw[lower.tri(corrTableRaw)] >= 0,
-                        goodColor,
-                        badColor
-                    ),
-                    neutrColor
-                )
-            )
-            diag(corrTableCIs) <- "-"
-
-            corrTableComb[seq(1, nrow(corrTableComb), 2), ] <- corrTableCors
-            corrTableComb[seq(2, nrow(corrTableComb), 2), ] <- corrTableCIs
-
-            colnames(corrTableComb) <- input$itemCols
-            rownames(corrTableComb) <- c(rbind(input$itemCols, "CI"))
-
+        if (class(corrTableWithCIsRaw()$test)[1] == "list") {
             tagList(
                 h4("Correlation Table with Confidence Intervals:"),
-                HTML(kableExtra::column_spec(
-                    makeKable(corrTableComb),
-                    1,
-                    bold = TRUE
-                )),
+                HTML(
+                    kableExtra::column_spec(
+                        makeKable(
+                            makeCorrTableWithCIs(
+                                corrTableWithCIsRaw(),
+                                goodColor,
+                                badColor,
+                                neutrColor,
+                                textColor,
+                                input$sigLvl,
+                                input$itemCols
+                            ),
+                            bootstrap_options = c("condensed", "striped")
+                        ),
+                        1,
+                        bold = TRUE
+                    )
+                ),
                 h5("Legend:"),
                 HTML(makeKable(
                     cbind(
@@ -296,23 +333,27 @@ function(input, output, session) {
         }
     })
 
-    observe({
+    observeEvent(mvnTestResultRaw(), {
+        print(input$doMg)
+
         if (class(mvnTestResultRaw())[1] == "list") {
             req(input$sigLvl)
 
-            updateRadioButtons(session,
-                               "estimator",
-                               selected = ifelse(
-                                   any(
-                                       as.numeric(
-                                           as.character(
-                                               mvnTestResultRaw()$multivariateNormality[-3, "p value"]
-                                           )
-                                       ) < input$sigLvl
-                                   ),
-                                   "MLR",
-                                   "ML"
-                               ))
+            updateRadioButtons(
+                session,
+                "estimator",
+                selected = ifelse(
+                    any(
+                        as.numeric(
+                            as.character(
+                                mvnTestResultRaw()$multivariateNormality[-3, "p value"]
+                            )
+                        ) < input$sigLvl
+                    ),
+                    "MLR",
+                    "ML"
+                )
+            )
         }
     })
 
@@ -324,9 +365,11 @@ function(input, output, session) {
                             stringsAsFactors = F)[-3,]
 
         mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
-        mvnMV$p <- ifelse(mvnMV$p < 0.001,
-                          "< 0.001",
-                          sprintf("%.3f", round(mvnMV$p, 3)))
+        mvnMV$p <- ifelse(
+            mvnMV$p < 0.001,
+            "< 0.001",
+            sprintf("%.3f", round(mvnMV$p, 3))
+        )
 
         if (is.null(mvnTestResultRaw()$multivariateNormality)) {
             tagList()
@@ -361,7 +404,7 @@ function(input, output, session) {
     observe({
         # Check the number of items ----------------------------------------------------------------------------------------
         if (length(input$itemCols) == 1) {
-            itemCheck <- "&#10005;"
+            itemCheckSymb <- "&#10005;"
             itemColor <- "red"
             itemTag <- sprintf("ERROR: Only one or no item selected. No analysis possible.")
 
@@ -373,7 +416,7 @@ function(input, output, session) {
                                     value = FALSE)
             }
         } else if (length(input$itemCols) == 2) {
-            itemCheck <- "(&#10003;)"
+            itemCheckSymb <- "(&#10003;)"
             itemColor <- "orange"
             itemTag <- HTML("WARNING: Only two items selected. The &tau;-kongeneric and
                                         the essentially &tau;-equivalt model can not be tested.")
@@ -386,7 +429,7 @@ function(input, output, session) {
                                     value = !(model %in% c("tko", "ete")))
             }
         } else if (length(input$itemCols) == 3) {
-            itemCheck <- "(&#10003;)"
+            itemCheckSymb <- "(&#10003;)"
             itemColor <- "orange"
             itemTag <- HTML(sprintf("WARNING: Only three items selected. The &tau;-kongeneric
                                         model can not be tested."))
@@ -399,7 +442,7 @@ function(input, output, session) {
                                     value = model != "tko")
             }
         } else if (length(input$itemCols) >= 4) {
-            itemCheck <- "&#10003;"
+            itemCheckSymb <- "&#10003;"
             itemColor <- "black"
             itemTag <- NULL
 
@@ -411,7 +454,7 @@ function(input, output, session) {
                                     value = TRUE)
             }
         } else {
-            itemCheck <- NULL
+            itemCheckSymb <- NULL
             itemColor <- "black"
             itemTag <- NULL
         }
@@ -421,31 +464,31 @@ function(input, output, session) {
             req(input$groupCol)
 
             if (input$groupCol == "no") {
-                enoughObsCheck <- "&#10003;"
+                enoughObsCheckSymb <- "&#10003;"
                 enoughObsColor <- "black"
                 enoughObsTag <- NULL
 
                 output$obsOk <- reactive({TRUE})
             } else if (input$groupCol %in% colnames(userData())) {
-                nObsInGroups <- sapply(split(userData(), userData()[, input$groupCol]), nrow)
+                nObsInGroups <- sapply(split(userData(), userDataGroup()), nrow)
 
                 if (all(length(input$itemCols) < nObsInGroups)) {
-                    enoughObsCheck <- "&#10003;"
+                    enoughObsCheckSymb <- "&#10003;"
                     enoughObsColor <- "black"
                     enoughObsTag <- NULL
 
                     output$obsOk <- reactive({TRUE})
                 } else {
-                    enoughObsCheck <- "&#10005;"
+                    enoughObsCheckSymb <- "&#10005;"
                     enoughObsColor <- "red"
                     enoughObsTag <- "ERROR: There are fewer observations than items in some groups.
-                    Multigroupanalysis not possible. Please deselect the group column to continue."
+                    Multigroupanalysis not possible."
 
                     output$obsOk <- reactive({FALSE})
                 }
             }
         } else {
-            enoughObsCheck <- "&#10005;"
+            enoughObsCheckSymb <- "&#10005;"
             enoughObsColor <- "red"
             enoughObsTag <- "ERROR: There are fewer observations than items."
 
@@ -458,26 +501,26 @@ function(input, output, session) {
             cors <- corrTableWithCIsRaw()$cor
 
             if (any(ps >= input$sigLvl) && any(cors < 0)) {
-                corrNegSigCheck <- "?"
+                corrNegSigCheckSymb <- "?"
                 corrNegSigColor <- "orange"
                 corrNegSigTag <- "WARNING: Insignificant and negative correlations found."
             } else if (any(ps >= input$sigLvl) && any(cors >= 0)) {
-                corrNegSigCheck <- "?"
+                corrNegSigCheckSymb <- "?"
                 corrNegSigColor <- "orange"
                 corrNegSigTag <- "WARNING: Insignificant correlations found."
             } else if (all(ps < input$sigLvl) && any(cors < 0)) {
-                corrNegSigCheck <- "&#10005;"
+                corrNegSigCheckSymb <- "&#10005;"
                 corrNegSigColor <- "red"
                 corrNegSigTag <- "WARNING: Negative correlations found."
             } else {
-                corrNegSigCheck <- "&#10003;"
+                corrNegSigCheckSymb <- "&#10003;"
                 corrNegSigColor <- "black"
                 corrNegSigTag <- NULL
             }
 
             output$corrNegNoErr <- reactive({TRUE})
         } else {
-            corrNegSigCheck <- "&#10005;"
+            corrNegSigCheckSymb <- "&#10005;"
             corrNegSigColor <- "red"
             corrNegSigTag <- paste("WARNING/ERROR:", corrTableWithCIsRaw()$test$message)
 
@@ -501,34 +544,38 @@ function(input, output, session) {
             corrInd <- unlist(extractFitParameters(fittedDummyModel)[, c(2, 1, 3)])
 
             if (corrInd[3] < input$sigLvl) {
-                corrIndCheck <- "&#10003;"
+                corrIndCheckSymb <- "&#10003;"
                 corrIndColor <- "black"
                 corrIndTag <- HTML(sprintf(
-                    "(Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s)",
+                    "Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s",
                     input$estimator,
                     corrInd[1],
                     corrInd[2],
-                    ifelse(corrInd[3] < 0.001,
-                           "< 0.001",
-                           sprintf("= %.3f", corrInd[3])))
+                    ifelse(
+                        corrInd[3] < 0.001,
+                        "< 0.001",
+                        sprintf("= %.3f", corrInd[3]))
+                    )
                 )
                 output$isCorrInd <- reactive({TRUE})
             } else {
-                corrIndCheck <- "&#10005;"
+                corrIndCheckSymb <- "&#10005;"
                 corrIndColor <- "red"
                 corrIndTag <- HTML(sprintf(
-                    "(Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s)",
+                    "Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s",
                     input$estimator,
                     corrInd[1],
                     corrInd[2],
-                    ifelse(corrInd[3] < 0.001,
-                           "< 0.001",
-                           sprintf("= %.3f", corrInd[3])))
+                    ifelse(
+                        corrInd[3] < 0.001,
+                        "< 0.001",
+                        sprintf("= %.3f", corrInd[3]))
+                    )
                 )
                 output$isCorrInd <- reactive({TRUE})#({FALSE})
             }
         } else {
-            corrIndCheck <- "&#10005;"
+            corrIndCheckSymb <- "&#10005;"
             corrIndColor <- "red"
             corrIndTag <- paste("WARNING/ERROR:", fittedDummyModel$message)
 
@@ -540,19 +587,19 @@ function(input, output, session) {
 
             tagList(
                 div(style = paste0("color:", itemColor),
-                    h5(HTML(paste("Number of Items:", itemCheck))),
+                    h5(HTML(paste("Number of Items:", itemCheckSymb))),
                     itemTag
                 ),
                 div(style = paste0("color:", enoughObsColor),
-                    h5(HTML(paste("Number of Observations:", enoughObsCheck))),
+                    h5(HTML(paste("Number of Observations:", enoughObsCheckSymb))),
                     enoughObsTag
                 ),
                 div(style = paste0("color:", corrNegSigColor),
-                    h5(HTML(paste("Item Correlations:", corrNegSigCheck))),
+                    h5(HTML(paste("Item Correlations:", corrNegSigCheckSymb))),
                     corrNegSigTag
                 ),
                 div(style = paste0("color:", corrIndColor),
-                    h5(HTML(paste("Test on Correlative Independence:", corrIndCheck))),
+                    h5(HTML(paste("Test on Correlative Independence:", corrIndCheckSymb))),
                     corrIndTag
                 )
             )
@@ -563,14 +610,250 @@ function(input, output, session) {
         outputOptions(output, "oneItem", suspendWhenHidden = FALSE)
         outputOptions(output, "corrNegNoErr", suspendWhenHidden = FALSE)
 
-        if (any(c(itemCheck, enoughObsCheck, corrNegSigCheck, corrIndCheck) != "&#10003;"))
-            updateActionButton(session,
-                               "goModels",
-                               label = "Test the models (anyway)")
-        else
-            updateActionButton(session,
-                               "goModels",
-                               label = "Test the models")
+        #if (any(c(itemCheckSymb, enoughObsCheckSymb, corrNegSigCheckSymb, corrIndCheckSymb) != "&#10003;"))
+        #    updateActionButton(session,
+        #                       "goModels",
+        #                       label = "Test the models (anyway)")
+        #else
+        #    updateActionButton(session,
+        #                       "goModels",
+        #                       label = "Test the models")
+    })
+
+    # Add descr. stats for groups if a group column is specified -----------------------------------------------------------
+    observe({
+        req(input$groupCol)
+
+        if (input$groupCol != "no") {
+            output$mgDescrTable <- renderUI({
+                req(userDataGroup())
+
+                mgDescrTableList <- lapply(
+                    unique(userDataGroup()),
+                    function(group) t(
+                        apply(
+                            subset(
+                                userDataItems(),
+                                userDataGroup() == group
+                            ),
+                            2,
+                            function(col)
+                                c(Mean = mean(col), SD = sd(col),
+                                  Skew = moments::skewness(col),
+                                  Excess = moments::kurtosis(col) - 3)
+                        )
+                    )
+                )
+
+                descrGroupHeader <- c(1, rep(4, length(unique(userDataGroup()))))
+                names(descrGroupHeader) <- c(
+                    " ",
+                    sprintf(
+                        "Group: %s (n = %i)",
+                        unique(userDataGroup()),
+                        c(table(userDataGroup()))[unique(userDataGroup())]
+                    )
+                )
+
+                tagList(
+                    h4("Mean, Standard Deviation, Skewness, Excess:"),
+                    HTML(
+                        kableExtra::column_spec(
+                            kableExtra::add_header_above(
+                                kableExtra::column_spec(
+                                    makeKable(do.call(cbind, mgDescrTableList)),
+                                    1,
+                                    bold = TRUE
+                                ),
+                                header = descrGroupHeader,
+                                escape = FALSE
+                            ),
+                            1:max(1, length(unique(userDataGroup())) - 1) * 4 + 1,
+                            border_right = ifelse(
+                                length(unique(userDataGroup())) > 1,
+                                "1px solid lightgrey",
+                                FALSE
+                            )
+                        )
+                    )
+                )
+            })
+
+            output$mgCovMat <- renderUI({
+                req(userDataGroup())
+
+                mgCovMatList <- lapply(
+                    unique(userDataGroup()),
+                    function(group)
+                        cov(
+                            subset(
+                                userDataItems(),
+                                userDataGroup() == group
+                            )
+                        )
+                )
+
+                for (i in 1:length(mgCovMatList))
+                    mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
+
+                mgCovMatTable <- kableExtra::column_spec(
+                    makeKable(do.call(rbind, mgCovMatList)),
+                    1,
+                    bold = TRUE
+                )
+
+                groupRowHeaders <- sprintf(
+                    "Group: %s (n = %i)",
+                    unique(userDataGroup()),
+                    c(table(userDataGroup()))
+                )
+
+                for (i in 1:length(unique(userDataGroup())))
+                    mgCovMatTable <- kableExtra::group_rows(
+                        mgCovMatTable,
+                        group_label = groupRowHeaders[i],
+                        start_row = (i - 1) * length(input$itemCols) + 1,
+                        end_row = i * length(input$itemCols),
+                        label_row_css = "background-color: #666; color: #fff;"
+                    )
+
+                tagList(
+                    h4("Covariance Matrix:"),
+                    HTML(
+                        mgCovMatTable
+                    )
+                )
+            })
+
+            output$mgCorrTableTagList <- renderUI({
+                req(userDataGroup())
+
+                mgCorrTableList <- lapply(
+                    unique(userDataGroup()),
+                    function(group)
+                        makeCorrTableWithCIs(
+                            list(
+                                cor = suppressWarnings(cor(
+                                    subset(
+                                        userDataItems(),
+                                        userDataGroup() == group
+                                    )
+                                )),
+                                test = corrplot::cor.mtest(
+                                    subset(
+                                        userDataItems(),
+                                        userDataGroup() == group
+                                    ),
+                                    conf.level = (1 - input$sigLvl)
+                                )
+                            ),
+                            goodColor,
+                            badColor,
+                            neutrColor,
+                            textColor,
+                            input$sigLvl,
+                            input$itemCols
+                        )
+                )
+
+                mgCorrTable <- kableExtra::column_spec(
+                    makeKable(do.call(rbind, mgCorrTableList), bootstrap_options = c("condensed", "striped")),
+                    1,
+                    bold = TRUE
+                )
+
+                groupRowHeaders <- sprintf(
+                    "Group: %s (n = %i)",
+                    unique(userDataGroup()),
+                    c(table(userDataGroup()))
+                )
+
+                for (i in 1:length(unique(userDataGroup())))
+                    mgCorrTable <- kableExtra::group_rows(
+                        mgCorrTable,
+                        group_label = groupRowHeaders[i],
+                        start_row = (i - 1) * length(input$itemCols) * 2 + 1,
+                        end_row = i * length(input$itemCols) * 2,
+                        label_row_css = "background-color: #666; color: #fff;"
+                    )
+
+                tagList(
+                    h4("Correlation Table with Confidence Intervals:"),
+                    HTML(mgCorrTable),
+                    h5("Legend:"),
+                    HTML(makeKable(
+                        cbind(
+                            kableExtra::cell_spec(
+                                "Sig. pos.",
+                                color = textColor,
+                                background = goodColor
+                            ),
+                            kableExtra::cell_spec(
+                                "Sig. neg.",
+                                color = textColor,
+                                background = badColor
+                            ),
+                            kableExtra::cell_spec(
+                                "Insig.",
+                                color = textColor,
+                                background = neutrColor
+                            )
+                        ),
+                        bootstrap_options = "bordered",
+                        position = "left"
+                    ))
+                )
+            })
+        } else {
+            output$mgDescrTable <- renderUI({tagList()})
+            output$mgCovMat <- renderUI({tagList()})
+            output$mgCorrTableTagList <- renderUI({tagList()})
+        }
+    })
+
+    observeEvent(input$groupCol, {
+        req(input$groupCol)
+
+        removeTab(
+            inputId = "preTestTabs",
+            target = "Multigroup statistics"
+        )
+
+        updateCheckboxInput(
+            session,
+            "doMg",
+            value = ifelse(
+                input$groupCol != "no" &&
+                    !any(c(table(userDataRaw()[, input$groupCol])) == 1),
+                TRUE,
+                FALSE
+            )
+        )
+
+        if (input$groupCol != "no" && !any(c(table(userDataRaw()[, input$groupCol])) == 1))
+            insertTab(
+                inputId = "preTestTabs",
+                target = "Statistics",
+                position = "after",
+                select = FALSE,
+                tabPanel("Multigroup statistics",
+                         uiOutput("mgObs"),
+                         uiOutput("mgDescrTable"),
+                         uiOutput("mgCovMat"),
+                         uiOutput("mgCorrTableTagList"))
+            )
+    })
+
+    observeEvent(input$groups, {
+        updateCheckboxInput(
+            session,
+            "doMg",
+            value = ifelse(
+                length(unique(userDataGroup())) > 1,
+                TRUE,
+                FALSE
+            )
+        )
     })
 
     ########################################################################################################################
@@ -918,26 +1201,43 @@ function(input, output, session) {
                         if (isFALSE(groupName)) {
 
                             # Factor Scores --------------------------------------------------------------------------------
-                            output[[paste0(thisModel, "Scores")]] <- renderDataTable({
-                                etaDf <- data.frame(
+                            etaDf <- reactive({
+                                etaDfTmp <- data.frame(
                                     n = 1:nrow(userData()),
                                     eta.hat = lavPredict(fittedModelsWarns[[thisModel]])
                                 )
 
                                 if (input$groupCol != "no") {
-                                    etaDf[[input$groupCol]] <- userData()[, input$groupCol]
+                                    etaDfTmp[[input$groupCol]] <- userDataGroup()
 
-                                    etaDf <- etaDf[, c(1, 3, 2)]
+                                    etaDfTmp <- etaDfTmp[, c(1, 3, 2)]
                                 }
 
-                                etaDf
+                                etaDfTmp
                             })
+
+                            output[[paste0(thisModel, "Scores")]] <- renderDataTable(etaDf())
+
+                            output[[paste0(thisModel, "ScoresDownload")]] <- downloadHandler(
+                                filename = function() {
+                                    input[[paste0(thisModel, "Filename")]]
+                                },
+                                content = function(file) {
+                                    write.table(
+                                        etaDf(),
+                                        file,
+                                        sep = input[[paste0(thisModel, "Sep")]],
+                                        dec = input[[paste0(thisModel, "Dec")]],
+                                        row.names = FALSE
+                                    )
+                                }
+                            )
 
                             appendTab(
                                 inputId = "parTabsets",
                                 tabPanel(
                                     title = HTML(modelsLong[thisModel]),
-                                    h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
+                                    h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
                                     HTML(
                                         kableExtra::add_header_above(
                                             kableExtra::row_spec(
@@ -986,8 +1286,46 @@ function(input, output, session) {
                                               "Reliabilities" = 4)
                                         )
                                     ),
-                                    h4(HTML("Predicted Factor Scores (&eta;)")),
-                                    dataTableOutput(paste0(thisModel, "Scores"))
+                                    h3(HTML("Predicted Factor Scores (&eta;&#x302;)")),
+                                    sidebarLayout(
+                                        sidebarPanel(
+                                            h4("Download Predicted Factor Scores as CSV"),
+                                            textInput(
+                                                paste0(thisModel, "Filename"),
+                                                "Filename:",
+                                                sprintf(
+                                                    "%s_%s_factorscores.csv",
+                                                    switch(
+                                                        input$source,
+                                                        "Workspace" = input$objectFromWorkspace,
+                                                        "CSV" = gsub("\\.csv", "", input$CSVFile$name),
+                                                        "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
+                                                    ),
+                                                    thisModel
+                                                )
+                                            ),
+                                            radioButtons(
+                                                paste0(thisModel, "Sep"),
+                                                "Separator",
+                                                choices = c(Comma = ",",
+                                                            Semicolon = ";",
+                                                            Tab = "\t"),
+                                                selected = ","
+                                            ),
+                                            radioButtons(
+                                                paste0(thisModel, "Dec"),
+                                                "Decimal Separator",
+                                                choices = c(Comma = ",",
+                                                            Dot = "."),
+                                                selected = "."
+                                            ),
+                                            downloadButton(paste0(thisModel, "ScoresDownload"), "Download Factor Scores")
+                                        ),
+                                        mainPanel(
+                                            h4("Data Overview"),
+                                            dataTableOutput(paste0(thisModel, "Scores"))
+                                        )
+                                    )
                                 ),
                                 select = as.logical(whichModel == 1)
                             )
@@ -1234,8 +1572,8 @@ function(input, output, session) {
 
                     colnames(combCompTable) <- rep(c("&Delta;df", paste0(input$estimator, "-&Delta;&chi;&sup2;")), 5)
 
-                    headerNames <- c("", rep(2, 5))
-                    names(headerNames) <- c("", modelsAbbrev)
+                    headerNames <- c(1, rep(2, 5))
+                    names(headerNames) <- c(" ", modelsAbbrev)
 
                     # AIC comparison table ---------------------------------------------------------------------------------
                     dim(infCompTable$aic) <- dim(infCompTable$bic) <- c(5, 5)
@@ -1263,9 +1601,9 @@ function(input, output, session) {
                                 lavErrsMsg,
                                 lavWarnsMsg
                             ),
-                            h4("Hierarchical model comparison plot:"),
+                            h3("Hierarchical model comparison plot:"),
                             plotOutput(paste0("hierPlot", groupName)),
-                            h4("Hierarchical model comparison table:"),
+                            h3("Hierarchical model comparison table:"),
                             HTML(paste0(
                                 "<table align = \"center\", width = \"100%\"><tr><td>",
                                 hierTables[[1]],
@@ -1273,7 +1611,7 @@ function(input, output, session) {
                                 hierTables[[2]],
                                 "</td></tr></table>"
                             )),
-                            h4("Fit index table"),
+                            h3("Fit index table"),
                             HTML(
                                 kableExtra::column_spec(
                                     kableExtra::column_spec(
@@ -1295,7 +1633,7 @@ function(input, output, session) {
                                     border_right = TRUE
                                 )
                             ),
-                            h4(HTML("&chi;&sup2;-Comparison Table:")),
+                            h3(HTML("&chi;&sup2;-Comparison Table:")),
                             HTML(
                                 kableExtra::add_header_above(
                                     kableExtra::column_spec(
@@ -1307,7 +1645,7 @@ function(input, output, session) {
                                     escape = FALSE
                                 )
                             ),
-                            h4("AIC/BIC-Comparison Table:"),
+                            h3("AIC/BIC-Comparison Table:"),
                             HTML(paste0("<table align = \"center\", width = \"100%\">
                                 <tr><td>
                                 <table align = \"center\">
@@ -1362,7 +1700,7 @@ function(input, output, session) {
 
         # Write the selected values ----------------------------------------------------------------------------------------
         output$selectedData <- renderText({
-            paste("The following data was used:",
+            paste("The following data was used:<br>",
                   switch(input$source,
                          "Workspace" = sprintf("Object \"%s\" from workspace", input$objectFromWorkspace),
                          "CSV" = sprintf("CSV-File \"%s\"", input$CSVFile$name),
@@ -1371,7 +1709,7 @@ function(input, output, session) {
         })
 
         output$selectedItems <- renderText({
-            paste("The following items have been chosen:",
+            paste("The following items have been chosen:<br>",
                   paste(input$itemCols, collapse = ", "))
         })
 

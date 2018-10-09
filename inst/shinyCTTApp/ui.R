@@ -53,6 +53,18 @@ fluidPage(
                         uiOutput("itemColsChooser"),
                         hr(),
                         uiOutput("groupColChooser"),
+                        conditionalPanel(
+                            condition = "input.groupCol != 'no'",
+                            uiOutput("groupChooser"),
+                            conditionalPanel(
+                                condition = "input.groups.length > 1",
+                                checkboxInput(
+                                    "doMg",
+                                    "Perform Multigroup Tests",
+                                    value = FALSE
+                                )
+                            )
+                        ),
                         hr(),
                         radioButtons(
                             "estimator",
@@ -72,15 +84,15 @@ fluidPage(
                         ),
                         hr(),
                         conditionalPanel(
-                            condition = "output.oneItem == false",
+                            condition = "!output.oneItem",
                             helpText("Please select more than one item.")
                         ),
                         conditionalPanel(
-                            condition = "output.isCorrInd == false",
+                            condition = "!output.isCorrInd",
                             helpText("All items seem to be uncorrelated.")
                         ),
                         conditionalPanel(
-                            condition = "output.obsOk == false",
+                            condition = "!output.obsOk",
                             helpText("Number of observations too low.")
                         ),
                         conditionalPanel(
@@ -88,22 +100,38 @@ fluidPage(
                             helpText("You didn't select any models.")
                         ),
                         conditionalPanel(
-                            condition = "output.oneItem &&
-                                         output.obsOk &&
-                                         output.isCorrInd &&
-                                         (input.tko || input.ete || input.teq || input.etp || input.tpa)",
+                            condition = "(input.tko || input.ete || input.teq || input.etp || input.tpa) &&
+                                         output.userDataExists",
                             div(align = "center",
                                 actionButton("goModels",
                                              "Test the models"),
                                 helpText("This may take a few seconds."))
+                        ),
+                        conditionalPanel(
+                            condition = "!output.userDataExists",
+                            div(align = "center",
+                                helpText("Can't test the models since there is no valid data."))
+                        ),
+                        hr(),
+                        checkboxInput(
+                            "showOptions",
+                            "Show advanced options"
+                        ),
+                        conditionalPanel(
+                            "input.showOptions",
+                            radioButtons(
+                                "para",
+                                "Choose parameterization:",
+                                choices = c("Std. Eta", "Std. Alpha")
+                            )
                         )
                     ),
                     conditionalPanel(
                         condition = "input.goModels > 0",
                         h5("Selected options:"),
-                        textOutput("selectedData"),
+                        htmlOutput("selectedData"),
                         hr(),
-                        textOutput("selectedItems"),
+                        htmlOutput("selectedItems"),
                         hr(),
                         textOutput("selectedGroup"),
                         hr(),
@@ -118,7 +146,7 @@ fluidPage(
                         h4("Controls"),
                         uiOutput("checks")
                     ),
-                    tabsetPanel(
+                    tabsetPanel(id = "preTestTabs",
                         tabPanel(
                             "Data Overview",
                             h4("Raw data:"),
@@ -127,8 +155,8 @@ fluidPage(
                         tabPanel(
                             "Statistics",
                             htmlOutput("descrTable"),
-                            htmlOutput("corrTableWithCIs"),
-                            htmlOutput("covMat")
+                            htmlOutput("covMat"),
+                            htmlOutput("corrTableWithCIs")
                         ),
                         tabPanel(
                             "Multivariate Normality",
