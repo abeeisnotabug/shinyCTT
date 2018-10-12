@@ -84,35 +84,39 @@ fluidPage(
                         ),
                         hr(),
                         conditionalPanel(
-                            condition = "!output.oneItem",
-                            helpText("Please select more than one item.")
-                        ),
-                        conditionalPanel(
-                            condition = "!output.isCorrInd",
-                            helpText("All items seem to be uncorrelated.")
-                        ),
-                        conditionalPanel(
-                            condition = "!output.obsOk",
-                            helpText("Number of observations too low.")
+                            condition = "(input.tko || input.ete || input.teq || input.etp || input.tpa) &&
+                                         output.oneItem &&
+                                         output.obsOk &&
+                                         output.userDataExists",
+                            div(
+                                align = "center",
+                                actionButton("goModels",
+                                             "Test the models"),
+                                helpText("This may take a few seconds.")
+                            )
                         ),
                         conditionalPanel(
                             condition = "!(input.tko || input.ete || input.teq || input.etp || input.tpa)",
                             helpText("You didn't select any models.")
                         ),
                         conditionalPanel(
-                            condition = "(input.tko || input.ete || input.teq || input.etp || input.tpa) &&
-                                         output.userDataExists",
-                            div(align = "center",
-                                actionButton("goModels",
-                                             "Test the models"),
-                                helpText("This may take a few seconds."))
+                            condition = "!output.oneItem",
+                            helpText("Please select more than one item.")
+                        ),
+                        conditionalPanel(
+                            condition = "!output.obsOk",
+                            helpText("Number of observations too low.")
                         ),
                         conditionalPanel(
                             condition = "!output.userDataExists",
-                            div(align = "center",
-                                helpText("Can't test the models since there is no valid data."))
+                            helpText("Can't test the models since there is no valid data.")
                         ),
                         hr(),
+                        checkboxInput(
+                            "showControls",
+                            "Show controls",
+                            value = TRUE
+                        ),
                         checkboxInput(
                             "showOptions",
                             "Show advanced options"
@@ -140,11 +144,16 @@ fluidPage(
                         textOutput("selectedSigLvl"),
                         hr(),
                         helpText("The models have been tested.")
-                    ), width = 3),
+                    ),
+                    width = 3
+                ),
                 mainPanel(
-                    wellPanel(
-                        h4("Controls"),
-                        uiOutput("checks")
+                    conditionalPanel(
+                        "input.showControls",
+                        wellPanel(
+                            h4("Controls"),
+                            uiOutput("checksUI")
+                        )
                     ),
                     tabsetPanel(id = "preTestTabs",
                         tabPanel(
@@ -152,17 +161,7 @@ fluidPage(
                             h4("Raw data:"),
                             dataTableOutput("dataOverview")
                         ),
-                        tabPanel(
-                            "Statistics",
-                            htmlOutput("descrTable"),
-                            htmlOutput("covMat"),
-                            htmlOutput("corrTableWithCIs")
-                        ),
-                        tabPanel(
-                            "Multivariate Normality",
-                            htmlOutput("mvnComment"),
-                            htmlOutput("mvnTableUV")
-                        ),
+                        # A table with all the models to test in checkboxes ------------------------------------------------
                         tabPanel(
                             "Models to test",
                             h4("Choose models to test and compare:"),
@@ -490,6 +489,25 @@ fluidPage(
                                        )
                                 )
                             )
+                        ),
+                        # End of table -------------------------------------------------------------------------------------
+                        tabPanel(
+                            "Statistics",
+                            htmlOutput("descrTable"),
+                            uiOutput("mgDescrTable"),
+                            htmlOutput("covMat"),
+                            uiOutput("mgCovMat")
+                        ),
+                        tabPanel(
+                            "Correlations",
+                            htmlOutput("corrInd"),
+                            htmlOutput("corrTableWithCIs"),
+                            uiOutput("mgCorrTableTagList")
+                        ),
+                        tabPanel(
+                            "Multivariate Normality",
+                            htmlOutput("mvnComment"),
+                            htmlOutput("mvnTableUV")
                         )
                     )
                 )

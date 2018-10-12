@@ -33,6 +33,39 @@ function(input, output, session) {
 
     possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
 
+    # Preparation 2: Reactive Values ---------------------------------------------------------------------------------------
+    mvnTestResult <- reactiveValues(
+        raw = NULL,
+        estimator = "ML"
+    )
+
+    checks <- reactiveValues(
+        oneItem = list(
+            check = FALSE,
+            symb = NULL,
+            col = NULL,
+            tag = NULL
+        ),
+        obsOk = list(
+            check = FALSE,
+            symb = NULL,
+            col = NULL,
+            tag = NULL
+        ),
+        corrOk = list(
+            check = FALSE,
+            symb = NULL,
+            col = NULL,
+            tag = NULL
+        ),
+        corrIndOk = list(
+            check = FALSE,
+            symb = NULL,
+            col = NULL,
+            tag = NULL
+        )
+    )
+
     ########################################################################################################################
     ## ------------------------------------------------- Data input ----------------------------------------------------- ##
     ########################################################################################################################
@@ -107,13 +140,7 @@ function(input, output, session) {
             NULL
     })
 
-    output$userDataExists <- reactive({
-        if (is.null(userData()))
-            FALSE
-        else
-            TRUE
-    })
-
+    output$userDataExists <- reactive(!is.null(userData()))
     outputOptions(output, "userDataExists", suspendWhenHidden = FALSE)
 
     output$dataOverview <- renderDataTable(userDataRaw())
@@ -209,14 +236,25 @@ function(input, output, session) {
                             Excess = moments::kurtosis(col) - 3))
         )
 
+        nHeader <- c(1, 4)
+        names(nHeader) <- c(
+            " ",
+            sprintf("n<sub>all</sub> = %i", nrow(userDataItems()))
+        )
+
         tagList(
-            h4("Mean, Standard Deviation, Skewness, Excess:"),
+            h4("Descriptive Statistics"),
             HTML(
-                kableExtra::column_spec(
-                    makeKable(table),
-                    1,
-                    bold = TRUE
+                kableExtra::add_header_above(
+                    kableExtra::column_spec(
+                        makeKable(table),
+                        1,
+                        bold = TRUE
+                    ),
+                    nHeader,
+                    escape = FALSE
                 )
+
             )
         )
     })
@@ -228,7 +266,7 @@ function(input, output, session) {
         table[upper.tri(table)] <- NA
 
         tagList(
-            h4("Covariance Matrix:"),
+            h4("Covariance Matrix"),
             HTML(
                 kableExtra::column_spec(
                     makeKable(table),
@@ -300,22 +338,120 @@ function(input, output, session) {
         }
     })
 
-    # Calculate test on MVN ------------------------------------------------------------------------------------------------
-    mvnTestResultRaw <- reactive({
+    # Correlative independence ---------------------------------------------------------------------------------------------
+    corrIndRaw <- reactive({
+        req(userDataItems())
+        req(mvnTestResult$estimator)
+
+        dummyModel <- paste(sprintf("%s ~ 1", colnames(userDataItems())), collapse = "\n")
+
         tryCatch(
-            MVN::mvn(userDataItems()),
+            cfa(
+                model = dummyModel,
+                data = userData(),
+                estimator = mvnTestResult$estimator
+            ),
             warning = function(w) w,
             error = function(e) e
         )
     })
 
-    output$mvnTableUV <- renderUI({
-        if (class(mvnTestResultRaw())[1] == "list") {
+    output$corrInd <- renderUI({
+        req(userData())
 
-            mvnUV <- data.frame(Test = as.character(mvnTestResultRaw()$univariateNormality$Test),
-                                Item = as.character(mvnTestResultRaw()$univariateNormality$Variable),
-                                Statistic = as.numeric(mvnTestResultRaw()$univariateNormality$Statistic),
-                                p = suppressWarnings(as.numeric(mvnTestResultRaw()$univariateNormality$`p value`)),
+        if (class(corrIndRaw())[1] == "lavaan") {
+            corrInd <- unlist(extractFitParameters(corrIndRaw())[, c(2, 1, 3)])
+
+            if (corrInd[3] < input$sigLvl) {
+                tagList(
+                    h4("Test on Correlative Independence"),
+                    HTML(
+                        sprintf(
+                            "The hypothesis that all correlations are equal to zero has to be
+                            discarded on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
+                            input$sigLvl,
+                            mvnTestResult$estimator,
+                            corrInd[1],
+                            corrInd[2],
+                            ifelse(
+                                corrInd[3] < 0.001,
+                                "< 0.001",
+                                sprintf("= %.3f", corrInd[3]))
+                        )
+                    )
+                )
+            } else {
+                tagList(
+                    h4("Test on Correlative Independence"),
+                    HTML(
+                        sprintf(
+                            "The hypothesis that all correlations are equal to zero can be
+                            maintained on a significance level of %.3f.
+                            Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s",
+                            input$sigLvl,
+                            mvnTestResult$estimator,
+                            corrInd[1],
+                            corrInd[2],
+                            ifelse(
+                                corrInd[3] < 0.001,
+                                "< 0.001",
+                                sprintf("= %.3f", corrInd[3]))
+                        )
+                    )
+                )
+            }
+        } else {
+            tagList(
+                h4("Test on Correlative Independence"),
+                div(style = paste0("color:red"),
+                    HTML(paste("There was an ERROR/WARNING:", corrIndRaw()$message))
+                )
+            )
+        }
+    })
+
+    # Calculate test on MVN ------------------------------------------------------------------------------------------------
+    observeEvent(userDataItems(), {
+        mvnTestResult$raw <- tryCatch(
+            MVN::mvn(userDataItems()),
+            warning = function(w) w,
+            error = function(e) e
+        )
+
+        if (class(mvnTestResult$raw)[1] == "list") {
+            mvnTestResult$estimator <- ifelse(
+                any(
+                    as.numeric(
+                        as.character(
+                            mvnTestResult$raw$multivariateNormality[-3, "p value"]
+                        )
+                    ) < input$sigLvl
+                ),
+                "MLR",
+                "ML"
+            )
+
+            updateRadioButtons(
+                session,
+                "estimator",
+                selected = mvnTestResult$estimator
+            )
+        }
+    })
+
+    observeEvent(input$estimator, {
+        mvnTestResult$estimator <- input$estimator
+    })
+
+    output$mvnTableUV <- renderUI({
+        req(userData())
+
+        if (class(mvnTestResult$raw)[1] == "list") {
+
+            mvnUV <- data.frame(Test = as.character(mvnTestResult$raw$univariateNormality$Test),
+                                Item = as.character(mvnTestResult$raw$univariateNormality$Variable),
+                                Statistic = as.numeric(mvnTestResult$raw$univariateNormality$Statistic),
+                                p = suppressWarnings(as.numeric(mvnTestResult$raw$univariateNormality$`p value`)),
                                 stringsAsFactors = F)
 
             mvnUV$p[is.na(mvnUV$p)] <- 0
@@ -333,35 +469,13 @@ function(input, output, session) {
         }
     })
 
-    observeEvent(mvnTestResultRaw(), {
-        print(input$doMg)
-
-        if (class(mvnTestResultRaw())[1] == "list") {
-            req(input$sigLvl)
-
-            updateRadioButtons(
-                session,
-                "estimator",
-                selected = ifelse(
-                    any(
-                        as.numeric(
-                            as.character(
-                                mvnTestResultRaw()$multivariateNormality[-3, "p value"]
-                            )
-                        ) < input$sigLvl
-                    ),
-                    "MLR",
-                    "ML"
-                )
-            )
-        }
-    })
-
     output$mvnComment <- renderUI({
-        mvnMV <- data.frame(Test = as.character(mvnTestResultRaw()$multivariateNormality$Test),
-                            Statistic = as.numeric(as.character(mvnTestResultRaw()$multivariateNormality$Statistic)),
-                            p = as.numeric(as.character(mvnTestResultRaw()$multivariateNormality$`p value`)),
-                            Signif. = as.character(mvnTestResultRaw()$multivariateNormality$Result),
+        req(userData())
+
+        mvnMV <- data.frame(Test = as.character(mvnTestResult$raw$multivariateNormality$Test),
+                            Statistic = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$Statistic)),
+                            p = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$`p value`)),
+                            Signif. = as.character(mvnTestResult$raw$multivariateNormality$Result),
                             stringsAsFactors = F)[-3,]
 
         mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
@@ -371,7 +485,7 @@ function(input, output, session) {
             sprintf("%.3f", round(mvnMV$p, 3))
         )
 
-        if (is.null(mvnTestResultRaw()$multivariateNormality)) {
+        if (is.null(mvnTestResult$raw$multivariateNormality)) {
             tagList()
         } else {
             if ("*" %in% mvnMV$Signif.) {
@@ -401,229 +515,199 @@ function(input, output, session) {
     ########################################################################################################################
     ## ----------------------------------------- Check data before analysis --------------------------------------------- ##
     ########################################################################################################################
-    observe({
-        # Check the number of items ----------------------------------------------------------------------------------------
-        if (length(input$itemCols) == 1) {
-            itemCheckSymb <- "&#10005;"
-            itemColor <- "red"
-            itemTag <- sprintf("ERROR: Only one or no item selected. No analysis possible.")
+    # Check the number of items --------------------------------------------------------------------------------------------
+    observeEvent(input$itemCols, {
+        checks$oneItem <- switch(
+            as.character(length(input$itemCols)),
+            "1" = list(
+                check = FALSE,
+                symb = "&#10005;",
+                col = "red",
+                tag = sprintf("ERROR: Only one or no item selected. No analysis possible.")
+            ),
+            "2" = list(
+                check = TRUE,
+                symb = "(&#10003;)",
+                col = "orange",
+                tag = HTML("WARNING: Only two items selected. The &tau;-kongeneric and
+                            the essentially &tau;-equivalt model can not be tested.")
+            ),
+            "3" = list(
+                check = TRUE,
+                symb = "(&#10003;)",
+                col = "orange",
+                tag = HTML("WARNING: Only three items selected. The &tau;-kongeneric model can not be tested.")
+            ),
+            list(
+                check = TRUE,
+                symb = "&#10003;",
+                col = "black",
+                tag = NULL
+            )
+        )
 
-            output$oneItem <- reactive({FALSE})
+        for (model in models)
+            updateCheckboxInput(
+                session,
+                model,
+                value = switch(
+                    as.character(length(input$itemCols)),
+                    "0" = FALSE,
+                    "1" = FALSE,
+                    "2" = !(model %in% c("tko", "ete")),
+                    "3" = model != "tko",
+                    TRUE
+                )
+            )
 
-            for (model in models) {
-                updateCheckboxInput(session,
-                                    model,
-                                    value = FALSE)
-            }
-        } else if (length(input$itemCols) == 2) {
-            itemCheckSymb <- "(&#10003;)"
-            itemColor <- "orange"
-            itemTag <- HTML("WARNING: Only two items selected. The &tau;-kongeneric and
-                                        the essentially &tau;-equivalt model can not be tested.")
+        output$oneItem <- reactive(checks$oneItem$check)
+        outputOptions(output, "oneItem", suspendWhenHidden = FALSE)
+    })
 
-            output$oneItem <- reactive({TRUE})
+    # Check the number of observations -------------------------------------------------------------------------------------
+    observeEvent(userData(), {
+        req(userDataItems())
 
-            for (model in models) {
-                updateCheckboxInput(session,
-                                    model,
-                                    value = !(model %in% c("tko", "ete")))
-            }
-        } else if (length(input$itemCols) == 3) {
-            itemCheckSymb <- "(&#10003;)"
-            itemColor <- "orange"
-            itemTag <- HTML(sprintf("WARNING: Only three items selected. The &tau;-kongeneric
-                                        model can not be tested."))
-
-            output$oneItem <- reactive({TRUE})
-
-            for (model in models) {
-                updateCheckboxInput(session,
-                                    model,
-                                    value = model != "tko")
-            }
-        } else if (length(input$itemCols) >= 4) {
-            itemCheckSymb <- "&#10003;"
-            itemColor <- "black"
-            itemTag <- NULL
-
-            output$oneItem <- reactive({TRUE})
-
-            for (model in models) {
-                updateCheckboxInput(session,
-                                    model,
-                                    value = TRUE)
-            }
+        checks$obsOk <- if (nrow(userData()) < ncol(userDataItems())) {
+            list(
+                check = FALSE,
+                symb = "&#10005;",
+                col = "red",
+                tag = "ERROR: There are fewer observations than items."
+            )
         } else {
-            itemCheckSymb <- NULL
-            itemColor <- "black"
-            itemTag <- NULL
+            if (input$groupCol == "no") {
+                list(
+                    check = TRUE,
+                    symb = "&#10003;",
+                    col = "black",
+                    tag = NULL
+                )
+            } else {
+                if (any(sapply(split(userData(), userDataGroup()), nrow) < ncol(userDataItems()))) {
+                    list(
+                        check = FALSE,
+                        symb = "&#10005;",
+                        col = "red",
+                        tag = "ERROR: There are fewer observations than items in some groups."
+                    )
+                } else {
+                    list(
+                        check = TRUE,
+                        symb = "&#10003;",
+                        col = "black",
+                        tag = NULL
+                    )
+                }
+            }
         }
 
-        # Check the number of observations ---------------------------------------------------------------------------------
-        if (length(input$itemCols) < nrow(userData())) {
-            req(input$groupCol)
+        output$obsOk <- reactive(checks$obsOk$check)
+        outputOptions(output, "obsOk", suspendWhenHidden = FALSE)
+    })
 
-            if (input$groupCol == "no") {
-                enoughObsCheckSymb <- "&#10003;"
-                enoughObsColor <- "black"
-                enoughObsTag <- NULL
-
-                output$obsOk <- reactive({TRUE})
-            } else if (input$groupCol %in% colnames(userData())) {
-                nObsInGroups <- sapply(split(userData(), userDataGroup()), nrow)
-
-                if (all(length(input$itemCols) < nObsInGroups)) {
-                    enoughObsCheckSymb <- "&#10003;"
-                    enoughObsColor <- "black"
-                    enoughObsTag <- NULL
-
-                    output$obsOk <- reactive({TRUE})
+    # Check for correlations (neg/insig) -----------------------------------------------------------------------------------
+    observeEvent(corrTableWithCIsRaw(), {
+        checks$corrOk <- if (class(corrTableWithCIsRaw()$test)[1] == "list") {
+            if (any(corrTableWithCIsRaw()$test$p >= input$sigLvl)) {
+                if (any(corrTableWithCIsRaw()$cor < 0)) {
+                    list(
+                        check = TRUE,
+                        symb = "?",
+                        col = "orange",
+                        tag = "WARNING: Insignificant and negative correlations found."
+                    )
                 } else {
-                    enoughObsCheckSymb <- "&#10005;"
-                    enoughObsColor <- "red"
-                    enoughObsTag <- "ERROR: There are fewer observations than items in some groups.
-                    Multigroupanalysis not possible."
-
-                    output$obsOk <- reactive({FALSE})
+                    list(
+                        check = TRUE,
+                        symb = "?",
+                        col = "orange",
+                        tag = "WARNING: Insignificant correlations found."
+                    )
+                }
+            } else {
+                if (any(corrTableWithCIsRaw()$cor < 0)) {
+                    list(
+                        check = TRUE,
+                        symb = "&#10005;",
+                        col = "red",
+                        tag = "WARNING: Negative correlations found."
+                    )
+                } else {
+                    list(
+                        check = TRUE,
+                        symb = "&#10003;",
+                        col = "black",
+                        tag = NULL
+                    )
                 }
             }
         } else {
-            enoughObsCheckSymb <- "&#10005;"
-            enoughObsColor <- "red"
-            enoughObsTag <- "ERROR: There are fewer observations than items."
-
-            output$obsOk <- reactive({FALSE})
-        }
-
-        # Check for correlations (neg/insig) -------------------------------------------------------------------------------
-        if (class(corrTableWithCIsRaw()$test)[1] == "list") {
-            ps <- corrTableWithCIsRaw()$test$p
-            cors <- corrTableWithCIsRaw()$cor
-
-            if (any(ps >= input$sigLvl) && any(cors < 0)) {
-                corrNegSigCheckSymb <- "?"
-                corrNegSigColor <- "orange"
-                corrNegSigTag <- "WARNING: Insignificant and negative correlations found."
-            } else if (any(ps >= input$sigLvl) && any(cors >= 0)) {
-                corrNegSigCheckSymb <- "?"
-                corrNegSigColor <- "orange"
-                corrNegSigTag <- "WARNING: Insignificant correlations found."
-            } else if (all(ps < input$sigLvl) && any(cors < 0)) {
-                corrNegSigCheckSymb <- "&#10005;"
-                corrNegSigColor <- "red"
-                corrNegSigTag <- "WARNING: Negative correlations found."
-            } else {
-                corrNegSigCheckSymb <- "&#10003;"
-                corrNegSigColor <- "black"
-                corrNegSigTag <- NULL
-            }
-
-            output$corrNegNoErr <- reactive({TRUE})
-        } else {
-            corrNegSigCheckSymb <- "&#10005;"
-            corrNegSigColor <- "red"
-            corrNegSigTag <- paste("WARNING/ERROR:", corrTableWithCIsRaw()$test$message)
-
-            output$corrNegNoErr <- reactive({FALSE})
-        }
-
-        # Check for correlative independence -------------------------------------------------------------------------------
-        dummyModel <- reactive({
-            paste(sprintf("%s ~ 1", colnames(userDataItems()), collapse = "\n"))
-        })
-
-        fittedDummyModel <- tryCatch(cfa(model = dummyModel(),
-                                         data = userData(),
-                                         estimator = input$estimator),
-                                     warning = function(w) w,
-                                     error = function(e) e)
-
-        if (class(fittedDummyModel)[1] == "lavaan") {
-            req(input$sigLvl)
-
-            corrInd <- unlist(extractFitParameters(fittedDummyModel)[, c(2, 1, 3)])
-
-            if (corrInd[3] < input$sigLvl) {
-                corrIndCheckSymb <- "&#10003;"
-                corrIndColor <- "black"
-                corrIndTag <- HTML(sprintf(
-                    "Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s",
-                    input$estimator,
-                    corrInd[1],
-                    corrInd[2],
-                    ifelse(
-                        corrInd[3] < 0.001,
-                        "< 0.001",
-                        sprintf("= %.3f", corrInd[3]))
-                    )
-                )
-                output$isCorrInd <- reactive({TRUE})
-            } else {
-                corrIndCheckSymb <- "&#10005;"
-                corrIndColor <- "red"
-                corrIndTag <- HTML(sprintf(
-                    "Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s",
-                    input$estimator,
-                    corrInd[1],
-                    corrInd[2],
-                    ifelse(
-                        corrInd[3] < 0.001,
-                        "< 0.001",
-                        sprintf("= %.3f", corrInd[3]))
-                    )
-                )
-                output$isCorrInd <- reactive({TRUE})#({FALSE})
-            }
-        } else {
-            corrIndCheckSymb <- "&#10005;"
-            corrIndColor <- "red"
-            corrIndTag <- paste("WARNING/ERROR:", fittedDummyModel$message)
-
-            output$isCorrInd <- reactive({TRUE})#({FALSE})
-        }
-
-        output$checks <- renderUI({
-            req(userDataItems())
-
-            tagList(
-                div(style = paste0("color:", itemColor),
-                    h5(HTML(paste("Number of Items:", itemCheckSymb))),
-                    itemTag
-                ),
-                div(style = paste0("color:", enoughObsColor),
-                    h5(HTML(paste("Number of Observations:", enoughObsCheckSymb))),
-                    enoughObsTag
-                ),
-                div(style = paste0("color:", corrNegSigColor),
-                    h5(HTML(paste("Item Correlations:", corrNegSigCheckSymb))),
-                    corrNegSigTag
-                ),
-                div(style = paste0("color:", corrIndColor),
-                    h5(HTML(paste("Test on Correlative Independence:", corrIndCheckSymb))),
-                    corrIndTag
-                )
+            list(
+                check = FALSE,
+                symb = "&#10005;",
+                col = "red",
+                tag = paste("WARNING/ERROR:", corrTableWithCIsRaw()$test$message)
             )
-        })
+        }
+    })
 
-        outputOptions(output, "isCorrInd", suspendWhenHidden = FALSE)
-        outputOptions(output, "obsOk", suspendWhenHidden = FALSE)
-        outputOptions(output, "oneItem", suspendWhenHidden = FALSE)
-        outputOptions(output, "corrNegNoErr", suspendWhenHidden = FALSE)
+    # Check for correlative independence -----------------------------------------------------------------------------------
+    observeEvent(corrIndRaw(), {
+        if (class(corrIndRaw())[1] == "lavaan") {
+            corrInd <- unlist(extractFitParameters(corrIndRaw())[, c(2, 1, 3)])
 
-        #if (any(c(itemCheckSymb, enoughObsCheckSymb, corrNegSigCheckSymb, corrIndCheckSymb) != "&#10003;"))
-        #    updateActionButton(session,
-        #                       "goModels",
-        #                       label = "Test the models (anyway)")
-        #else
-        #    updateActionButton(session,
-        #                       "goModels",
-        #                       label = "Test the models")
+            checks$corrIndOk <- if (corrInd[3] < input$sigLvl) {
+                list(
+                    check = TRUE,
+                    symb = "&#10003;",
+                    col = "black",
+                    tag = NULL
+                )
+            } else {
+                list(
+                    check = FALSE,
+                    symb = "&#10005;",
+                    col = "red",
+                    tag = NULL
+                )
+            }
+        } else {
+            checks$corrIndOk <- list(
+                check = FALSE,
+                symb = "&#10005;",
+                col = "red",
+                tag = paste("WARNING/ERROR:", corrIndRaw()$message)
+            )
+        }
+    })
+
+    # Create the output object ---------------------------------------------------------------------------------------------
+    output$checksUI <- renderUI({
+        req(userData())
+
+        tagList(
+            div(style = paste0("color:", checks$oneItem$col),
+                h5(HTML(paste("Number of Items:", checks$oneItem$symb))),
+                checks$oneItem$tag
+            ),
+            div(style = paste0("color:", checks$obsOk$col),
+                h5(HTML(paste("Number of Observations:", checks$obsOk$symb))),
+                checks$obsOk$tag
+            ),
+            div(style = paste0("color:", checks$corrOk$col),
+                h5(HTML(paste("Item Correlations:", checks$corrOk$symb))),
+                checks$corrOk$tag
+            ),
+            div(style = paste0("color:", checks$corrIndOk$col),
+                h5(HTML(paste("Test on Correlative Independence:", checks$corrIndOk$symb))),
+                checks$corrIndOk$tag
+            )
+        )
     })
 
     # Add descr. stats for groups if a group column is specified -----------------------------------------------------------
-    observe({
-        req(input$groupCol)
-
+    observeEvent(input$groupCol, {
         if (input$groupCol != "no") {
             output$mgDescrTable <- renderUI({
                 req(userDataGroup())
@@ -649,14 +733,15 @@ function(input, output, session) {
                 names(descrGroupHeader) <- c(
                     " ",
                     sprintf(
-                        "Group: %s (n = %i)",
+                        "Group: %s (n<sub>%s</sub> = %i)",
                         unique(userDataGroup()),
-                        c(table(userDataGroup()))[unique(userDataGroup())]
+                        unique(userDataGroup()),
+                        c(table(userDataGroup()))[as.character(unique(userDataGroup()))]
                     )
                 )
 
                 tagList(
-                    h4("Mean, Standard Deviation, Skewness, Excess:"),
+                    h4("Multigroup Descriptive Statistics"),
                     HTML(
                         kableExtra::column_spec(
                             kableExtra::add_header_above(
@@ -703,9 +788,8 @@ function(input, output, session) {
                 )
 
                 groupRowHeaders <- sprintf(
-                    "Group: %s (n = %i)",
-                    unique(userDataGroup()),
-                    c(table(userDataGroup()))
+                    "Group: %s",
+                    unique(userDataGroup())
                 )
 
                 for (i in 1:length(unique(userDataGroup())))
@@ -718,7 +802,7 @@ function(input, output, session) {
                     )
 
                 tagList(
-                    h4("Covariance Matrix:"),
+                    h4("Multigroup Covariance Matrices:"),
                     HTML(
                         mgCovMatTable
                     )
@@ -763,9 +847,8 @@ function(input, output, session) {
                 )
 
                 groupRowHeaders <- sprintf(
-                    "Group: %s (n = %i)",
-                    unique(userDataGroup()),
-                    c(table(userDataGroup()))
+                    "Group: %s",
+                    unique(userDataGroup())
                 )
 
                 for (i in 1:length(unique(userDataGroup())))
@@ -778,7 +861,7 @@ function(input, output, session) {
                     )
 
                 tagList(
-                    h4("Correlation Table with Confidence Intervals:"),
+                    h4("Multigroup Correlation Tables"),
                     HTML(mgCorrTable),
                     h5("Legend:"),
                     HTML(makeKable(
@@ -811,45 +894,14 @@ function(input, output, session) {
         }
     })
 
-    observeEvent(input$groupCol, {
-        req(input$groupCol)
-
-        removeTab(
-            inputId = "preTestTabs",
-            target = "Multigroup statistics"
-        )
-
+    observeEvent(list(input$groupCol, input$groups), {
         updateCheckboxInput(
             session,
             "doMg",
             value = ifelse(
                 input$groupCol != "no" &&
-                    !any(c(table(userDataRaw()[, input$groupCol])) == 1),
-                TRUE,
-                FALSE
-            )
-        )
-
-        if (input$groupCol != "no" && !any(c(table(userDataRaw()[, input$groupCol])) == 1))
-            insertTab(
-                inputId = "preTestTabs",
-                target = "Statistics",
-                position = "after",
-                select = FALSE,
-                tabPanel("Multigroup statistics",
-                         uiOutput("mgObs"),
-                         uiOutput("mgDescrTable"),
-                         uiOutput("mgCovMat"),
-                         uiOutput("mgCorrTableTagList"))
-            )
-    })
-
-    observeEvent(input$groups, {
-        updateCheckboxInput(
-            session,
-            "doMg",
-            value = ifelse(
-                length(unique(userDataGroup())) > 1,
+                    !any(c(table(userDataRaw()[, input$groupCol])) == 1) &&
+                    length(input$groups) > 1,
                 TRUE,
                 FALSE
             )
@@ -860,7 +912,6 @@ function(input, output, session) {
     ## --------------------------------------------- Generate the models ------------------------------------------------ ##
     ########################################################################################################################
     observeEvent(input$goModels, {
-
         modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
 
         appendTab(
@@ -883,7 +934,7 @@ function(input, output, session) {
         )
 
         lapply(
-            append(list(FALSE), if (input$groupCol != "no") input$groupCol),
+            append(list(FALSE), if (input$doMg) input$groupCol),
             function(groupName) {
 
                 # Try fitting and capture warning and error messages -------------------------------------------------------
@@ -898,7 +949,7 @@ function(input, output, session) {
                             tryCatch(cfa(model = model,
                                          data = userData(),
                                          meanstructure = TRUE,
-                                         estimator = input$estimator),
+                                         estimator = mvnTestResult$estimator),
                                      error = function(e) e,
                                      warning = function(w) w)
                         }
@@ -910,7 +961,7 @@ function(input, output, session) {
                                 tryCatch(cfa(model = model,
                                              data = userData(),
                                              meanstructure = TRUE,
-                                             estimator = input$estimator),
+                                             estimator = mvnTestResult$estimator),
                                          error = function(e) e)
                             )
                         }
@@ -924,7 +975,7 @@ function(input, output, session) {
                                          meanstructure = TRUE,
                                          group = groupName,
                                          group.equal = c("loadings", "intercepts"),
-                                         estimator = input$estimator),
+                                         estimator = mvnTestResult$estimator),
                                      error = function(e) e,
                                      warning = function(w) w)
                         }
@@ -938,13 +989,14 @@ function(input, output, session) {
                                              meanstructure = TRUE,
                                              group = groupName,
                                              group.equal = c("loadings", "intercepts"),
-                                             estimator = input$estimator),
+                                             estimator = mvnTestResult$estimator),
                                          error = function(e) e)
                             )
                         }
                     )
                 }
 
+                # Warning and error counting and capturing -----------------------------------------------------------------
                 warns <- sapply(
                     lapply(fittedModelsWarns, class),
                     function(code) code[1] == "simpleWarning"
@@ -1058,7 +1110,7 @@ function(input, output, session) {
 
                 compTable$chisq[lower.tri(diag(5), diag = TRUE)] <-
                     infCompTable$aic[lower.tri(diag(5), diag = TRUE)] <-
-                    infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"     color: lightgrey;\" >X</span>"
+                    infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
 
                 # Generate Paramter Tables, Fits and Fit Tables ------------------------------------------------------------
                 for (model in goodModels) {
@@ -1066,7 +1118,7 @@ function(input, output, session) {
                         thisModel <- model
                         whichModel <- which(goodModels == thisModel)
 
-                        # Write to chisq comp table ------------------------------------------------------------------------
+                        # Write to diag(chisq comp table) ------------------------------------------------------------------
                         if (fits[thisModel, "pvalue"] < 0.05) {
                             sigAddon <- "*"
                             sigColor <- badColor
@@ -1145,7 +1197,7 @@ function(input, output, session) {
                                 )
                         }
 
-                        # Some stuff to be edited later --------------------------------------------------------------------
+                        # Write to lower.tri(chisq comp table) -------------------------------------------------------------
                         compsWithThisModel <- substring(
                             comps[grep(thisModel, substr(comps, 1, 3))],
                             4,
@@ -1201,43 +1253,37 @@ function(input, output, session) {
                         if (isFALSE(groupName)) {
 
                             # Factor Scores --------------------------------------------------------------------------------
-                            etaDf <- reactive({
-                                etaDfTmp <- data.frame(
+                            output[[paste0(thisModel, "Scores")]] <<- renderDataTable(
+                                data.frame(
                                     n = 1:nrow(userData()),
                                     eta.hat = lavPredict(fittedModelsWarns[[thisModel]])
                                 )
+                            )
 
-                                if (input$groupCol != "no") {
-                                    etaDfTmp[[input$groupCol]] <- userDataGroup()
-
-                                    etaDfTmp <- etaDfTmp[, c(1, 3, 2)]
-                                }
-
-                                etaDfTmp
-                            })
-
-                            output[[paste0(thisModel, "Scores")]] <- renderDataTable(etaDf())
-
-                            output[[paste0(thisModel, "ScoresDownload")]] <- downloadHandler(
+                            output[[paste0(thisModel, "ScoresDownload")]] <<- downloadHandler(
                                 filename = function() {
                                     input[[paste0(thisModel, "Filename")]]
                                 },
                                 content = function(file) {
                                     write.table(
-                                        etaDf(),
+                                        data.frame(
+                                            n = 1:nrow(userData()),
+                                            eta.hat = lavPredict(fittedModelsWarns[[thisModel]])
+                                        ),
                                         file,
                                         sep = input[[paste0(thisModel, "Sep")]],
                                         dec = input[[paste0(thisModel, "Dec")]],
                                         row.names = FALSE
                                     )
-                                }
+                                },
+                                contentType = "text/csv"
                             )
 
                             appendTab(
                                 inputId = "parTabsets",
                                 tabPanel(
                                     title = HTML(modelsLong[thisModel]),
-                                    h3("Estimated Paramters with Standard Errors and Confidence Intervals:"),
+                                    h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
                                     HTML(
                                         kableExtra::add_header_above(
                                             kableExtra::row_spec(
@@ -1252,26 +1298,26 @@ function(input, output, session) {
                                                             "&lambda;&#x302;<sub>i</sub>",
                                                             "Est.", paste0(c("SE", "CI"),
                                                                            "<sub>",
-                                                                           input$estimator,
+                                                                           mvnTestResult$estimator,
                                                                            "</sub>"),
                                                             "Std. Est.", paste0(c("SE", "CI"),
                                                                                 "<sub>",
-                                                                                input$estimator,
+                                                                                mvnTestResult$estimator,
                                                                                 "</sub>"),
                                                             "&alpha;&#x302;<sub>i</sub>",
                                                             "Est.", paste0(c("SE", "CI"),
                                                                            "<sub>",
-                                                                           input$estimator,
+                                                                           mvnTestResult$estimator,
                                                                            "</sub>"),
                                                             "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
                                                             "Est.", paste0(c("SE", "CI"),
                                                                            "<sub>",
-                                                                           input$estimator,
+                                                                           mvnTestResult$estimator,
                                                                            "</sub>"),
                                                             "R&#x302;<sub>i</sub>",
                                                             "Est.", paste0(c("SE", "CI"),
                                                                            "<sub>",
-                                                                           input$estimator,
+                                                                           mvnTestResult$estimator,
                                                                            "</sub>")
                                                         )
                                                     ),
@@ -1286,7 +1332,7 @@ function(input, output, session) {
                                               "Reliabilities" = 4)
                                         )
                                     ),
-                                    h3(HTML("Predicted Factor Scores (&eta;&#x302;)")),
+                                    h4(HTML("Predicted Factor Scores (&eta;&#x302;)")),
                                     sidebarLayout(
                                         sidebarPanel(
                                             h4("Download Predicted Factor Scores as CSV"),
@@ -1304,6 +1350,7 @@ function(input, output, session) {
                                                     thisModel
                                                 )
                                             ),
+                                            hr(),
                                             radioButtons(
                                                 paste0(thisModel, "Sep"),
                                                 "Separator",
@@ -1319,7 +1366,12 @@ function(input, output, session) {
                                                             Dot = "."),
                                                 selected = "."
                                             ),
-                                            downloadButton(paste0(thisModel, "ScoresDownload"), "Download Factor Scores")
+                                            hr(),
+                                            div(
+                                                align = "center",
+                                                downloadButton(paste0(thisModel, "ScoresDownload"), "Download Factor Scores")
+                                            ),
+                                            width = 3
                                         ),
                                         mainPanel(
                                             h4("Data Overview"),
@@ -1383,7 +1435,7 @@ function(input, output, session) {
                                                is.na(chisq),
                                                "No~Comparison",
                                                sprintf("'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
-                                                       input$estimator,
+                                                       mvnTestResult$estimator,
                                                        chisq,
                                                        df,
                                                        ifelse(pvalue < 0.001,
@@ -1475,11 +1527,11 @@ function(input, output, session) {
                                 hierTable$CFI[1] <- sprintf("%.3f", as.numeric(hierTable$CFI[1]))
 
                                 names(hierTable) <- c("&Delta;df",
-                                                      paste0(input$estimator, "-&Delta;&chi;&sup2;"),
+                                                      paste0(mvnTestResult$estimator, "-&Delta;&chi;&sup2;"),
                                                       "p",
                                                       "AIC",
                                                       "BIC",
-                                                      paste0(input$estimator, "-CFI"))
+                                                      paste0(mvnTestResult$estimator, "-CFI"))
 
                                 rownames(hierTable) <- modelsAbbrev[rownames(hierTable)]
 
@@ -1570,7 +1622,7 @@ function(input, output, session) {
                     combCompTable[, seq(1, 10, 2)] <- matrix(compTable$df, ncol = 5, nrow = 5)
                     combCompTable[, seq(2, 10, 2)] <- matrix(compTable$chisq, ncol = 5, nrow = 5)
 
-                    colnames(combCompTable) <- rep(c("&Delta;df", paste0(input$estimator, "-&Delta;&chi;&sup2;")), 5)
+                    colnames(combCompTable) <- rep(c("&Delta;df", paste0(mvnTestResult$estimator, "-&Delta;&chi;&sup2;")), 5)
 
                     headerNames <- c(1, rep(2, 5))
                     names(headerNames) <- c(" ", modelsAbbrev)
@@ -1601,9 +1653,9 @@ function(input, output, session) {
                                 lavErrsMsg,
                                 lavWarnsMsg
                             ),
-                            h3("Hierarchical model comparison plot:"),
+                            h4("Hierarchical model comparison plot:"),
                             plotOutput(paste0("hierPlot", groupName)),
-                            h3("Hierarchical model comparison table:"),
+                            h4("Hierarchical model comparison table:"),
                             HTML(paste0(
                                 "<table align = \"center\", width = \"100%\"><tr><td>",
                                 hierTables[[1]],
@@ -1611,29 +1663,29 @@ function(input, output, session) {
                                 hierTables[[2]],
                                 "</td></tr></table>"
                             )),
-                            h3("Fit index table"),
+                            h4("Fit index table"),
                             HTML(
                                 kableExtra::column_spec(
                                     kableExtra::column_spec(
                                         makeKable(
                                             fits[, -c(9, 10)],
                                             col.names = c("df",
-                                                          paste0(input$estimator, "-&chi;&sup2;"),
+                                                          paste0(mvnTestResult$estimator, "-&chi;&sup2;"),
                                                           "p",
                                                           "RMSEA",
                                                           "p",
                                                           "95%-CI",
-                                                          paste0(input$estimator, "-CFI"),
+                                                          paste0(mvnTestResult$estimator, "-CFI"),
                                                           "SRMR")
                                         ),
                                         1,
                                         bold = TRUE
                                     ),
                                     c(4, 7),
-                                    border_right = TRUE
+                                    border_right = "1px solid lightgrey"
                                 )
                             ),
-                            h3(HTML("&chi;&sup2;-Comparison Table:")),
+                            h4(HTML("&chi;&sup2;-Comparison Table:")),
                             HTML(
                                 kableExtra::add_header_above(
                                     kableExtra::column_spec(
@@ -1645,7 +1697,7 @@ function(input, output, session) {
                                     escape = FALSE
                                 )
                             ),
-                            h3("AIC/BIC-Comparison Table:"),
+                            h4("AIC/BIC-Comparison Table:"),
                             HTML(paste0("<table align = \"center\", width = \"100%\">
                                 <tr><td>
                                 <table align = \"center\">
@@ -1696,8 +1748,6 @@ function(input, output, session) {
             }
         )
 
-        # Print the error/warnings -----------------------------------------------------------------------------------------
-
         # Write the selected values ----------------------------------------------------------------------------------------
         output$selectedData <- renderText({
             paste("The following data was used:<br>",
@@ -1714,14 +1764,13 @@ function(input, output, session) {
         })
 
         output$selectedGroup <- renderText({
-            if (input$groupCol == "no") {
-                "No group variable has been chosen."
-            } else {
-                paste("The following group column has been chosen:", input$groupCol)
-            }
+            if (input$groupCol == "no")
+                "No multigroup tests have been performed."
+            else
+                paste("Multigroup tests have been performed with group column", input$groupCol)
         })
 
-        output$selectedEstimator <- renderText({sprintf("The %s estimator has been chosen.", input$estimator)})
+        output$selectedEstimator <- renderText({sprintf("The %s estimator has been chosen.", mvnTestResult$estimator)})
 
         output$selectedSigLvl <- renderText({
             paste("All tests have been performed on a significance level of", input$sigLvl)
