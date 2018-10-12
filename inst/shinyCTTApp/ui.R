@@ -91,20 +91,20 @@ fluidPage(
                             div(
                                 align = "center",
                                 actionButton("goModels",
-                                             "Test the models"),
-                                helpText("This may take a few seconds.")
+                                             "Test the models")
                             )
                         ),
                         conditionalPanel(
-                            condition = "!(input.tko || input.ete || input.teq || input.etp || input.tpa)",
+                            condition = "!(input.tko || input.ete || input.teq || input.etp || input.tpa) &&
+                                         output.oneItem",
                             helpText("You didn't select any models.")
                         ),
                         conditionalPanel(
                             condition = "!output.oneItem",
-                            helpText("Please select more than one item.")
+                            helpText("Number of items too low.")
                         ),
                         conditionalPanel(
-                            condition = "!output.obsOk",
+                            condition = "!output.obsOk && input.doMg",
                             helpText("Number of observations too low.")
                         ),
                         conditionalPanel(
@@ -132,18 +132,8 @@ fluidPage(
                     ),
                     conditionalPanel(
                         condition = "input.goModels > 0",
-                        h5("Selected options:"),
-                        htmlOutput("selectedData"),
-                        hr(),
-                        htmlOutput("selectedItems"),
-                        hr(),
-                        textOutput("selectedGroup"),
-                        hr(),
-                        textOutput("selectedEstimator"),
-                        hr(),
-                        textOutput("selectedSigLvl"),
-                        hr(),
-                        helpText("The models have been tested.")
+                        uiOutput("testing"),
+                        uiOutput("selectedOptions")
                     ),
                     width = 3
                 ),

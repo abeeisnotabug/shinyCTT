@@ -2,6 +2,7 @@
 
 export(extractFitParameters)
 export(extractParameters)
+export(getPredictedScores)
 export(makeCorrTableWithCIs)
 export(makeKable)
 export(makeModelCodes)

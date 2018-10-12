@@ -475,7 +475,7 @@ function(input, output, session) {
             tagList(
                 h4("Test on Multivariate Normality:"),
                 div(style = paste0("color:red"),
-                    HTML(paste("There was an ERROR/WARNING:", corrIndRaw()$message))
+                    HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message))
                 )
             )
         }
@@ -575,7 +575,7 @@ function(input, output, session) {
     })
 
     # Check the number of observations -------------------------------------------------------------------------------------
-    observeEvent(userData(), {
+    observeEvent(list(userData(), input$doMg), {
         req(userDataItems())
 
         checks$obsOk <- if (nrow(userData()) < ncol(userDataItems())) {
@@ -594,7 +594,8 @@ function(input, output, session) {
                     tag = NULL
                 )
             } else {
-                if (any(sapply(split(userData(), userDataGroup()), nrow) < ncol(userDataItems()))) {
+                if (any(sapply(split(userData(), userDataGroup()), nrow) < ncol(userDataItems())) &&
+                    input$doMg) {
                     list(
                         check = FALSE,
                         symb = "&#10005;",
@@ -926,6 +927,8 @@ function(input, output, session) {
     ########################################################################################################################
     ## --------------------------------------------- Generate the models ------------------------------------------------ ##
     ########################################################################################################################
+    output$testing <- renderUI(helpText("The models are being tested. This may take a few seconds."))
+
     observeEvent(input$goModels, {
         modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
 
@@ -934,7 +937,7 @@ function(input, output, session) {
             tabPanel(
                 "Model Comparison Tests",
                 value = "panelModelTests",
-                tabsetPanel(id = "compTabsets")
+                tabsetPanel(id = "compTabsets", type = "pills")
             ),
             select = TRUE
         )
@@ -944,7 +947,7 @@ function(input, output, session) {
             tabPanel(
                 "Parameter Tables and Factor Scores",
                 value = "panelParTables",
-                tabsetPanel(id = "parTabsets")
+                tabsetPanel(id = "parTabsets", type = "pills")
             )
         )
 
@@ -1127,6 +1130,20 @@ function(input, output, session) {
                     infCompTable$aic[lower.tri(diag(5), diag = TRUE)] <-
                     infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
 
+                # Make tabs for single/multigroup --------------------------------------------------------------------------
+                appendTab(
+                    inputId = "parTabsets",
+                    tabPanel(
+                        ifelse(isFALSE(groupName),
+                               "Singlegroup",
+                               "Multigroup"),
+                        tabsetPanel(
+                            id = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)])
+                        )
+                    ),
+                    select = isFALSE(groupName)
+                )
+
                 # Generate Paramter Tables, Fits and Fit Tables ------------------------------------------------------------
                 for (model in goodModels) {
                     local({
@@ -1264,27 +1281,22 @@ function(input, output, session) {
                                 )
                         }
 
-                        # Create Tab ---------------------------------------------------------------------------------------
-                        if (isFALSE(groupName)) {
-
-                            # Factor Scores --------------------------------------------------------------------------------
-                            output[[paste0(thisModel, "Scores")]] <<- renderDataTable(
-                                data.frame(
-                                    n = 1:nrow(userData()),
-                                    eta.hat = lavPredict(fittedModelsWarns[[thisModel]])
-                                )
+                        # Factor Scores ------------------------------------------------------------------------------------
+                        output[[
+                            paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
+                            ]] <<- renderDataTable(
+                                getPredictedScores(fittedModelsWarns[[thisModel]], userDataGroup())
                             )
 
-                            output[[paste0(thisModel, "ScoresDownload")]] <<- downloadHandler(
+                        output[[
+                            paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)])
+                            ]] <<- downloadHandler(
                                 filename = function() {
-                                    input[[paste0(thisModel, "Filename")]]
+                                    input[[paste0(thisModel, "Filename", c("Mg")[!isFALSE(groupName)])]]
                                 },
                                 content = function(file) {
                                     write.table(
-                                        data.frame(
-                                            n = 1:nrow(userData()),
-                                            eta.hat = lavPredict(fittedModelsWarns[[thisModel]])
-                                        ),
+                                        getPredictedScores(fittedModelsWarns[[thisModel]], userDataGroup()),
                                         file,
                                         sep = input[[paste0(thisModel, "Sep")]],
                                         dec = input[[paste0(thisModel, "Dec")]],
@@ -1294,109 +1306,131 @@ function(input, output, session) {
                                 contentType = "text/csv"
                             )
 
-                            appendTab(
-                                inputId = "parTabsets",
-                                tabPanel(
-                                    title = HTML(modelsLong[thisModel]),
-                                    h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
-                                    HTML(
-                                        kableExtra::add_header_above(
-                                            kableExtra::row_spec(
-                                                kableExtra::column_spec(
-                                                    makeKable(
-                                                        extractParameters(
-                                                            fittedModelsWarns[[thisModel]],
-                                                            alpha = input$sigLvl
-                                                        ),
-                                                        col.names = c(
-                                                            "Item",
-                                                            "&lambda;&#x302;<sub>i</sub>",
-                                                            "Est.", paste0(c("SE", "CI"),
-                                                                           "<sub>",
-                                                                           mvnTestResult$estimator,
-                                                                           "</sub>"),
-                                                            "Std. Est.", paste0(c("SE", "CI"),
-                                                                                "<sub>",
-                                                                                mvnTestResult$estimator,
-                                                                                "</sub>"),
-                                                            "&alpha;&#x302;<sub>i</sub>",
-                                                            "Est.", paste0(c("SE", "CI"),
-                                                                           "<sub>",
-                                                                           mvnTestResult$estimator,
-                                                                           "</sub>"),
-                                                            "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
-                                                            "Est.", paste0(c("SE", "CI"),
-                                                                           "<sub>",
-                                                                           mvnTestResult$estimator,
-                                                                           "</sub>"),
-                                                            "R&#x302;<sub>i</sub>",
-                                                            "Est.", paste0(c("SE", "CI"),
-                                                                           "<sub>",
-                                                                           mvnTestResult$estimator,
-                                                                           "</sub>")
-                                                        )
-                                                    ),
-                                                    1,
-                                                    bold = TRUE),
-                                                length(input$itemCols) + 1,
-                                                bold = TRUE),
-                                            c(" ",
-                                              "Discrimination Parameters (Factor Loadings)" = 7,
-                                              "Easiness Parameters" = 4,
-                                              "Variances" = 4,
-                                              "Reliabilities" = 4)
+                        # Parameter tables ---------------------------------------------------------------------------------
+                        parTableWithCIs <- kableExtra::add_header_above(
+                            kableExtra::row_spec(
+                                kableExtra::column_spec(
+                                    makeKable(
+                                        extractParameters(
+                                            fittedModelsWarns[[thisModel]],
+                                            alpha = input$sigLvl
+                                        ),
+                                        col.names = c(
+                                            "Item",
+                                            "&lambda;&#x302;<sub>i</sub>",
+                                            "Est.", paste0(c("SE", "CI"),
+                                                           "<sub>",
+                                                           mvnTestResult$estimator,
+                                                           "</sub>"),
+                                            "Std. Est.", paste0(c("SE", "CI"),
+                                                                "<sub>",
+                                                                mvnTestResult$estimator,
+                                                                "</sub>"),
+                                            "&alpha;&#x302;<sub>i</sub>",
+                                            "Est.", paste0(c("SE", "CI"),
+                                                           "<sub>",
+                                                           mvnTestResult$estimator,
+                                                           "</sub>"),
+                                            "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
+                                            "Est.", paste0(c("SE", "CI"),
+                                                           "<sub>",
+                                                           mvnTestResult$estimator,
+                                                           "</sub>"),
+                                            "R&#x302;<sub>i</sub>",
+                                            "Est.", paste0(c("SE", "CI"),
+                                                           "<sub>",
+                                                           mvnTestResult$estimator,
+                                                           "</sub>")
                                         )
                                     ),
-                                    h4(HTML("Predicted Factor Scores (&eta;&#x302;)")),
-                                    sidebarLayout(
-                                        sidebarPanel(
-                                            h4("Download Predicted Factor Scores as CSV"),
-                                            textInput(
-                                                paste0(thisModel, "Filename"),
-                                                "Filename:",
-                                                sprintf(
-                                                    "%s_%s_factorscores.csv",
-                                                    switch(
-                                                        input$source,
-                                                        "Workspace" = input$objectFromWorkspace,
-                                                        "CSV" = gsub("\\.csv", "", input$CSVFile$name),
-                                                        "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
-                                                    ),
-                                                    thisModel
-                                                )
-                                            ),
-                                            hr(),
-                                            radioButtons(
-                                                paste0(thisModel, "Sep"),
-                                                "Separator",
-                                                choices = c(Comma = ",",
-                                                            Semicolon = ";",
-                                                            Tab = "\t"),
-                                                selected = ","
-                                            ),
-                                            radioButtons(
-                                                paste0(thisModel, "Dec"),
-                                                "Decimal Separator",
-                                                choices = c(Comma = ",",
-                                                            Dot = "."),
-                                                selected = "."
-                                            ),
-                                            hr(),
-                                            div(
-                                                align = "center",
-                                                downloadButton(paste0(thisModel, "ScoresDownload"), "Download Factor Scores")
-                                            ),
-                                            width = 3
+                                    1,
+                                    bold = TRUE),
+                                (length(input$itemCols) + 1) * 1:fittedModelsWarns[[thisModel]]@Data@ngroups,
+                                bold = TRUE),
+                            c(" ",
+                              "Discrimination Parameters (Factor Loadings)" = 7,
+                              "Easiness Parameters" = 4,
+                              "Variances" = 4,
+                              "Reliabilities" = 4)
+                        )
+
+                        if (!isFALSE(groupName))
+                            for (i in 1:fittedModelsWarns[[thisModel]]@Data@ngroups) {
+                                groupRowHeaders <- sprintf(
+                                    "Group: %s",
+                                    fittedModelsWarns[[thisModel]]@Data@group.label
+                                )
+
+                                parTableWithCIs <- kableExtra::group_rows(
+                                    parTableWithCIs,
+                                    group_label = groupRowHeaders[i],
+                                    start_row = (i - 1) * (length(input$itemCols) + 1) + 1,
+                                    end_row = i * (length(input$itemCols) + 1),
+                                    label_row_css = "background-color: #666; color: #fff;"
+                                )
+                            }
+
+                        # Create Tab ---------------------------------------------------------------------------------------
+                        appendTab(
+                            inputId = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)]),
+                            tabPanel(
+                                title = HTML(modelsLong[thisModel]),
+                                h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
+                                HTML(parTableWithCIs),
+                                h4(HTML("Predicted Factor Scores (&eta;&#x302;)")),
+                                sidebarLayout(
+                                    sidebarPanel(
+                                        h4("Download Predicted Factor Scores as CSV"),
+                                        textInput(
+                                            paste0(thisModel, "Filename"),
+                                            "Filename:",
+                                            sprintf(
+                                                "%s_%s_factorscores.csv",
+                                                switch(
+                                                    input$source,
+                                                    "Workspace" = input$objectFromWorkspace,
+                                                    "CSV" = gsub("\\.csv", "", input$CSVFile$name),
+                                                    "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
+                                                ),
+                                                thisModel
+                                            )
                                         ),
-                                        mainPanel(
-                                            h4("Data Overview"),
-                                            dataTableOutput(paste0(thisModel, "Scores"))
+                                        hr(),
+                                        radioButtons(
+                                            paste0(thisModel, "Sep"),
+                                            "Separator",
+                                            choices = c(Comma = ",",
+                                                        Semicolon = ";",
+                                                        Tab = "\t"),
+                                            selected = ","
+                                        ),
+                                        radioButtons(
+                                            paste0(thisModel, "Dec"),
+                                            "Decimal Separator",
+                                            choices = c(Comma = ",",
+                                                        Dot = "."),
+                                            selected = "."
+                                        ),
+                                        hr(),
+                                        div(
+                                            align = "center",
+                                            downloadButton(
+                                                paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
+                                                "Download Factor Scores"
+                                            )
+                                        ),
+                                        width = 3
+                                    ),
+                                    mainPanel(
+                                        h4("Data Overview"),
+                                        dataTableOutput(
+                                            paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
                                         )
                                     )
-                                ),
-                                select = as.logical(whichModel == 1)
-                            )
-                        }
+                                )
+                            ),
+                            select = as.logical(whichModel == 1)
+                        )
                     })
                 }
 
@@ -1657,8 +1691,8 @@ function(input, output, session) {
                         inputId = "compTabsets",
                         tabPanel(
                             ifelse(isFALSE(groupName),
-                                   "Singlegroup Comparison overview",
-                                   "Multigroup Comparison overview"),
+                                   "Singlegroup",
+                                   "Multigroup"),
                             wellPanel(
                                 h5(sprintf(
                                     "Lavaan status: %i warnings, %i errors.",
@@ -1764,31 +1798,43 @@ function(input, output, session) {
         )
 
         # Write the selected values ----------------------------------------------------------------------------------------
-        output$selectedData <- renderText({
-            paste("The following data was used:<br>",
-                  switch(input$source,
-                         "Workspace" = sprintf("Object \"%s\" from workspace", input$objectFromWorkspace),
-                         "CSV" = sprintf("CSV-File \"%s\"", input$CSVFile$name),
-                         "SPSS" = sprintf("SPSS-File \"%s\"", input$SPSSFile$name))
+        output$selectedOptions <- renderUI({
+            selectedData <- paste(
+                "The following data was used:<br>",
+                switch(input$source,
+                       "Workspace" = sprintf("Object \"%s\" from workspace", input$objectFromWorkspace),
+                       "CSV" = sprintf("CSV-File \"%s\"", input$CSVFile$name),
+                       "SPSS" = sprintf("SPSS-File \"%s\"", input$SPSSFile$name))
+            )
+
+            selectedItems <- paste("The following items have been chosen:<br>",
+                                   paste(input$itemCols, collapse = ", "))
+
+            selectedGroup <- if (input$groupCol == "no")
+                "No multigroup tests have been performed."
+            else
+                paste("Multigroup tests have been performed with group column", sprintf("\"%s\"", input$groupCol))
+
+            selectedEstimator <- sprintf("The %s estimator has been chosen.", mvnTestResult$estimator)
+
+            selectedSigLvl <- paste("All tests have been performed on a significance level of", input$sigLvl)
+
+            tagList(
+                h5("Selected options:"),
+                HTML(selectedData),
+                hr(),
+                HTML(selectedItems),
+                hr(),
+                HTML(selectedGroup),
+                hr(),
+                HTML(selectedEstimator),
+                hr(),
+                HTML(selectedSigLvl),
+                hr(),
+                helpText("The models have been tested.")
             )
         })
 
-        output$selectedItems <- renderText({
-            paste("The following items have been chosen:<br>",
-                  paste(input$itemCols, collapse = ", "))
-        })
-
-        output$selectedGroup <- renderText({
-            if (input$groupCol == "no")
-                "No multigroup tests have been performed."
-            else
-                paste("Multigroup tests have been performed with group column", input$groupCol)
-        })
-
-        output$selectedEstimator <- renderText({sprintf("The %s estimator has been chosen.", mvnTestResult$estimator)})
-
-        output$selectedSigLvl <- renderText({
-            paste("All tests have been performed on a significance level of", input$sigLvl)
-        })
+        output$testing <- renderUI(tagList())
     })
 }

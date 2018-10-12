@@ -61,7 +61,64 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE) {
       etaVar <- sprintf("eta ~~ c(%s) * eta",
                          paste(paste0("sigma_eta_g", 1:nGroups), collapse = ", "))
 
-      paste(etaDep, errVars, alphas, etaVar, sep = "\n")
+      #Item Reliabilities per Group:
+      defNames <- gsub("lambda_1", "1", discPar[[model]])
+      itemRels <- paste(
+        sapply(
+          1:nGroups,
+          function(ig) {
+            paste(
+              sprintf(
+                "rel_%i_g%i := 1 / (1 + %s_g%i / (%s^2 * sigma_eta_g%i))",
+                1:nItems,
+                ig,
+                errVar[[model]],
+                ig,
+                defNames,
+                ig
+              ),
+              collapse = "\n"
+            )
+          }
+        ),
+        collapse = "\n"
+      )
+
+      # Sum reliability per group:
+      discParSumSq <-  sprintf(
+        "(%s)^2",
+        paste(defNames,
+              collapse = " + ")
+      )
+
+      sumRels <- paste(
+        sapply(
+          1:nGroups,
+          function(ig) {
+            errVarSumBySigma <- sprintf(
+              "(%s) / sigma_eta_g%i",
+              paste(
+                sprintf(
+                  "%s_g%i",
+                  errVar[[model]],
+                  ig
+                ),
+                collapse = " + "
+              ),
+              ig
+            )
+
+            sprintf("sumrel_g%i := %s / (%s + %s)",
+                    ig,
+                    discParSumSq,
+                    discParSumSq,
+                    errVarSumBySigma)
+          }
+        ),
+        collapse = "\n"
+      )
+
+      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRels, sep = "\n")
     } else {
       errVars <- paste(sprintf("%s ~~ %s * %s",
                                 itemNames,
@@ -73,25 +130,28 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE) {
       # Item reliabilities:
       defNames <- gsub("lambda_1", "1", discPar[[model]])
       itemRels <- paste(
-        sprintf("rel_%i := 1 / (1 + %s / (%s^2 * sigma_eta))",
-                1:nItems,
-                errVar[[model]],
-                defNames),
+        sprintf(
+          "rel_%i := 1 / (1 + %s / (%s^2 * sigma_eta))",
+          1:nItems,
+          errVar[[model]],
+          defNames
+        ),
         collapse = "\n"
       )
+
       # Sum reliability:
-      discParSumSq <-  paste0(
-        "(",
+      discParSumSq <-  sprintf(
+        "(%s)^2",
         paste(defNames,
-              collapse = " + "),
-        ")^2"
+              collapse = " + ")
       )
-      errVarSumBySigma <- paste0(
-        "(",
+
+      errVarSumBySigma <- sprintf(
+        "(%s) / sigma_eta",
         paste(errVar[[model]],
-              collapse = " + "),
-        ") / sigma_eta"
+              collapse = " + ")
       )
+
       sumRel <- sprintf("sumrel := %s / (%s + %s)",
                         discParSumSq,
                         discParSumSq,
