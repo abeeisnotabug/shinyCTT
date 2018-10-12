@@ -280,7 +280,11 @@ function(input, output, session) {
     corrTableWithCIsRaw <- reactive({
         req(userDataItems())
 
-        list(cor = suppressWarnings(cor(userDataItems())),
+        list(cor = tryCatch(
+            cor(userDataItems()),
+            warning = function(w) NULL,
+            error = function(e) NULL
+        ),
              test = tryCatch(
                  corrplot::cor.mtest(userDataItems(),
                                      conf.level = (1 - input$sigLvl)),
@@ -411,14 +415,16 @@ function(input, output, session) {
     })
 
     # Calculate test on MVN ------------------------------------------------------------------------------------------------
-    observeEvent(userData(), {
+    observeEvent(userDataItems(), {
         mvnTestResult$raw <- tryCatch(
             MVN::mvn(userDataItems()),
             warning = function(w) w,
             error = function(e) e
         )
 
-        if (class(mvnTestResult$raw)[1] == "list") {
+        req(mvnTestResult$raw)
+
+        if (class(mvnTestResult$raw$multivariateNormality) == "data.frame") {
             mvnTestResult$estimator <- ifelse(
                 any(
                     as.numeric(
@@ -444,10 +450,9 @@ function(input, output, session) {
     })
 
     output$mvnTableUV <- renderUI({
-        req(userData())
+        req(userDataItems())
 
         if (class(mvnTestResult$raw)[1] == "list") {
-
             mvnUV <- data.frame(Test = as.character(mvnTestResult$raw$univariateNormality$Test),
                                 Item = as.character(mvnTestResult$raw$univariateNormality$Variable),
                                 Statistic = as.numeric(mvnTestResult$raw$univariateNormality$Statistic),
@@ -466,28 +471,33 @@ function(input, output, session) {
                 h4("Tests on Univariate Normality:"),
                 HTML(makeKable(mvnUV, bootstrap_options = "basic"))
             )
+        } else {
+            tagList(
+                h4("Test on Multivariate Normality:"),
+                div(style = paste0("color:red"),
+                    HTML(paste("There was an ERROR/WARNING:", corrIndRaw()$message))
+                )
+            )
         }
     })
 
     output$mvnComment <- renderUI({
-        req(userData())
+        req(userDataItems())
 
-        mvnMV <- data.frame(Test = as.character(mvnTestResult$raw$multivariateNormality$Test),
-                            Statistic = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$Statistic)),
-                            p = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$`p value`)),
-                            Signif. = as.character(mvnTestResult$raw$multivariateNormality$Result),
-                            stringsAsFactors = F)[-3,]
+        if (class(mvnTestResult$raw$multivariateNormality) == "data.frame") {
+            mvnMV <- data.frame(Test = as.character(mvnTestResult$raw$multivariateNormality$Test),
+                                Statistic = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$Statistic)),
+                                p = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$`p value`)),
+                                Signif. = as.character(mvnTestResult$raw$multivariateNormality$Result),
+                                stringsAsFactors = F)[-3,]
 
-        mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
-        mvnMV$p <- ifelse(
-            mvnMV$p < 0.001,
-            "< 0.001",
-            sprintf("%.3f", round(mvnMV$p, 3))
-        )
+            mvnMV$Signif. <- ifelse(mvnMV$p < input$sigLvl, "*", "")
+            mvnMV$p <- ifelse(
+                mvnMV$p < 0.001,
+                "< 0.001",
+                sprintf("%.3f", round(mvnMV$p, 3))
+            )
 
-        if (is.null(mvnTestResult$raw$multivariateNormality)) {
-            tagList()
-        } else {
             if ("*" %in% mvnMV$Signif.) {
                 tagList(
                     h4("Test on Multivariate Normality:"),
@@ -683,14 +693,19 @@ function(input, output, session) {
     })
 
     # Create the output object ---------------------------------------------------------------------------------------------
-    output$checksUI <- renderUI({
+    output$oneItemCheck <- renderUI({
         req(userData())
 
+        div(style = paste0("color:", checks$oneItem$col),
+            h5(HTML(paste("Number of Items:", checks$oneItem$symb))),
+            checks$oneItem$tag
+        )
+    })
+
+    output$checksUI <- renderUI({
+        req(userDataItems())
+
         tagList(
-            div(style = paste0("color:", checks$oneItem$col),
-                h5(HTML(paste("Number of Items:", checks$oneItem$symb))),
-                checks$oneItem$tag
-            ),
             div(style = paste0("color:", checks$obsOk$col),
                 h5(HTML(paste("Number of Observations:", checks$obsOk$symb))),
                 checks$obsOk$tag

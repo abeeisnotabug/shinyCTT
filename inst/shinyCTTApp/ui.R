@@ -152,6 +152,7 @@ fluidPage(
                         "input.showControls",
                         wellPanel(
                             h4("Controls"),
+                            uiOutput("oneItemCheck"),
                             uiOutput("checksUI")
                         )
                     ),
