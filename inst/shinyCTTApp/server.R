@@ -311,7 +311,7 @@ function(input, output, session) {
     output$corrTableWithCIs <- renderUI({
         if (class(corrTableWithCIsRaw()$test)[1] == "list") {
             tagList(
-                h4("Correlation Table with Confidence Intervals:"),
+                h4("Correlation Table"),
                 HTML(
                     kableExtra::column_spec(
                         makeKable(
@@ -1396,7 +1396,7 @@ function(input, output, session) {
                             inputId = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)]),
                             tabPanel(
                                 title = HTML(modelsLong[thisModel]),
-                                h4("Estimated Paramters with Standard Errors and Confidence Intervals:"),
+                                h4("Estimated Paramters"),
                                 HTML(parTableWithCIs),
                                 h4(HTML("Predicted Factor Scores (&eta;&#x302;)")),
                                 sidebarLayout(
