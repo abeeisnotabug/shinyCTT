@@ -411,7 +411,7 @@ function(input, output, session) {
     })
 
     # Calculate test on MVN ------------------------------------------------------------------------------------------------
-    observeEvent(userDataItems(), {
+    observeEvent(userData(), {
         mvnTestResult$raw <- tryCatch(
             MVN::mvn(userDataItems()),
             warning = function(w) w,
