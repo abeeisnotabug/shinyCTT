@@ -29,7 +29,10 @@ function(input, output, session) {
                       "&#964;-paral.")
     models <- c("tko", "ete", "teq", "etp", "tpa")
 
-    names(models) <- names(modelsLong) <- names(modelsExpr) <- names(modelsAbbrev) <- models
+    names(models) <-
+        names(modelsLong) <-
+        names(modelsExpr) <-
+        names(modelsAbbrev) <- models
 
     possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
 
@@ -111,10 +114,14 @@ function(input, output, session) {
         req(userDataRaw())
         req(input$groupCol)
 
-        if (input$groupCol != "no" && input$groupCol %in% colnames(userDataRaw())) {
+        if (input$groupCol != "no" &&
+            input$groupCol %in% colnames(userDataRaw())) {
             req(input$groups)
 
-            subset(userDataRaw(), userDataRaw()[, input$groupCol] %in% input$groups)
+            subset(
+                userDataRaw(),
+                userDataRaw()[, input$groupCol] %in% input$groups
+            )
         } else {
             userDataRaw()
         }
@@ -206,8 +213,15 @@ function(input, output, session) {
                 lapply(
                     possComps[grep(thisModel, possComps)],
                     function(thisComp) {
-                        if ((substr(thisComp, 1, 3) == thisModel && input[[substr(thisComp, 4, 6)]]) ||
-                            (substr(thisComp, 4, 6) == thisModel && input[[substr(thisComp, 1, 3)]]))
+                        if (
+                            (
+                                substr(thisComp, 1, 3) == thisModel &&
+                                input[[substr(thisComp, 4, 6)]]
+                            ) || (
+                                substr(thisComp, 4, 6) == thisModel &&
+                                input[[substr(thisComp, 1, 3)]]
+                            )
+                        )
                             updateCheckboxInput(
                                 session,
                                 thisComp,
@@ -347,7 +361,10 @@ function(input, output, session) {
         req(userDataItems())
         req(mvnTestResult$estimator)
 
-        dummyModel <- paste(sprintf("%s ~ 1", colnames(userDataItems())), collapse = "\n")
+        dummyModel <- paste(
+            sprintf("%s ~ 1", colnames(userDataItems())),
+            collapse = "\n"
+        )
 
         tryCatch(
             cfa(
@@ -371,8 +388,9 @@ function(input, output, session) {
                     h4("Test on Correlative Independence"),
                     HTML(
                         sprintf(
-                            "The hypothesis that all correlations are equal to zero has to be
-                            discarded on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
+                            "The hypothesis that all correlations are equal to
+                            zero has to be discarded on a significance level of
+                            %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
                             input$sigLvl,
                             mvnTestResult$estimator,
                             corrInd[1],
@@ -389,9 +407,9 @@ function(input, output, session) {
                     h4("Test on Correlative Independence"),
                     HTML(
                         sprintf(
-                            "The hypothesis that all correlations are equal to zero can be
-                            maintained on a significance level of %.3f.
-                            Test result: %s-&chi;&sup2; = %.3f, df = %i, p %s",
+                            "The hypothesis that all correlations are equal to
+                            zero can be maintained on a significance level of
+                            %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
                             input$sigLvl,
                             mvnTestResult$estimator,
                             corrInd[1],
@@ -408,7 +426,10 @@ function(input, output, session) {
             tagList(
                 h4("Test on Correlative Independence"),
                 div(style = paste0("color:red"),
-                    HTML(paste("There was an ERROR/WARNING:", corrIndRaw()$message))
+                    HTML(
+                        paste("There was an ERROR/WARNING:",
+                              corrIndRaw()$message)
+                    )
                 )
             )
         }
@@ -1671,7 +1692,13 @@ function(input, output, session) {
                     combCompTable[, seq(1, 10, 2)] <- matrix(compTable$df, ncol = 5, nrow = 5)
                     combCompTable[, seq(2, 10, 2)] <- matrix(compTable$chisq, ncol = 5, nrow = 5)
 
-                    colnames(combCompTable) <- rep(c("&Delta;df", paste0(mvnTestResult$estimator, "-&Delta;&chi;&sup2;")), 5)
+                    colnames(combCompTable) <- rep(
+                        c(
+                            "&Delta;df",
+                            paste0(mvnTestResult$estimator, "-&Delta;&chi;&sup2;")
+                        ),
+                        5
+                    )
 
                     headerNames <- c(1, rep(2, 5))
                     names(headerNames) <- c(" ", modelsAbbrev)
