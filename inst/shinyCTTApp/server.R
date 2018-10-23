@@ -155,11 +155,15 @@ function(input, output, session) {
     output$itemColsChooser <- renderUI({
         possibleItemColumns <- colnames(userDataRaw())[sapply(userDataRaw(), is.numeric)]
 
-        checkboxGroupInput("itemCols",
-                           "Select the item columns",
-                           choices = possibleItemColumns,
-                           selected = possibleItemColumns,
-                           inline = TRUE)
+        tagList(
+            checkboxGroupInput("itemCols",
+                               "Select the item columns",
+                               choices = possibleItemColumns,
+                               selected = possibleItemColumns,
+                               inline = TRUE),
+            if (length(possibleItemColumns) == 0)
+                helpText("No numeric columns found.")
+        )
     })
 
     output$groupColChooser <- renderUI({
@@ -1499,23 +1503,31 @@ function(input, output, session) {
                             aes(x = x, y = y, label = name)
                         ) + geom_text(parse = TRUE, fontface = "bold", size = 5) +
                             geom_segment(aes(x = xstarts, y = ystarts, xend = xends, yend = yends), size = 0.3) +
-                            geom_label(aes(x = labelxs,
-                                           y = labelys,
-                                           label = ifelse(
-                                               is.na(chisq),
-                                               "No~Comparison",
-                                               sprintf("'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
-                                                       mvnTestResult$estimator,
-                                                       chisq,
-                                                       df,
-                                                       ifelse(pvalue < 0.001,
-                                                              "<0.001",
-                                                              sprintf("==%.3f", pvalue)))
-                                           ),
-                                           fill = c(pvalue < 0.05)),
-                                       color = textColor,
-                                       size = 4.5,
-                                       parse = TRUE) +
+                            geom_label(
+                                aes(
+                                    x = labelxs,
+                                    y = labelys,
+                                    label = ifelse(
+                                        is.na(chisq),
+                                        "No~Comparison",
+                                        sprintf(
+                                            "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
+                                            mvnTestResult$estimator,
+                                            chisq,
+                                            df,
+                                            ifelse(
+                                                pvalue < 0.001,
+                                                "<0.001",
+                                                sprintf("==%.3f", pvalue)
+                                            )
+                                        )
+                                    ),
+                                    fill = c(pvalue < 0.05)
+                                ),
+                                color = textColor,
+                                size = 4.5,
+                                parse = TRUE
+                            ) +
                             scale_fill_manual(values = c(goodColor, badColor), na.value = neutrColor) +
                             guides(fill = FALSE) +
                             xlim(c(-4, 4)) +

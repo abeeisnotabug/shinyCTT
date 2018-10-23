@@ -119,7 +119,7 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
     for (group in fittedModel@Data@group.label)
       out$eta.hat[groupVar == group] <- lavPredict(fittedModel)[[which(fittedModel@Data@group.label == group)]]
 
-    out[[fitted_models_mg[[1]]@Data@group]] <- groupVar
+    out[[fittedModel@Data@group]] <- groupVar
   } else {
     out$eta.hat <- lavPredict(fittedModel)
   }
