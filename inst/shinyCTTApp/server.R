@@ -114,7 +114,7 @@ function(input, output, session) {
         req(userDataRaw())
         req(input$groupCol)
 
-        if (input$groupCol != "no" &&
+        if (input$groupCol != "noGroupSelected" &&
             input$groupCol %in% colnames(userDataRaw())) {
             req(input$groups)
 
@@ -169,14 +169,14 @@ function(input, output, session) {
     output$groupColChooser <- renderUI({
         selectInput("groupCol",
                     "Select the group column",
-                    choices = c("No group column selected" = "no",
+                    choices = c("No group column selected" = "noGroupSelected",
                                 colnames(userDataRaw())[!(colnames(userDataRaw()) %in% input$itemCols)]))
     })
 
     output$groupChooser <- renderUI({
         req(input$groupCol)
 
-        if (input$groupCol != "no" && input$groupCol %in% colnames(userDataRaw())) {
+        if (input$groupCol != "noGroupSelected" && input$groupCol %in% colnames(userDataRaw())) {
             possibleGroups <- unique(userDataRaw()[, input$groupCol])
 
             if (any(c(table(userDataRaw()[, input$groupCol])) == 1)) {
@@ -186,23 +186,28 @@ function(input, output, session) {
             } else {
                 groupWarning <- ""
             }
-        } else {
-            possibleGroups <- NULL
-            groupWarning <- ""
-        }
 
-        tagList(
-            checkboxGroupInput("groups",
-                               "Select which groups to include",
-                               choices = possibleGroups,
-                               selected = possibleGroups,
-                               inline = TRUE),
-            helpText(groupWarning)
-        )
+            tagList(
+                checkboxGroupInput("groups",
+                                   "Select which groups to include",
+                                   choices = possibleGroups,
+                                   selected = possibleGroups,
+                                   inline = TRUE),
+                helpText(groupWarning),
+                conditionalPanel(
+                    condition = "input.groups.length > 1",
+                    checkboxInput(
+                        "doMg",
+                        "Perform Multigroup Tests",
+                        value = FALSE
+                    )
+                )
+            )
+        }
     })
 
     observeEvent(input$sigLvl, {
-        if ((input$sigLvl < 0 | input$sigLvl > 1) & !is.na(input$sigLvl)) {
+        if ((input$sigLvl < 0 | input$sigLvl > 1) && !is.na(input$sigLvl)) {
             updateNumericInput(session,
                                "sigLvl",
                                value = 0.05)
@@ -265,7 +270,7 @@ function(input, output, session) {
             HTML(
                 kableExtra::add_header_above(
                     kableExtra::column_spec(
-                        makeKable(table),
+                        shinyCTT:::makeKable(table),
                         1,
                         bold = TRUE
                     ),
@@ -287,7 +292,7 @@ function(input, output, session) {
             h4("Covariance Matrix"),
             HTML(
                 kableExtra::column_spec(
-                    makeKable(table),
+                    shinyCTT:::makeKable(table),
                     1,
                     bold = TRUE
                 )
@@ -318,8 +323,8 @@ function(input, output, session) {
                 h4("Correlation Table"),
                 HTML(
                     kableExtra::column_spec(
-                        makeKable(
-                            makeCorrTableWithCIs(
+                        shinyCTT:::makeKable(
+                            shinyCTT:::makeCorrTableWithCIs(
                                 corrTableWithCIsRaw(),
                                 goodColor,
                                 badColor,
@@ -335,7 +340,7 @@ function(input, output, session) {
                     )
                 ),
                 h5("Legend:"),
-                HTML(makeKable(
+                HTML(shinyCTT:::makeKable(
                     cbind(
                         kableExtra::cell_spec(
                             "Sig. pos.",
@@ -371,7 +376,7 @@ function(input, output, session) {
         )
 
         tryCatch(
-            cfa(
+            lavaan::cfa(
                 model = dummyModel,
                 data = userData(),
                 estimator = mvnTestResult$estimator
@@ -385,7 +390,7 @@ function(input, output, session) {
         req(userData())
 
         if (class(corrIndRaw())[1] == "lavaan") {
-            corrInd <- unlist(extractFitParameters(corrIndRaw())[, c(2, 1, 3)])
+            corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw())[, c(2, 1, 3)])
 
             if (corrInd[3] < input$sigLvl) {
                 tagList(
@@ -494,7 +499,7 @@ function(input, output, session) {
 
             tagList(
                 h4("Tests on Univariate Normality:"),
-                HTML(makeKable(mvnUV, bootstrap_options = "basic"))
+                HTML(shinyCTT:::makeKable(mvnUV, bootstrap_options = "basic"))
             )
         } else {
             tagList(
@@ -530,7 +535,7 @@ function(input, output, session) {
                             or Mardias' Kurtosis statistic matches one of a
                             normal distribution has to be discarded on a significance
                             level of %s. Test result:", input$sigLvl),
-                    HTML(makeKable(mvnMV, bootstrap_options = "basic")),
+                    HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
                     HTML("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator.")
                 )
             } else {
@@ -540,7 +545,7 @@ function(input, output, session) {
                         and Mardias' Kurtosis statistic match those of a
                         normal distribution can be maintained on a significance
                         level of %s. Test result:", input$sigLvl),
-                    HTML(makeKable(mvnMV, bootstrap_options = "basic")),
+                    HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
                     HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator.")
                 )
             }
@@ -611,7 +616,7 @@ function(input, output, session) {
                 tag = "ERROR: There are fewer observations than items."
             )
         } else {
-            if (input$groupCol == "no") {
+            if (input$groupCol == "noGroupSelected") {
                 list(
                     check = TRUE,
                     symb = "&#10003;",
@@ -691,7 +696,7 @@ function(input, output, session) {
     # Check for correlative independence -----------------------------------------------------------------------------------
     observeEvent(corrIndRaw(), {
         if (class(corrIndRaw())[1] == "lavaan") {
-            corrInd <- unlist(extractFitParameters(corrIndRaw())[, c(2, 1, 3)])
+            corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw())[, c(2, 1, 3)])
 
             checks$corrIndOk <- if (corrInd[3] < input$sigLvl) {
                 list(
@@ -749,7 +754,7 @@ function(input, output, session) {
 
     # Add descr. stats for groups if a group column is specified -----------------------------------------------------------
     observeEvent(input$groupCol, {
-        if (input$groupCol != "no") {
+        if (input$groupCol != "noGroupSelected") {
             output$mgDescrTable <- renderUI({
                 req(userDataGroup())
 
@@ -787,7 +792,7 @@ function(input, output, session) {
                         kableExtra::column_spec(
                             kableExtra::add_header_above(
                                 kableExtra::column_spec(
-                                    makeKable(do.call(cbind, mgDescrTableList)),
+                                    shinyCTT:::makeKable(do.call(cbind, mgDescrTableList)),
                                     1,
                                     bold = TRUE
                                 ),
@@ -823,7 +828,7 @@ function(input, output, session) {
                     mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
 
                 mgCovMatTable <- kableExtra::column_spec(
-                    makeKable(do.call(rbind, mgCovMatList)),
+                    shinyCTT:::makeKable(do.call(rbind, mgCovMatList)),
                     1,
                     bold = TRUE
                 )
@@ -856,7 +861,7 @@ function(input, output, session) {
                 mgCorrTableList <- lapply(
                     unique(userDataGroup()),
                     function(group)
-                        makeCorrTableWithCIs(
+                        shinyCTT:::makeCorrTableWithCIs(
                             list(
                                 cor = suppressWarnings(cor(
                                     subset(
@@ -882,7 +887,7 @@ function(input, output, session) {
                 )
 
                 mgCorrTable <- kableExtra::column_spec(
-                    makeKable(do.call(rbind, mgCorrTableList), bootstrap_options = c("condensed", "striped")),
+                    shinyCTT:::makeKable(do.call(rbind, mgCorrTableList), bootstrap_options = c("condensed", "striped")),
                     1,
                     bold = TRUE
                 )
@@ -905,7 +910,7 @@ function(input, output, session) {
                     h4("Multigroup Correlation Tables"),
                     HTML(mgCorrTable),
                     h5("Legend:"),
-                    HTML(makeKable(
+                    HTML(shinyCTT:::makeKable(
                         cbind(
                             kableExtra::cell_spec(
                                 "Sig. pos.",
@@ -940,7 +945,7 @@ function(input, output, session) {
             session,
             "doMg",
             value = ifelse(
-                input$groupCol != "no" &&
+                input$groupCol != "noGroupSelected" &&
                     !any(c(table(userDataRaw()[, input$groupCol])) == 1) &&
                     length(input$groups) > 1,
                 TRUE,
@@ -981,18 +986,18 @@ function(input, output, session) {
             function(groupName) {
 
                 # Try fitting and capture warning and error messages -------------------------------------------------------
-                modelCodes <- makeModelCodes(inputData = userData(),
-                                             itemCols = input$itemCols,
-                                             group = groupName)
+                modelCodes <- shinyCTT:::makeModelCodes(inputData = userData(),
+                                                        itemCols = input$itemCols,
+                                                        group = groupName)
 
                 if (isFALSE(groupName)) {
                     fittedModelsWarns <- lapply(
                         modelCodes[modelsToTest],
                         FUN = function(model) {
-                            tryCatch(cfa(model = model,
-                                         data = userData(),
-                                         meanstructure = TRUE,
-                                         estimator = mvnTestResult$estimator),
+                            tryCatch(lavaan::cfa(model = model,
+                                                 data = userData(),
+                                                 meanstructure = TRUE,
+                                                 estimator = mvnTestResult$estimator),
                                      error = function(e) e,
                                      warning = function(w) w)
                         }
@@ -1001,10 +1006,10 @@ function(input, output, session) {
                         modelCodes[modelsToTest],
                         FUN = function(model) {
                             suppressWarnings(
-                                tryCatch(cfa(model = model,
-                                             data = userData(),
-                                             meanstructure = TRUE,
-                                             estimator = mvnTestResult$estimator),
+                                tryCatch(lavaan::cfa(model = model,
+                                                     data = userData(),
+                                                     meanstructure = TRUE,
+                                                     estimator = mvnTestResult$estimator),
                                          error = function(e) e)
                             )
                         }
@@ -1013,12 +1018,12 @@ function(input, output, session) {
                     fittedModelsWarns <- lapply(
                         modelCodes[modelsToTest],
                         FUN = function(model) {
-                            tryCatch(cfa(model = model,
-                                         data = userData(),
-                                         meanstructure = TRUE,
-                                         group = groupName,
-                                         group.equal = c("loadings", "intercepts"),
-                                         estimator = mvnTestResult$estimator),
+                            tryCatch(lavaan::cfa(model = model,
+                                                 data = userData(),
+                                                 meanstructure = TRUE,
+                                                 group = groupName,
+                                                 group.equal = c("loadings", "intercepts"),
+                                                 estimator = mvnTestResult$estimator),
                                      error = function(e) e,
                                      warning = function(w) w)
                         }
@@ -1027,12 +1032,12 @@ function(input, output, session) {
                         modelCodes[modelsToTest],
                         FUN = function(model) {
                             suppressWarnings(
-                                tryCatch(cfa(model = model,
-                                             data = userData(),
-                                             meanstructure = TRUE,
-                                             group = groupName,
-                                             group.equal = c("loadings", "intercepts"),
-                                             estimator = mvnTestResult$estimator),
+                                tryCatch(lavaan::cfa(model = model,
+                                                     data = userData(),
+                                                     meanstructure = TRUE,
+                                                     group = groupName,
+                                                     group.equal = c("loadings", "intercepts"),
+                                                     estimator = mvnTestResult$estimator),
                                          error = function(e) e)
                             )
                         }
@@ -1100,15 +1105,15 @@ function(input, output, session) {
                 }
 
                 # Generate comparative fit table and tab  ------------------------------------------------------------------
-                fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], extractFitParameters))
+                fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], shinyCTT:::extractFitParameters))
                 comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
 
                 succTable <- list()
 
-                if (length(goodModels) > 1 & !identical(goodModels, c(teq = "teq", etp = "etp"))) {
+                if (length(goodModels) > 1 && !identical(goodModels, c(teq = "teq", etp = "etp"))) {
                     if ("teq" %in% goodModels) {
                         succTable$teq <- do.call(
-                            lavTestLRT,
+                            lavaan::lavTestLRT,
                             args = c(object = fittedModelsWarns[[goodModels[1]]],
                                      ... = fittedModelsWarns[goodModels[-c(1, which(goodModels == "etp"))]])
                         )
@@ -1117,7 +1122,7 @@ function(input, output, session) {
                     }
                     if ("etp" %in% goodModels) {
                         succTable$etp <- do.call(
-                            lavTestLRT,
+                            lavaan::lavTestLRT,
                             args = c(object = fittedModelsWarns[[goodModels[1 + (goodModels[1] == "teq")]]],
                                      ... = fittedModelsWarns[goodModels[-c(1 + (goodModels[1] == "teq"),
                                                                            which(goodModels == "teq"))]])
@@ -1127,7 +1132,7 @@ function(input, output, session) {
                     }
                     if (!any(c("teq", "etp") %in% goodModels)) {
                         succTable$teq <- do.call(
-                            lavTestLRT,
+                            lavaan::lavTestLRT,
                             args = c(object = fittedModelsWarns[[goodModels[1]]],
                                      ... = fittedModelsWarns[goodModels[-1]])
                         )
@@ -1267,7 +1272,7 @@ function(input, output, session) {
                         fitCompsWithThisModel <- sapply(
                             compsWithThisModel,
                             function(thisComp) {
-                                tmpTbl <- lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
+                                tmpTbl <- lavaan::lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
                                 unlist(tmpTbl[2, c(5, 6, 7)])
                             }
                         )
@@ -1306,37 +1311,12 @@ function(input, output, session) {
                                 )
                         }
 
-                        # Factor Scores ------------------------------------------------------------------------------------
-                        output[[
-                            paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
-                            ]] <<- renderDataTable(
-                                getPredictedScores(fittedModelsWarns[[thisModel]], userDataGroup())
-                            )
-
-                        output[[
-                            paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)])
-                            ]] <<- downloadHandler(
-                                filename = function() {
-                                    input[[paste0(thisModel, "Filename", c("Mg")[!isFALSE(groupName)])]]
-                                },
-                                content = function(file) {
-                                    write.table(
-                                        getPredictedScores(fittedModelsWarns[[thisModel]], userDataGroup()),
-                                        file,
-                                        sep = input[[paste0(thisModel, "Sep")]],
-                                        dec = input[[paste0(thisModel, "Dec")]],
-                                        row.names = FALSE
-                                    )
-                                },
-                                contentType = "text/csv"
-                            )
-
                         # Parameter tables ---------------------------------------------------------------------------------
                         parTableWithCIs <- kableExtra::add_header_above(
                             kableExtra::row_spec(
                                 kableExtra::column_spec(
-                                    makeKable(
-                                        extractParameters(
+                                    shinyCTT:::makeKable(
+                                        shinyCTT:::extractParameters(
                                             fittedModelsWarns[[thisModel]],
                                             alpha = input$sigLvl
                                         ),
@@ -1395,6 +1375,57 @@ function(input, output, session) {
                                 )
                             }
 
+                        # Factor Scores ------------------------------------------------------------------------------------
+                        output[[
+                            paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
+                            ]] <<- renderDataTable(
+                                shinyCTT:::getPredictedScores(fittedModelsWarns[[thisModel]], userDataGroup())
+                            )
+
+                        output[[
+                            paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)])
+                            ]] <<- downloadHandler(
+                                filename = function() {
+                                    input[[paste0(thisModel, "Filename", c("Mg")[!isFALSE(groupName)])]]
+                                },
+                                content = function(file) {
+                                    write.table(
+                                        shinyCTT:::getPredictedScores(fittedModelsWarns[[thisModel]], userDataGroup()),
+                                        file,
+                                        sep = input[[paste0(thisModel, "Sep")]],
+                                        dec = input[[paste0(thisModel, "Dec")]],
+                                        row.names = FALSE
+                                    )
+                                },
+                                contentType = "text/csv"
+                            )
+
+                        # Model code ---------------------------------------------------------------------------------------
+                        output[[
+                            paste0(thisModel, "Code", c("Mg")[!isFALSE(groupName)])
+                            ]] <<- renderPrint({
+                                if (input$groupCol != "noGroupSelected") {
+                                    if (length(unique(userData()[, input$groupCol])) <
+                                        length(unique(userDataRaw()[, input$groupCol])))
+                                        isSubset <- TRUE
+                                    else
+                                        isSubset <- FALSE
+                                } else {
+                                    isSubset <- FALSE
+                                }
+
+                                cat(
+                                    shinyCTT:::makeRCode(
+                                        input,
+                                        modelCodes[[thisModel]],
+                                        mvnTestResult$estimator,
+                                        isSubset,
+                                        thisModel,
+                                        !isFALSE(groupName)
+                                    )
+                                )
+                            })
+
                         # Create Tab ---------------------------------------------------------------------------------------
                         appendTab(
                             inputId = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)]),
@@ -1402,54 +1433,64 @@ function(input, output, session) {
                                 title = HTML(modelsLong[thisModel]),
                                 h4("Estimated Paramters"),
                                 HTML(parTableWithCIs),
-                                h4(HTML("Predicted Factor Scores (&eta;&#x302;)")),
-                                sidebarLayout(
-                                    sidebarPanel(
-                                        h4("Download Predicted Factor Scores as CSV"),
-                                        textInput(
-                                            paste0(thisModel, "Filename"),
-                                            "Filename:",
-                                            sprintf(
-                                                "%s_%s_factorscores.csv",
-                                                switch(
-                                                    input$source,
-                                                    "Workspace" = input$objectFromWorkspace,
-                                                    "CSV" = gsub("\\.csv", "", input$CSVFile$name),
-                                                    "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
-                                                ),
-                                                thisModel
-                                            )
-                                        ),
-                                        hr(),
-                                        radioButtons(
-                                            paste0(thisModel, "Sep"),
-                                            "Separator",
-                                            choices = c(Comma = ",",
-                                                        Semicolon = ";",
-                                                        Tab = "\t"),
-                                            selected = ","
-                                        ),
-                                        radioButtons(
-                                            paste0(thisModel, "Dec"),
-                                            "Decimal Separator",
-                                            choices = c(Comma = ",",
-                                                        Dot = "."),
-                                            selected = "."
-                                        ),
-                                        hr(),
-                                        div(
-                                            align = "center",
-                                            downloadButton(
-                                                paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
-                                                "Download Factor Scores"
-                                            )
-                                        ),
-                                        width = 3
+                                h4("Additional Information"),
+                                tabsetPanel(
+                                    tabPanel(
+                                        "Model Code",
+                                        h5("The following R code can be used to fit this model with lavaan:"),
+                                        verbatimTextOutput(paste0(thisModel, "Code", c("Mg")[!isFALSE(groupName)]))
                                     ),
-                                    mainPanel(
-                                        h4("Data Overview"),
-                                        dataTableOutput(
-                                            paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
+                                    tabPanel(
+                                        HTML("Predicted Factor Scores (&eta;&#x302;)"),
+                                        sidebarLayout(
+                                            sidebarPanel(
+                                                h4("Download Predicted Factor Scores as CSV"),
+                                                textInput(
+                                                    paste0(thisModel, "Filename"),
+                                                    "Filename:",
+                                                    sprintf(
+                                                        "%s_%s_factorscores.csv",
+                                                        switch(
+                                                            input$source,
+                                                            "Workspace" = input$objectFromWorkspace,
+                                                            "CSV" = gsub("\\.csv", "", input$CSVFile$name),
+                                                            "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
+                                                        ),
+                                                        thisModel
+                                                    )
+                                                ),
+                                                hr(),
+                                                radioButtons(
+                                                    paste0(thisModel, "Sep"),
+                                                    "Separator",
+                                                    choices = c(Comma = ",",
+                                                                Semicolon = ";",
+                                                                Tab = "\t"),
+                                                    selected = ","
+                                                ),
+                                                radioButtons(
+                                                    paste0(thisModel, "Dec"),
+                                                    "Decimal Separator",
+                                                    choices = c(Comma = ",",
+                                                                Dot = "."),
+                                                    selected = "."
+                                                ),
+                                                hr(),
+                                                div(
+                                                    align = "center",
+                                                    downloadButton(
+                                                        paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
+                                                        "Download Factor Scores"
+                                                    )
+                                                ),
+                                                width = 3
+                                            ),
+                                            mainPanel(
+                                                h4("Data Overview"),
+                                                dataTableOutput(
+                                                    paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
+                                                )
+                                            )
                                         )
                                     )
                                 )
@@ -1487,7 +1528,7 @@ function(input, output, session) {
                                            rownames(succTable$etp)[2:nrow(succTable$etp)])] <- succTable$etp[-1, 7]
                         }
 
-                        ggplot(
+                        ggplot2::ggplot(
                             data.frame(name = modelsExpr,
                                        x = c(0, 0, -2, 2, 0),
                                        y = c(6, 4, 2, 2, 0),
@@ -1500,11 +1541,14 @@ function(input, output, session) {
                                        chisq = chisqs,
                                        df = dfs,
                                        pvalue = pvalues),
-                            aes(x = x, y = y, label = name)
-                        ) + geom_text(parse = TRUE, fontface = "bold", size = 5) +
-                            geom_segment(aes(x = xstarts, y = ystarts, xend = xends, yend = yends), size = 0.3) +
-                            geom_label(
-                                aes(
+                            ggplot2::aes(x = x, y = y, label = name)
+                        ) + ggplot2::geom_text(parse = TRUE, fontface = "bold", size = 5) +
+                            ggplot2::geom_segment(
+                                ggplot2::aes(x = xstarts, y = ystarts, xend = xends, yend = yends),
+                                size = 0.3
+                            ) +
+                            ggplot2::geom_label(
+                                ggplot2::aes(
                                     x = labelxs,
                                     y = labelys,
                                     label = ifelse(
@@ -1528,11 +1572,11 @@ function(input, output, session) {
                                 size = 4.5,
                                 parse = TRUE
                             ) +
-                            scale_fill_manual(values = c(goodColor, badColor), na.value = neutrColor) +
-                            guides(fill = FALSE) +
-                            xlim(c(-4, 4)) +
-                            coord_fixed() +
-                            theme_void()
+                            ggplot2::scale_fill_manual(values = c(goodColor, badColor), na.value = neutrColor) +
+                            ggplot2::guides(fill = FALSE) +
+                            ggplot2::xlim(c(-4, 4)) +
+                            ggplot2::coord_fixed() +
+                            ggplot2::theme_void()
                     })
 
                     # Hierarchical model comparison table ------------------------------------------------------------------
@@ -1619,7 +1663,7 @@ function(input, output, session) {
 
                                 kableExtra::row_spec(
                                     kableExtra::column_spec(
-                                        makeKable(hierTable),
+                                        shinyCTT:::makeKable(hierTable),
                                         1,
                                         bold = TRUE
                                     ),
@@ -1755,7 +1799,7 @@ function(input, output, session) {
                             HTML(
                                 kableExtra::column_spec(
                                     kableExtra::column_spec(
-                                        makeKable(
+                                        shinyCTT:::makeKable(
                                             fits[, -c(9, 10)],
                                             col.names = c("df",
                                                           paste0(mvnTestResult$estimator, "-&chi;&sup2;"),
@@ -1777,7 +1821,7 @@ function(input, output, session) {
                             HTML(
                                 kableExtra::add_header_above(
                                     kableExtra::column_spec(
-                                        makeKable(combCompTable),
+                                        shinyCTT:::makeKable(combCompTable),
                                         1,
                                         bold = TRUE
                                     ),
@@ -1791,7 +1835,7 @@ function(input, output, session) {
                                 <table align = \"center\">
                                 <tr><td><h5>AIC:</h5>",
                                         kableExtra::column_spec(
-                                            makeKable(infCompTable$aic),
+                                            shinyCTT:::makeKable(infCompTable$aic),
                                             1,
                                             bold = TRUE
                                         ),
@@ -1801,7 +1845,7 @@ function(input, output, session) {
                                 <td><table align = \"center\">
                                 <tr><td><h5>BIC:</h5>",
                                         kableExtra::column_spec(
-                                            makeKable(infCompTable$bic),
+                                            shinyCTT:::makeKable(infCompTable$bic),
                                             1,
                                             bold = TRUE
                                         ),
@@ -1849,7 +1893,7 @@ function(input, output, session) {
             selectedItems <- paste("The following items have been chosen:<br>",
                                    paste(input$itemCols, collapse = ", "))
 
-            selectedGroup <- if (input$groupCol == "no")
+            selectedGroup <- if (input$groupCol == "noGroupSelected")
                 "No multigroup tests have been performed."
             else
                 paste("Multigroup tests have been performed with group column", sprintf("\"%s\"", input$groupCol))

@@ -55,15 +55,7 @@ fluidPage(
                         uiOutput("groupColChooser"),
                         conditionalPanel(
                             condition = "input.groupCol != 'no'",
-                            uiOutput("groupChooser"),
-                            conditionalPanel(
-                                condition = "input.groups.length > 1",
-                                checkboxInput(
-                                    "doMg",
-                                    "Perform Multigroup Tests",
-                                    value = FALSE
-                                )
-                            )
+                            uiOutput("groupChooser")
                         ),
                         hr(),
                         radioButtons(

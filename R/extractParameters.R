@@ -1,34 +1,33 @@
-#' @export
 extractParameters <- function(fittedModel, alpha = 0.05) {
   nGroups <- fittedModel@Data@ngroups
-  nItems <- length(lavNames(fittedModel))
+  nItems <- length(lavaan::lavNames(fittedModel))
 
   if (nGroups > 1) {
-    parDf <- parameterEstimates(fittedModel,
-                                zstat = FALSE,
-                                pvalue = FALSE,
-                                rsquare = FALSE)[, -c(1, 2, 3, 4)]
+    parDf <- lavaan::parameterEstimates(fittedModel,
+                                        zstat = FALSE,
+                                        pvalue = FALSE,
+                                        rsquare = FALSE)[, -c(1, 2, 3, 4)]
 
     parDf$group[parDf$group == 0] <- c(rep(1:nGroups, each = nItems), 1:nGroups)
 
-    stdDf <- standardizedSolution(fittedModel,
-                                  zstat = FALSE,
-                                  pvalue = FALSE)[grep("lambda", parDf$label), -c(1, 2, 3)]
+    stdDf <- lavaan::standardizedSolution(fittedModel,
+                                          zstat = FALSE,
+                                          pvalue = FALSE)[grep("lambda", parDf$label), -c(1, 2, 3)]
 
     stdDf$label <- rep(paste("std", 1:nItems, sep = "_"), nGroups)
   } else {
     parDf <- cbind(
       group = 1,
-      parameterEstimates(fittedModel,
-                         zstat = FALSE,
-                         pvalue = FALSE,
-                         rsquare = FALSE)[, -c(1, 2, 3)]
+      lavaan::parameterEstimates(fittedModel,
+                                 zstat = FALSE,
+                                 pvalue = FALSE,
+                                 rsquare = FALSE)[, -c(1, 2, 3)]
     )
     stdDf <- cbind(
       group = 1,
-      standardizedSolution(fittedModel,
-                           zstat = FALSE,
-                           pvalue = FALSE)[grep("lambda", parDf$label), -c(1, 2, 3)]
+      lavaan::standardizedSolution(fittedModel,
+                                   zstat = FALSE,
+                                   pvalue = FALSE)[grep("lambda", parDf$label), -c(1, 2, 3)]
     )
 
     stdDf$label <- paste("std", 1:nItems, sep = "_")
@@ -66,7 +65,7 @@ extractParameters <- function(fittedModel, alpha = 0.05) {
   df$label <- gsub("alpha_(\\d+)",
                    "&alpha;&#x302;<sub>\\1</sub>",
                    df$label)
-  df$label[grep("rel_", df$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavNames(fittedModel)))
+  df$label[grep("rel_", df$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavaan::lavNames(fittedModel)))
   df$label[grep("sumrel", df$label)] <- "R&#x302;<sub>&Sigma;</sub>"
   df$label[grep("sigma_eta", df$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
 
@@ -74,7 +73,7 @@ extractParameters <- function(fittedModel, alpha = 0.05) {
   splitDf <- lapply(
     split(df, df$group),
     function(subDf) {
-      rbind(cbind(Item = lavNames(fittedModel),
+      rbind(cbind(Item = lavaan::lavNames(fittedModel),
                   subDf[grep("lambda", subDf$label), -1],
                   subDf[grep("std", subDf$label), -c(1, 2)],
                   subDf[grep("alpha", subDf$label), -1],

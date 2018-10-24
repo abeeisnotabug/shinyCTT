@@ -1,4 +1,3 @@
-#' @export
 makeModelCodes <- function(inputData, itemCols, group = FALSE) {
   itemNames <- colnames(inputData[, itemCols])
   nItems <- length(itemCols)

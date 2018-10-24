@@ -1,4 +1,3 @@
-#' @export
 makeCorrTableWithCIs <- function(rawTable, goodColor, badColor, neutrColor, textColor, sigLvl, itemCols) {
   CIs <- rawTable$test
 
@@ -49,7 +48,6 @@ makeCorrTableWithCIs <- function(rawTable, goodColor, badColor, neutrColor, text
   corrTableComb
 }
 
-#' @export
 makeKable <- function(table,
                       digits = 3,
                       full_width = FALSE,
@@ -70,10 +68,9 @@ makeKable <- function(table,
     ...)
 }
 
-#' @export
 extractFitParameters <- function(fittedModel) {
   scaledAddon <- switch(length(fittedModel@test), "", ".scaled")
-  rawParams <- lavInspect(fittedModel, what = "fit")
+  rawParams <- lavaan::lavInspect(fittedModel, what = "fit")
 
   paramsDfLeft <- as.data.frame(t(
     rawParams[c(
@@ -103,7 +100,6 @@ extractFitParameters <- function(fittedModel) {
   paramsDf
 }
 
-#' @export
 getPredictedScores <- function(fittedModel, groupVar = FALSE) {
   if (fittedModel@Data@ngroups > 1 && isFALSE(groupVar))
     stop("The data is based on groups but you didn't supply a group variable.")
@@ -117,12 +113,105 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
 
   if (fittedModel@Data@ngroups > 1) {
     for (group in fittedModel@Data@group.label)
-      out$eta.hat[groupVar == group] <- lavPredict(fittedModel)[[which(fittedModel@Data@group.label == group)]]
+      out$eta.hat[groupVar == group] <- lavaan::lavPredict(fittedModel)[[which(fittedModel@Data@group.label == group)]]
 
     out[[fittedModel@Data@group]] <- groupVar
   } else {
-    out$eta.hat <- lavPredict(fittedModel)
+    out$eta.hat <- lavaan::lavPredict(fittedModel)
   }
 
   out
+}
+
+makeRCode <- function(input, modelCode, estimator, isSubset, model, isMg) {
+  head <- "library(lavaan)"
+
+  dataInput <- sprintf(
+    "rawData <- %s",
+    switch(
+      input$source,
+      "Workspace" = input$objectFromWorkspace,
+      "CSV" = sprintf(
+"read.csv(
+  file = \"%s\",
+  header = %s,
+  sep = \"%s\",
+  quote = \"%s\",
+  stringsAsFactors = FALSE
+)",
+        input$CSVFile$name,
+        input$header,
+        input$sep,
+        ifelse(input$quote == "\"", "\\\"", input$quote)
+      ),
+      "SPSS" = sprintf(
+        "haven::read_spss(file = %s)",
+        input$SPSSFile$name
+      )
+    )
+  )
+
+  if (isSubset)
+    subsetData <- sprintf(
+      "subsetData <- subset(rawData, rawData[, \"%s\"] %%in%% c(%s))",
+      input$groupCol,
+      paste(input$groups, collapse = ", ")
+    )
+
+  modelCodeLine <- sprintf(
+"modelCode <- \"
+%s
+\"",
+    modelCode
+  )
+
+  if (isMg) {
+    fitLine <- sprintf(
+"%sFittedMg <- cfa(
+  model = modelCode,
+  data = %s,
+  meanstructure = TRUE,
+  group = \"%s\",
+  group.equal = c(\"loadings\", \"intercepts\"),
+  estimator = \"%s\"
+)",
+      model,
+      ifelse(isSubset, "subsetData", "rawData"),
+      input$groupCol,
+      estimator
+    )
+  } else {
+    fitLine <- sprintf(
+"%sFitted <- cfa(
+  model = modelCode,
+  data = %s,
+  meanstructure = TRUE,
+  estimator = \"%s\"
+)",
+      model,
+      ifelse(isSubset, "subsetData", "rawData"),
+      estimator
+    )
+  }
+
+sprintf(
+"# Load necesary package: lavaan
+%s
+
+# Load the data from the selected source:
+%s
+%s
+# Specify the model syntax:
+%s
+
+# Estimate the model:
+%s",
+head,
+dataInput,
+ifelse(isSubset, sprintf("# Select the subset of groups to include:
+%s
+", subsetData), ""),
+modelCodeLine,
+fitLine
+)
 }
