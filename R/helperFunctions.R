@@ -113,11 +113,11 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
 
   if (fittedModel@Data@ngroups > 1) {
     for (group in fittedModel@Data@group.label)
-      out$eta.hat[groupVar == group] <- lavaan::lavPredict(fittedModel)[[which(fittedModel@Data@group.label == group)]]
+      out$eta.hat[groupVar == group] <- lavaan::lavPredict(fittedModel, method = "regression")[[which(fittedModel@Data@group.label == group)]]
 
     out[[fittedModel@Data@group]] <- groupVar
   } else {
-    out$eta.hat <- lavaan::lavPredict(fittedModel)
+    out$eta.hat <- lavaan::lavPredict(fittedModel, method = "regression")
   }
 
   out
