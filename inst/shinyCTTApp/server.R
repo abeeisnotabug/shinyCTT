@@ -253,10 +253,10 @@ function(input, output, session) {
         table <- t(apply(
             userDataItems(),
             2,
-            function(col) c(Mean = mean(col),
-                            Sd = sd(col),
-                            Skew = moments::skewness(col),
-                            Excess = moments::kurtosis(col) - 3))
+            function(col) c(Mean = mean(col, na.rm = TRUE),
+                            Sd = sd(col, na.rm = TRUE),
+                            Skew = moments::skewness(col, na.rm = TRUE),
+                            Excess = moments::kurtosis(col, na.rm = TRUE) - 3))
         )
 
         nHeader <- c(1, 4)
@@ -285,7 +285,7 @@ function(input, output, session) {
     output$covMat <- renderUI({
         req(userDataItems())
 
-        table <- cov(userDataItems())
+        table <- cov(userDataItems(), use = "pairwise.complete.obs")
         table[upper.tri(table)] <- NA
 
         tagList(
@@ -304,7 +304,7 @@ function(input, output, session) {
         req(userDataItems())
 
         list(cor = tryCatch(
-            cor(userDataItems()),
+            cor(userDataItems(), use = "pairwise.complete.obs"),
             warning = function(w) NULL,
             error = function(e) NULL
         ),
@@ -605,8 +605,9 @@ function(input, output, session) {
     })
 
     # Check the number of observations -------------------------------------------------------------------------------------
-    observeEvent(list(userData(), input$doMg), {
+    observeEvent(list(userData(), input$doMg, input$groupCol), {
         req(userDataItems())
+        print(input$groupCol)
 
         checks$obsOk <- if (nrow(userData()) < ncol(userDataItems())) {
             list(
@@ -621,11 +622,12 @@ function(input, output, session) {
                     check = TRUE,
                     symb = "&#10003;",
                     col = "black",
-                    tag = NULL
+                    tag = "noG"
                 )
             } else {
-                if (any(sapply(split(userData(), userDataGroup()), nrow) < ncol(userDataItems())) &&
-                    input$doMg) {
+                #if (any(sapply(split(userData(), userDataGroup()), nrow) < ncol(userDataItems())) &&
+                #    input$doMg) {
+                if (TRUE) {
                     list(
                         check = FALSE,
                         symb = "&#10005;",
@@ -637,7 +639,7 @@ function(input, output, session) {
                         check = TRUE,
                         symb = "&#10003;",
                         col = "black",
-                        tag = NULL
+                        tag = "isG"
                     )
                 }
             }
@@ -768,9 +770,9 @@ function(input, output, session) {
                             ),
                             2,
                             function(col)
-                                c(Mean = mean(col), SD = sd(col),
-                                  Skew = moments::skewness(col),
-                                  Excess = moments::kurtosis(col) - 3)
+                                c(Mean = mean(col, na.rm = TRUE), SD = sd(col, na.rm = TRUE),
+                                  Skew = moments::skewness(col, na.rm = TRUE),
+                                  Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
                         )
                     )
                 )
@@ -820,7 +822,8 @@ function(input, output, session) {
                             subset(
                                 userDataItems(),
                                 userDataGroup() == group
-                            )
+                            ),
+                            use = "pairwise.complete.obs"
                         )
                 )
 
@@ -867,7 +870,8 @@ function(input, output, session) {
                                     subset(
                                         userDataItems(),
                                         userDataGroup() == group
-                                    )
+                                    ),
+                                    use = "pairwise.complete.obs"
                                 )),
                                 test = corrplot::cor.mtest(
                                     subset(
@@ -982,7 +986,7 @@ function(input, output, session) {
         )
 
         lapply(
-            append(list(FALSE), if (input$doMg) input$groupCol),
+            append(list(FALSE), if (isTRUE(input$doMg)) input$groupCol),
             function(groupName) {
 
                 # Try fitting and capture warning and error messages -------------------------------------------------------

@@ -108,16 +108,27 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
 
   out <- data.frame(
     n = 1:n,
-    eta.hat = numeric(n)
+    eta.hat = numeric(n),
+    se = numeric(n)
+  )
+
+  scores <- lavaan::lavPredict(
+    fittedModel,
+    method = "regression",
+    se = "standard"
   )
 
   if (fittedModel@Data@ngroups > 1) {
-    for (group in fittedModel@Data@group.label)
-      out$eta.hat[groupVar == group] <- lavaan::lavPredict(fittedModel, method = "regression")[[which(fittedModel@Data@group.label == group)]]
+    for (group in fittedModel@Data@group.label) {
+      out$eta.hat[groupVar == group] <- as.numeric(scores[[which(fittedModel@Data@group.label == group)]])
+      out$se[groupVar == group] <- as.numeric(attr(scores, "se")[[which(fittedModel@Data@group.label == group)]])
+    }
 
     out[[fittedModel@Data@group]] <- groupVar
   } else {
-    out$eta.hat <- lavaan::lavPredict(fittedModel, method = "regression")
+    out$eta.hat <- as.numeric(scores)
+
+    out$se <- as.numeric(attr(scores, "se")[[1]])
   }
 
   out
