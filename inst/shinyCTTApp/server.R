@@ -168,6 +168,7 @@ function(input, output, session) {
 
     itemColsRV <- reactiveVal()
     groupColRV <- reactiveVal()
+    naRowRV <- reactiveVal()
 
     output$itemColsChooser <- renderUI({
         possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
@@ -245,36 +246,38 @@ function(input, output, session) {
         ), {
             #req(input$itemCols)
 
-            if (length(input$itemCols) <= 1)
-                shinyjs::disable("subsetSelectButton")
-            else
-                shinyjs::enable("subsetSelectButton")
+            if (input$dataSelectButton > 0) {
+                if (length(input$itemCols) <= 1)
+                    shinyjs::disable("subsetSelectButton")
+                else
+                    shinyjs::enable("subsetSelectButton")
 
-            notifications$notList$numItems <- switch(
-                as.character(length(input$itemCols)),
-                "0" = shinydashboard::notificationItem(
-                    text = "No item selected. No analysis possible.",
-                    icon = icon("times"),
-                    status = "danger"
-                ),
-                "1" = shinydashboard::notificationItem(
-                    text = "Only one item selected. No analysis possible.",
-                    icon = icon("times"),
-                    status = "danger"
-                ),
-                "2" = shinydashboard::notificationItem(
-                    text = HTML("Only two items selected. Unable to test the &tau;-kongeneric and
+                notifications$notList$numItems <- switch(
+                    as.character(length(input$itemCols)),
+                    "0" = shinydashboard::notificationItem(
+                        text = "No item selected. No analysis possible.",
+                        icon = icon("times"),
+                        status = "danger"
+                    ),
+                    "1" = shinydashboard::notificationItem(
+                        text = "Only one item selected. No analysis possible.",
+                        icon = icon("times"),
+                        status = "danger"
+                    ),
+                    "2" = shinydashboard::notificationItem(
+                        text = HTML("Only two items selected. Unable to test the &tau;-kongeneric and
                                 the ess. &tau;-equivalent model."),
-                    icon = icon("exclamation-triangle"),
-                    status = "warning"
-                ),
-                "3" = shinydashboard::notificationItem(
-                    text = HTML("Only three items selected. Unable to test the &tau;-kongeneric model."),
-                    icon = icon("exclamation-triangle"),
-                    status = "warning"
-                ),
-                NULL
-            )
+                        icon = icon("exclamation-triangle"),
+                        status = "warning"
+                    ),
+                    "3" = shinydashboard::notificationItem(
+                        text = HTML("Only three items selected. Unable to test the &tau;-kongeneric model."),
+                        icon = icon("exclamation-triangle"),
+                        status = "warning"
+                    ),
+                    NULL
+                )
+            }
         }
     )
 
@@ -303,11 +306,11 @@ function(input, output, session) {
     })
 
     output$naInfoBox <- shinydashboard::renderValueBox({
-        naRows <- length(unique(which(is.na(userDataChosen()), arr.ind = TRUE)[, "row"]))
+        naRowRV(length(unique(which(is.na(userDataChosen()), arr.ind = TRUE)[, "row"])))
 
         shinydashboard::valueBox(
-            value = naRows,
-            color = if (naRows > 0) "yellow" else "green",
+            value = naRowRV(),
+            color = if (naRowRV() > 0) "yellow" else "green",
             subtitle = "rows with missing values found",
             icon = icon("exclamation-triangle")
         )
@@ -320,6 +323,13 @@ function(input, output, session) {
     })
 
     output$obsTable <- renderUI({
+        nTotal <- nrow(userDataChosen())
+        nComplete <- nTotal - naRowRV()
+
+        HTML(shinyCTT:::makeKable(data.frame(Total = nTotal, Complete = nComplete)))
+    })
+
+    output$obsPerGroupTable <- renderUI({
         req(input$groupCol)
 
         if (input$groupCol != "noGroupSelected")
@@ -334,14 +344,32 @@ function(input, output, session) {
         shinyjs::disable("groups")
         shinyjs::disable("subsetSelectButton")
 
-        dataMenuList$menuList[[6]] <- dataMenuList$menuList[[4]]
+        dataMenuList$menuList[[8]] <- dataMenuList$menuList[[4]]
         dataMenuList$menuList[[4]] <- shinydashboard::menuItem(
             "3. Statistics",
-            tabName = "statisticsTab",
+            shinydashboard::menuSubItem(
+                "Descriptive Statistics",
+                tabName = "statisticsTab",
+                selected = TRUE
+            ),
+            shinydashboard::menuSubItem(
+                "Correlational Analysis",
+                tabName = "corrTab"
+            ),
             icon = icon("chart-bar"),
-            selected = TRUE
+            startExpanded = TRUE
         )
-        dataMenuList$menuList[[5]] <- hr()
+        dataMenuList$menuList[[5]] <- shinydashboard::menuItem(
+            "4. Models to test",
+            tabName = "modelChooseTab",
+            icon = icon("check-square")
+        )
+        dataMenuList$menuList[[6]] <- shinydashboard::menuItem(
+            "5. Model Testing Parameters",
+            tabName = "testParamTab",
+            icon = icon("cog")
+        )
+        dataMenuList$menuList[[7]] <- hr()
 
         if (input$groupCol != "noGroupSelected") {
             userDataGroup(
@@ -356,6 +384,375 @@ function(input, output, session) {
                 subset(
                     userDataChosen(),
                     select = input$itemCols
+                )
+            )
+        }
+    })
+
+    output$descrBox <- renderUI({
+        req(userDataGroup())
+
+        table <- t(apply(
+            userDataGroup()[, input$itemCols],
+            2,
+            function(col) c(Mean = mean(col, na.rm = TRUE),
+                            Sd = sd(col, na.rm = TRUE),
+                            Skew = moments::skewness(col, na.rm = TRUE),
+                            Excess = moments::kurtosis(col, na.rm = TRUE) - 3))
+        )
+
+        nHeader <- c(1, 4)
+        names(nHeader) <- c(
+            " ",
+            sprintf("n<sub>all</sub> = %i", nrow(userDataGroup()))
+        )
+
+        if (input$groupCol != "noGroupSelected") {
+            groups <- unique(userDataGroup()[, input$groupCol])
+
+            mgDescrTableList <- lapply(
+                groups,
+                function(group) t(
+                    apply(
+                        subset(
+                            userDataGroup()[, input$itemCols],
+                            userDataGroup()[, input$groupCol] == group
+                        ),
+                        2,
+                        function(col)
+                            c(Mean = mean(col, na.rm = TRUE), SD = sd(col, na.rm = TRUE),
+                              Skew = moments::skewness(col, na.rm = TRUE),
+                              Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
+                    )
+                )
+            )
+
+            descrGroupHeader <- c(1, rep(4, length(groups)))
+            names(descrGroupHeader) <- c(
+                " ",
+                sprintf(
+                    "Group: %s (n<sub>%s</sub> = %i)",
+                    groups,
+                    groups,
+                    c(table(userDataGroup()[, input$groupCol]))[as.character(groups)]
+                )
+            )
+
+            shinydashboard::tabBox(
+                width = 6,
+                title = "Descriptive statistics:",
+                side = "right",
+                tabPanel(
+                    "Overall",
+                    HTML(
+                        kableExtra::add_header_above(
+                            kableExtra::column_spec(
+                                shinyCTT:::makeKable(table),
+                                1,
+                                bold = TRUE
+                            ),
+                            nHeader,
+                            escape = FALSE
+                        )
+                    )
+                ),
+                tabPanel(
+                    "Group-wise",
+                    HTML(
+                        kableExtra::column_spec(
+                            kableExtra::add_header_above(
+                                kableExtra::column_spec(
+                                    shinyCTT:::makeKable(do.call(cbind, mgDescrTableList)),
+                                    1,
+                                    bold = TRUE
+                                ),
+                                header = descrGroupHeader,
+                                escape = FALSE
+                            ),
+                            1:max(1, length(groups) - 1) * 4 + 1,
+                            border_right = ifelse(
+                                length(groups) > 1,
+                                "1px solid lightgrey",
+                                FALSE
+                            )
+                        )
+                    )
+                )
+            )
+        } else {
+            shinydashboard::box(
+                width = 4,
+                title = "Descriptive statistics:",
+                HTML(
+                    kableExtra::add_header_above(
+                        kableExtra::column_spec(
+                            shinyCTT:::makeKable(table),
+                            1,
+                            bold = TRUE
+                        ),
+                        nHeader,
+                        escape = FALSE
+                    )
+                )
+            )
+        }
+    })
+
+    output$histBox <- renderUI({
+        output$singleHist <- renderPlot({
+            ggplot2::ggplot(
+                data.frame(item = userDataGroup()[, input$histItem]),
+                ggplot2::aes(x = item)
+            ) +
+                ggplot2::geom_histogram(
+                    if (input$singleDens) ggplot2::aes(y = ..density..),
+                    color = "black",
+                    fill = "#438BCA",
+                    bins = input$singleNoBins
+                ) +
+                ggplot2::xlab(input$histItem) +
+                ggplot2::theme_classic()
+        })
+
+        if (input$groupCol != "noGroupSelected") {
+            output$groupHist <- renderPlot({
+                ggplot2::ggplot(
+                    data.frame(group = userDataGroup()[, input$groupCol], item = userDataGroup()[, input$histItemGroup]),
+                    ggplot2::aes(x = item, fill = group)
+                ) +
+                    ggplot2::geom_histogram(
+                        if (input$groupDens) ggplot2::aes(y = ..density..),
+                        color = "black",
+                        bins = input$groupNoBins,
+                        position = "dodge"
+                    ) +
+                    ggplot2::xlab(input$histItemGroup) +
+                    ggplot2::scale_fill_discrete(name = input$groupCol) +
+                    ggplot2::theme_classic()
+            })
+
+            shinydashboard::tabBox(
+                title = "Histogram:",
+                side = "right",
+                tabPanel(
+                    "Overall",
+                    selectInput(
+                        "histItem",
+                        "Select the item:",
+                        input$itemCols
+                    ),
+                    plotOutput("singleHist"),
+                    sliderInput(
+                        "singleNoBins",
+                        "Number of bins",
+                        1,
+                        100,
+                        30,
+                        1
+                    ),
+                    checkboxInput(
+                        "singleDens",
+                        "Plot density",
+                        value = FALSE
+                    )
+                ),
+                tabPanel(
+                    "Group-wise",
+                    selectInput(
+                        "histItemGroup",
+                        "Select the item:",
+                        input$itemCols
+                    ),
+                    plotOutput("groupHist"),
+                    sliderInput(
+                        "groupNoBins",
+                        "Number of bins",
+                        1,
+                        100,
+                        30,
+                        1
+                    ),
+                    checkboxInput(
+                        "groupDens",
+                        "Plot density",
+                        value = FALSE
+                    )
+                )
+            )
+        } else {
+            shinydashboard::box(
+                title = "Histogram:",
+                selectInput(
+                    "histItem",
+                    "Select the item:",
+                    input$itemCols
+                ),
+                plotOutput("singleHist"),
+                sliderInput(
+                    "singleNoBins",
+                    "Number of bins",
+                    1,
+                    100,
+                    30,
+                    1
+                ),
+                checkboxInput(
+                    "singleDens",
+                    "Plot density",
+                    value = FALSE
+                )
+            )
+        }
+    })
+
+    output$covMatBox <- renderUI({
+        req(userDataGroup())
+
+        table <- cov(userDataGroup()[, input$itemCols], use = "pairwise.complete.obs")
+        table[upper.tri(table)] <- NA
+
+        if (input$groupCol != "noGroupSelected") {
+            groups <- unique(userDataGroup()[, input$groupCol])
+
+            mgCovMatList <- lapply(
+                groups,
+                function(group)
+                    cov(
+                        subset(
+                            userDataGroup()[, input$itemCols],
+                            userDataGroup()[, input$groupCol] == group
+                        ),
+                        use = "pairwise.complete.obs"
+                    )
+            )
+
+            for (i in 1:length(mgCovMatList))
+                mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
+
+            mgCovMatTable <- kableExtra::column_spec(
+                shinyCTT:::makeKable(do.call(rbind, mgCovMatList)),
+                1,
+                bold = TRUE
+            )
+
+            groupRowHeaders <- sprintf(
+                "Group: %s (n = %i)",
+                groups,
+                c(table(userDataGroup()[, input$groupCol]))[as.character(groups)]
+            )
+
+            for (i in 1:length(groups))
+                mgCovMatTable <- kableExtra::group_rows(
+                    mgCovMatTable,
+                    group_label = groupRowHeaders[i],
+                    start_row = (i - 1) * length(input$itemCols) + 1,
+                    end_row = i * length(input$itemCols),
+                    label_row_css = "background-color: #666; color: #fff;"
+                )
+
+            shinydashboard::tabBox(
+                width = 12,
+                title = "Covariance Matrix:",
+                side = "right",
+                tabPanel(
+                    "Overall",
+                    HTML(
+                        kableExtra::column_spec(
+                            shinyCTT:::makeKable(table),
+                            1,
+                            bold = TRUE
+                        )
+                    )
+                ),
+                tabPanel(
+                    "Group-wise",
+                    HTML(mgCovMatTable)
+                )
+            )
+        } else {
+            shinydashboard::box(
+                width = 12,
+                title = "Covariance Matrix:",
+                HTML(
+                    kableExtra::column_spec(
+                        shinyCTT:::makeKable(table),
+                        1,
+                        bold = TRUE
+                    )
+                )
+            )
+        }
+    })
+
+    output$corrInd <- renderUI({
+        req(userDataGroup())
+        req(input$corrIndEst)
+
+        dummyModel <- paste(
+            sprintf("%s ~ 1", colnames(userDataGroup()[, input$itemCols])),
+            collapse = "\n"
+        )
+
+        corrIndRaw <- tryCatch(
+            lavaan::cfa(
+                model = dummyModel,
+                data = userDataGroup(),
+                estimator = input$corrIndEst
+            ),
+            warning = function(w) w,
+            error = function(e) e
+        )
+
+        if (class(corrIndRaw[1] == "lavaan")) {
+            corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw[, c(2, 1, 3)]))
+
+            if (corrInd[3] < input$sigLvl) {
+                tagList(
+                    h4("Test on Correlative Independence"),
+                    HTML(
+                        sprintf(
+                            "The hypothesis that all correlations are equal to
+                            zero has to be discarded on a significance level of
+                            %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
+                            input$corrIndSL,
+                            input$corrIndEst,
+                            corrInd[1],
+                            corrInd[2],
+                            ifelse(
+                                corrInd[3] < 0.001,
+                                "< 0.001",
+                                sprintf("= %.3f", corrInd[3]))
+                        )
+                    )
+                )
+            } else {
+                tagList(
+                    h4("Test on Correlative Independence"),
+                    HTML(
+                        sprintf(
+                            "The hypothesis that all correlations are equal to
+                            zero can be maintained on a significance level of
+                            %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
+                            input$corrIndSL,
+                            input$corrIndEst,
+                            corrInd[1],
+                            corrInd[2],
+                            ifelse(
+                                corrInd[3] < 0.001,
+                                "< 0.001",
+                                sprintf("= %.3f", corrInd[3]))
+                        )
+                    )
+                )
+            }
+        } else {
+            tagList(
+                h4("Test on Correlative Independence"),
+                div(style = paste0("color:red"),
+                    HTML(
+                        paste("There was an ERROR/WARNING:",
+                              corrIndRaw$message)
+                    )
                 )
             )
         }
