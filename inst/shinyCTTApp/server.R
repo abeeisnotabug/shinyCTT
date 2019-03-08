@@ -1,4 +1,16 @@
 function(input, output, session) {
+    if (T) {
+        goodColor <- "darkgreen"
+        badColor <- "darkred"
+        textColor <- "white"
+        neutrColor <- "grey"
+    } else {
+        goodColor <- "white"
+        badColor <- "white"
+        textColor <- "black"
+        neutrColor <- "white"
+    }
+
     notifications <- reactiveValues(notList = list())
 
     output$infoMenu <- shinydashboard::renderMenu({
@@ -703,57 +715,124 @@ function(input, output, session) {
             error = function(e) e
         )
 
-        if (class(corrIndRaw[1] == "lavaan")) {
-            corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw[, c(2, 1, 3)]))
+        if (class(corrIndRaw)[1] == "lavaan") {
+            corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw)[, c(2, 1, 3)])
 
             if (corrInd[3] < input$sigLvl) {
                 tagList(
-                    h4("Test on Correlative Independence"),
-                    HTML(
-                        sprintf(
-                            "The hypothesis that all correlations are equal to
+                    strong("Test result:"),
+                    p(
+                        HTML(
+                            sprintf(
+                                "The hypothesis that all correlations are equal to
                             zero has to be discarded on a significance level of
                             %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                            input$corrIndSL,
-                            input$corrIndEst,
-                            corrInd[1],
-                            corrInd[2],
-                            ifelse(
-                                corrInd[3] < 0.001,
-                                "< 0.001",
-                                sprintf("= %.3f", corrInd[3]))
+                                input$corrIndSL,
+                                input$corrIndEst,
+                                corrInd[1],
+                                corrInd[2],
+                                ifelse(
+                                    corrInd[3] < 0.001,
+                                    "< 0.001",
+                                    sprintf("= %.3f", corrInd[3]))
+                            )
                         )
                     )
                 )
             } else {
                 tagList(
-                    h4("Test on Correlative Independence"),
-                    HTML(
-                        sprintf(
-                            "The hypothesis that all correlations are equal to
+                    strong("Test result:"),
+                    p(
+                        HTML(
+                            sprintf(
+                                "The hypothesis that all correlations are equal to
                             zero can be maintained on a significance level of
                             %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                            input$corrIndSL,
-                            input$corrIndEst,
-                            corrInd[1],
-                            corrInd[2],
-                            ifelse(
-                                corrInd[3] < 0.001,
-                                "< 0.001",
-                                sprintf("= %.3f", corrInd[3]))
+                                input$corrIndSL,
+                                input$corrIndEst,
+                                corrInd[1],
+                                corrInd[2],
+                                ifelse(
+                                    corrInd[3] < 0.001,
+                                    "< 0.001",
+                                    sprintf("= %.3f", corrInd[3]))
+                            )
                         )
                     )
                 )
             }
         } else {
             tagList(
-                h4("Test on Correlative Independence"),
+                strong("Test result:"),
                 div(style = paste0("color:red"),
                     HTML(
                         paste("There was an ERROR/WARNING:",
                               corrIndRaw$message)
                     )
                 )
+            )
+        }
+    })
+
+    output$corrTableBox <- renderUI({
+        req(userDataGroup())
+
+        corrTableWithCIsRaw <- list(
+            cor = tryCatch(
+                cor(userDataGroup()[, input$itemCols], use = input$corrTabNA),
+                warning = function(w) NULL,
+                error = function(e) NULL
+            ),
+            test = tryCatch(
+                corrplot::cor.mtest(userDataGroup()[, input$itemCols],
+                                    conf.level = (1 - input$corrTabSL)),
+                warning = function(w) w,
+                error = function(e) e
+            )
+        )
+
+        if (class(corrTableWithCIsRaw$test)[1] == "list") {
+            tagList(
+                HTML(
+                    kableExtra::column_spec(
+                        shinyCTT:::makeKable(
+                            shinyCTT:::makeCorrTableWithCIs(
+                                corrTableWithCIsRaw,
+                                goodColor,
+                                badColor,
+                                neutrColor,
+                                textColor,
+                                input$corrTabSL,
+                                input$itemCols
+                            ),
+                            bootstrap_options = c("condensed", "striped")
+                        ),
+                        1,
+                        bold = TRUE
+                    )
+                ),
+                h5("Legend:"),
+                HTML(shinyCTT:::makeKable(
+                    cbind(
+                        kableExtra::cell_spec(
+                            "Sig. pos.",
+                            color = textColor,
+                            background = goodColor
+                        ),
+                        kableExtra::cell_spec(
+                            "Sig. neg.",
+                            color = textColor,
+                            background = badColor
+                        ),
+                        kableExtra::cell_spec(
+                            "Insig.",
+                            color = textColor,
+                            background = neutrColor
+                        )
+                    ),
+                    bootstrap_options = "bordered",
+                    position = "left"
+                ))
             )
         }
     })

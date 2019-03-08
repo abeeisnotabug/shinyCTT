@@ -133,25 +133,60 @@ shinydashboard::dashboardPage(
             shinydashboard::tabItem(
                 tabName = "corrTab",
                 fluidRow(
+                    column(
+                        width = 4,
+                        shinydashboard::box(
+                            width = NULL,
+                            title = "Test on Correlative Independence:",
+                            radioButtons(
+                                "corrIndEst",
+                                "Choose the estimator for this test:",
+                                choices = c("Maximum Likelihood" = "ML",
+                                            "Robust Maximum Likelihood" = "MLR"),
+                                selected = "ML"
+                            ),
+                            numericInput(
+                                "corrIndSL",
+                                "Enter the significance level for this test:",
+                                value = 0.05,
+                                min = 0,
+                                max = 1,
+                                step = 0.001,
+                                width = "300px"
+                            ),
+                            htmlOutput("corrInd")
+                        ),
+                        shinydashboard::box(
+                            width = NULL,
+                            title = "Correlation Table with Confidence Intervals:",
+                            radioButtons(
+                                "corrTabNA",
+                                "Choose how to handle missing values:",
+                                choices = c("Use pairwise complete observations" = "pairwise.complete.obs",
+                                            "Use only complete observations" = "complete.obs"),
+                                selected = "pairwise.complete.obs"
+                            ),
+                            numericInput(
+                                "corrTabSL",
+                                "Enter the significance level for the correlation tests:",
+                                value = 0.05,
+                                min = 0,
+                                max = 1,
+                                step = 0.001,
+                                width = "350px"
+                            )
+                        )
+                    ),
+                    column(
+                        width = 8,
+                        htmlOutput("scatterPlotBox")
+                    )
+                ),
+                fluidRow(
                     shinydashboard::box(
-                        width = 6,
-                        title = "Test on Correlative Independence:",
-                        radioButtons(
-                            "corrIndEst",
-                            "Choose the estimator for the test on correlative independence:",
-                            choices = c("Maximum Likelihood" = "ML",
-                                        "Robust Maximum Likelihood" = "MLR"),
-                            selected = "ML"
-                        ),
-                        numericInput(
-                            "corrIndSL",
-                            "Enter the significance level for the test on correlative independence:",
-                            value = 0.05,
-                            min = 0,
-                            max = 1,
-                            step = 0.001
-                        ),
-                        uiOutput("corrInd")
+                        width = 12,
+                        title = "Correlation Table with Confidence Intervals:",
+                        htmlOutput("corrTableBox")
                     )
                 )
             ),
