@@ -186,11 +186,13 @@ function(input, output, session) {
         possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
         itemColsRV(length(possibleItemColumns))
 
-        checkboxGroupInput("itemCols",
-                           "2a. Select the item columns",
-                           choices = possibleItemColumns,
-                           selected = possibleItemColumns,
-                           inline = TRUE)
+        checkboxGroupInput(
+            "itemCols",
+            "2a. Select the item columns",
+            choices = possibleItemColumns,
+            selected = possibleItemColumns,
+            inline = TRUE
+        )
     })
 
     output$groupColChooser <- renderUI({
@@ -230,11 +232,13 @@ function(input, output, session) {
             }
 
             tagList(
-                checkboxGroupInput("groups",
-                                   "2c. Select which groups to include",
-                                   choices = possibleGroups,
-                                   selected = possibleGroups,
-                                   inline = TRUE),
+                checkboxGroupInput(
+                    "groups",
+                    "2c. Select which groups to include",
+                    choices = possibleGroups,
+                    selected = possibleGroups,
+                    inline = TRUE
+                ),
                 helpText(groupWarning),
                 conditionalPanel(
                     condition = "input.groups.length > 1",
@@ -259,7 +263,8 @@ function(input, output, session) {
             #req(input$itemCols)
 
             if (input$dataSelectButton > 0) {
-                if (length(input$itemCols) <= 1)
+                if (length(input$itemCols) <= 1 ||
+                    (input$groupCol != "noGroupSelected" && length(input$groups) == 0))
                     shinyjs::disable("subsetSelectButton")
                 else
                     shinyjs::enable("subsetSelectButton")
@@ -368,20 +373,19 @@ function(input, output, session) {
                 "Correlational Analysis",
                 tabName = "corrTab"
             ),
+            shinydashboard::menuSubItem(
+                "Test on Multivariate Normality",
+                tabName = "mvnTab"
+            ),
             icon = icon("chart-bar"),
             startExpanded = TRUE
         )
         dataMenuList$menuList[[5]] <- shinydashboard::menuItem(
-            "4. Models to test",
-            tabName = "modelChooseTab",
-            icon = icon("check-square")
-        )
-        dataMenuList$menuList[[6]] <- shinydashboard::menuItem(
-            "5. Model Testing Parameters",
+            "4. Testing Parameters",
             tabName = "testParamTab",
             icon = icon("cog")
         )
-        dataMenuList$menuList[[7]] <- hr()
+        dataMenuList$menuList[[6]] <- hr()
 
         if (input$groupCol != "noGroupSelected") {
             userDataGroup(
@@ -450,6 +454,33 @@ function(input, output, session) {
                 )
             )
 
+            mgDescrTableListTagged <- list()
+
+            for (i in 1:((length(groups) + 1) %/% 2))
+                mgDescrTableListTagged[i] <- kableExtra::column_spec(
+                    kableExtra::add_header_above(
+                        kableExtra::column_spec(
+                            shinyCTT:::makeKable(
+                                do.call(
+                                    cbind,
+                                    mgDescrTableList[(2 * i - 1):min(2 * i, length(groups))]
+                                )
+                            ),
+                            1,
+                            bold = TRUE
+                        ),
+                        header = descrGroupHeader[c(1, (2 * i):min(2 * i + 1, length(groups) + 1))],
+                        escape = FALSE
+                    ),
+                    5,
+                    border_right = "1px solid lightgrey"
+                    #ifelse(
+                    #    length(groups) > 1,
+                    #    "1px solid lightgrey",
+                    #    FALSE
+                    #)
+                )
+
             shinydashboard::tabBox(
                 width = 6,
                 title = "Descriptive statistics:",
@@ -470,30 +501,12 @@ function(input, output, session) {
                 ),
                 tabPanel(
                     "Group-wise",
-                    HTML(
-                        kableExtra::column_spec(
-                            kableExtra::add_header_above(
-                                kableExtra::column_spec(
-                                    shinyCTT:::makeKable(do.call(cbind, mgDescrTableList)),
-                                    1,
-                                    bold = TRUE
-                                ),
-                                header = descrGroupHeader,
-                                escape = FALSE
-                            ),
-                            1:max(1, length(groups) - 1) * 4 + 1,
-                            border_right = ifelse(
-                                length(groups) > 1,
-                                "1px solid lightgrey",
-                                FALSE
-                            )
-                        )
-                    )
+                    tagList(do.call(HTML, mgDescrTableListTagged))
                 )
             )
         } else {
             shinydashboard::box(
-                width = 4,
+                width = 6,
                 title = "Descriptive statistics:",
                 HTML(
                     kableExtra::add_header_above(
@@ -518,7 +531,7 @@ function(input, output, session) {
             ) +
                 ggplot2::geom_histogram(
                     if (input$singleDens) ggplot2::aes(y = ..density..),
-                    color = "black",
+                    color = "white",
                     fill = "#438BCA",
                     bins = input$singleNoBins
                 ) +
@@ -529,12 +542,21 @@ function(input, output, session) {
         if (input$groupCol != "noGroupSelected") {
             output$groupHist <- renderPlot({
                 ggplot2::ggplot(
-                    data.frame(group = userDataGroup()[, input$groupCol], item = userDataGroup()[, input$histItemGroup]),
+                    data.frame(
+                        group = userDataGroup()[
+                            userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
+                            input$groupCol
+                        ],
+                        item = userDataGroup()[
+                            userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
+                            input$histItemGroup
+                        ]
+                    ),
                     ggplot2::aes(x = item, fill = group)
                 ) +
                     ggplot2::geom_histogram(
                         if (input$groupDens) ggplot2::aes(y = ..density..),
-                        color = "black",
+                        color = "white",
                         bins = input$groupNoBins,
                         position = "dodge"
                     ) +
@@ -548,70 +570,122 @@ function(input, output, session) {
                 side = "right",
                 tabPanel(
                     "Overall",
-                    selectInput(
-                        "histItem",
-                        "Select the item:",
-                        input$itemCols
+                    fluidRow(
+                        column(
+                            width = 6,
+                            selectInput(
+                                "histItem",
+                                "Select the item:",
+                                input$itemCols
+                            )
+                        )
                     ),
                     plotOutput("singleHist"),
-                    sliderInput(
-                        "singleNoBins",
-                        "Number of bins",
-                        1,
-                        100,
-                        30,
-                        1
-                    ),
-                    checkboxInput(
-                        "singleDens",
-                        "Plot density",
-                        value = FALSE
+                    fluidRow(
+                        column(
+                            width = 6,
+                            sliderInput(
+                                "singleNoBins",
+                                "Choose the number of bins:",
+                                1,
+                                100,
+                                30,
+                                1
+                            )
+                        ),
+                        column(
+                            width = 6,
+                            radioButtons(
+                                "singleDens",
+                                "Choose the ordinate scaling:",
+                                choices = c("Density" = TRUE, "Frequency" = FALSE),
+                                selected = FALSE
+                            )
+                        )
                     )
                 ),
                 tabPanel(
                     "Group-wise",
-                    selectInput(
-                        "histItemGroup",
-                        "Select the item:",
-                        input$itemCols
+                    fluidRow(
+                        column(
+                            width = 6,
+                            selectInput(
+                                "histItemGroup",
+                                "Select the item:",
+                                input$itemCols
+                            )
+                        ),
+                        column(
+                            width = 6,
+                            checkboxGroupInput(
+                                "histGroupGroups",
+                                "Select the groups to include:",
+                                unique(userDataGroup()[, input$groupCol]),
+                                unique(userDataGroup()[, input$groupCol]),
+                                inline = TRUE
+                            )
+                        )
                     ),
                     plotOutput("groupHist"),
-                    sliderInput(
-                        "groupNoBins",
-                        "Number of bins",
-                        1,
-                        100,
-                        30,
-                        1
-                    ),
-                    checkboxInput(
-                        "groupDens",
-                        "Plot density",
-                        value = FALSE
+                    fluidRow(
+                        column(
+                            width = 6,
+                            sliderInput(
+                                "groupNoBins",
+                                "Choose the number of bins:",
+                                1,
+                                100,
+                                30,
+                                1
+                            )
+                        ),
+                        column(
+                            width = 6,
+                            radioButtons(
+                                "groupDens",
+                                "Choose the ordinate scaling:",
+                                choices = c("Density" = TRUE, "Frequency" = FALSE),
+                                selected = FALSE
+                            )
+                        )
                     )
                 )
             )
         } else {
             shinydashboard::box(
                 title = "Histogram:",
-                selectInput(
-                    "histItem",
-                    "Select the item:",
-                    input$itemCols
+                fluidRow(
+                    column(
+                        width = 6,
+                        selectInput(
+                            "histItem",
+                            "Select the item:",
+                            input$itemCols
+                        )
+                    )
                 ),
                 plotOutput("singleHist"),
-                sliderInput(
-                    "singleNoBins",
-                    "Number of bins",
-                    1,
-                    100,
-                    30,
-                    1
-                ),
-                checkboxInput(
-                    "singleDens",
-                    "Plot density",
-                    value = FALSE
+                fluidRow(
+                    column(
+                        width = 6,
+                        sliderInput(
+                            "singleNoBins",
+                            "Number of bins",
+                            1,
+                            100,
+                            30,
+                            1
+                        )
+                    ),
+                    column(
+                        width = 6,
+                        radioButtons(
+                            "singleDens",
+                            "Choose ordinate units",
+                            choices = c("Density" = TRUE, "Frequency" = FALSE),
+                            selected = FALSE
+                        )
+                    )
                 )
             )
         }
@@ -718,58 +792,198 @@ function(input, output, session) {
         if (class(corrIndRaw)[1] == "lavaan") {
             corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw)[, c(2, 1, 3)])
 
-            if (corrInd[3] < input$sigLvl) {
-                tagList(
-                    strong("Test result:"),
-                    p(
-                        HTML(
-                            sprintf(
-                                "The hypothesis that all correlations are equal to
+            if (!is.na(input$corrIndSL) && input$corrIndSL < 1 && input$corrIndSL > 0) {
+                if (corrInd[3] < input$corrIndSL) {
+                    tagList(
+                        strong("Test result:"),
+                        p(
+                            HTML(
+                                sprintf(
+                                    "The hypothesis that all correlations are equal to
                             zero has to be discarded on a significance level of
                             %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                                input$corrIndSL,
-                                input$corrIndEst,
-                                corrInd[1],
-                                corrInd[2],
-                                ifelse(
-                                    corrInd[3] < 0.001,
-                                    "< 0.001",
-                                    sprintf("= %.3f", corrInd[3]))
+                                    input$corrIndSL,
+                                    input$corrIndEst,
+                                    corrInd[1],
+                                    corrInd[2],
+                                    ifelse(
+                                        corrInd[3] < 0.001,
+                                        "< 0.001",
+                                        sprintf("= %.3f", corrInd[3]))
+                                )
                             )
                         )
                     )
-                )
-            } else {
-                tagList(
-                    strong("Test result:"),
-                    p(
-                        HTML(
-                            sprintf(
-                                "The hypothesis that all correlations are equal to
+                } else {
+                    tagList(
+                        strong("Test result:"),
+                        p(
+                            HTML(
+                                sprintf(
+                                    "The hypothesis that all correlations are equal to
                             zero can be maintained on a significance level of
                             %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                                input$corrIndSL,
-                                input$corrIndEst,
-                                corrInd[1],
-                                corrInd[2],
-                                ifelse(
-                                    corrInd[3] < 0.001,
-                                    "< 0.001",
-                                    sprintf("= %.3f", corrInd[3]))
+                                    input$corrIndSL,
+                                    input$corrIndEst,
+                                    corrInd[1],
+                                    corrInd[2],
+                                    ifelse(
+                                        corrInd[3] < 0.001,
+                                        "< 0.001",
+                                        sprintf("= %.3f", corrInd[3]))
+                                )
                             )
                         )
                     )
+                }
+            } else {
+                div(
+                    style = paste0("color:red"),
+                    HTML("Please enter a valid significance level")
                 )
             }
         } else {
             tagList(
                 strong("Test result:"),
-                div(style = paste0("color:red"),
+                div(
+                    style = paste0("color:red"),
                     HTML(
                         paste("There was an ERROR/WARNING:",
                               corrIndRaw$message)
                     )
                 )
+            )
+        }
+    })
+
+    output$scatterPlotBox <- renderUI({
+        req(userDataGroup())
+
+        output$singleScatter <- renderPlot({
+            ggplot2::ggplot(
+                data.frame(
+                    itemX = userDataGroup()[, input$scatterItemX],
+                    itemY = userDataGroup()[, input$scatterItemY]
+                ),
+                ggplot2::aes(x = itemX, y = itemY)
+            ) +
+                ggplot2::geom_point(color = "#438BCA") +
+                ggplot2::xlab(input$scatterItemX) +
+                ggplot2::ylab(input$scatterItemY) +
+                ggplot2::theme_classic()
+        })
+
+        if (input$groupCol != "noGroupSelected") {
+            output$groupScatter <- renderPlot({
+                ggplot2::ggplot(
+                    data.frame(
+                        group = userDataGroup()[
+                            userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
+                            input$groupCol
+                        ],
+                        itemX = userDataGroup()[
+                            userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
+                            input$scatterItemXGroup
+                        ],
+                        itemY = userDataGroup()[
+                            userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
+                            input$scatterItemYGroup
+                        ]
+                    ),
+                    ggplot2::aes(x = itemX, y = itemY, color = group)
+                ) +
+                    ggplot2::geom_point() +
+                    ggplot2::xlab(input$scatterItemXGroup) +
+                    ggplot2::ylab(input$scatterItemYGroup) +
+                    ggplot2::scale_color_discrete(name = input$groupCol) +
+                    ggplot2::theme_classic()
+            })
+
+            shinydashboard::tabBox(
+                title = "Histogram:",
+                width = NULL,
+                side = "right",
+                tabPanel(
+                    "Overall",
+                    fluidRow(
+                        column(
+                            width = 4,
+                            selectInput(
+                                "scatterItemX",
+                                "Select item on the abscissa:",
+                                input$itemCols
+                            )
+                        ),
+                        column(
+                            width = 4,
+                            selectInput(
+                                "scatterItemY",
+                                "Select item on the ordinate:",
+                                input$itemCols,
+                                selected = input$itemCols[2]
+                            )
+                        )
+                    ),
+                    plotOutput("singleScatter")
+                ),
+                tabPanel(
+                    "Group-wise",
+                    fluidRow(
+                        column(
+                            width = 4,
+                            selectInput(
+                                "scatterItemXGroup",
+                                "Select item on the abscissa:",
+                                input$itemCols
+                            )
+                        ),
+                        column(
+                            width = 4,
+                            selectInput(
+                                "scatterItemYGroup",
+                                "Select item on the ordinate:",
+                                input$itemCols,
+                                selected = input$itemCols[2]
+                            )
+                        ),
+                        column(
+                            width = 4,
+                            checkboxGroupInput(
+                                "scatterGroupGroups",
+                                "Select the groups to include:",
+                                unique(userDataGroup()[, input$groupCol]),
+                                unique(userDataGroup()[, input$groupCol]),
+                                inline = TRUE
+                            )
+                        )
+                    ),
+                    plotOutput("groupScatter")
+                )
+            )
+        } else {
+            shinydashboard::box(
+                title = "Scatter Plot:",
+                width = NULL,
+                fluidRow(
+                    column(
+                        width = 4,
+                        selectInput(
+                            "scatterItemX",
+                            "Select item on the abscissa:",
+                            input$itemCols
+                        )
+                    ),
+                    column(
+                        width = 4,
+                        selectInput(
+                            "scatterItemY",
+                            "Select item on the ordinate:",
+                            input$itemCols,
+                            selected = input$itemCols[2]
+                        )
+                    )
+                ),
+                plotOutput("singleScatter")
             )
         }
     })
@@ -791,49 +1005,296 @@ function(input, output, session) {
             )
         )
 
-        if (class(corrTableWithCIsRaw$test)[1] == "list") {
-            tagList(
-                HTML(
-                    kableExtra::column_spec(
-                        shinyCTT:::makeKable(
-                            shinyCTT:::makeCorrTableWithCIs(
-                                corrTableWithCIsRaw,
-                                goodColor,
-                                badColor,
-                                neutrColor,
-                                textColor,
-                                input$corrTabSL,
-                                input$itemCols
-                            ),
-                            bootstrap_options = c("condensed", "striped")
-                        ),
-                        1,
-                        bold = TRUE
+        corrTableLegend <- tagList(
+            h5("Legend:"),
+            HTML(shinyCTT:::makeKable(
+                cbind(
+                    kableExtra::cell_spec(
+                        "Sig. pos.",
+                        color = textColor,
+                        background = goodColor
+                    ),
+                    kableExtra::cell_spec(
+                        "Sig. neg.",
+                        color = textColor,
+                        background = badColor
+                    ),
+                    kableExtra::cell_spec(
+                        "Insig.",
+                        color = textColor,
+                        background = neutrColor
                     )
                 ),
-                h5("Legend:"),
-                HTML(shinyCTT:::makeKable(
-                    cbind(
-                        kableExtra::cell_spec(
-                            "Sig. pos.",
-                            color = textColor,
-                            background = goodColor
+                bootstrap_options = "bordered",
+                position = "left"
+            ))
+        )
+
+        if (class(corrTableWithCIsRaw$test)[1] == "list") {
+            singleCorrTable <- HTML(
+                kableExtra::column_spec(
+                    shinyCTT:::makeKable(
+                        shinyCTT:::makeCorrTableWithCIs(
+                            corrTableWithCIsRaw,
+                            goodColor,
+                            badColor,
+                            neutrColor,
+                            textColor,
+                            input$corrTabSL,
+                            input$itemCols
                         ),
-                        kableExtra::cell_spec(
-                            "Sig. neg.",
-                            color = textColor,
-                            background = badColor
-                        ),
-                        kableExtra::cell_spec(
-                            "Insig.",
-                            color = textColor,
-                            background = neutrColor
-                        )
+                        bootstrap_options = c("condensed", "striped")
                     ),
-                    bootstrap_options = "bordered",
-                    position = "left"
-                ))
+                    1,
+                    bold = TRUE
+                )
+            )
+        } else {
+            singleCorrTable <- div(
+                style = paste0("color:red"),
+                HTML(paste("There was an ERROR/WARNING:", corrTableWithCIsRaw$test))
             )
         }
+
+        if (input$groupCol != "noGroupSelected") {
+            mgCorrTableList <- lapply(
+                unique(userDataGroup()[, input$groupCol]),
+                function(group)
+                    shinyCTT:::makeCorrTableWithCIs(
+                        list(
+                            cor = suppressWarnings(cor(
+                                subset(
+                                    userDataGroup()[, input$itemCols],
+                                    userDataGroup()[, input$groupCol] == group
+                                ),
+                                use = input$corrTabNA
+                            )),
+                            test = corrplot::cor.mtest(
+                                subset(
+                                    userDataGroup()[, input$itemCols],
+                                    userDataGroup()[, input$groupCol] == group
+                                ),
+                                conf.level = (1 - input$corrTabSL)
+                            )
+                        ),
+                        goodColor,
+                        badColor,
+                        neutrColor,
+                        textColor,
+                        input$corrTabSL,
+                        input$itemCols
+                    )
+            )
+
+            mgCorrTable <- kableExtra::column_spec(
+                shinyCTT:::makeKable(
+                    do.call(rbind, mgCorrTableList),
+                    bootstrap_options = c("condensed", "striped")
+                ),
+                1,
+                bold = TRUE
+            )
+
+            groupRowHeaders <- sprintf(
+                "Group: %s",
+                unique(userDataGroup()[, input$groupCol])
+            )
+
+            for (i in 1:length(unique(userDataGroup()[, input$groupCol])))
+                mgCorrTable <- kableExtra::group_rows(
+                    mgCorrTable,
+                    group_label = groupRowHeaders[i],
+                    start_row = (i - 1) * length(input$itemCols) * 2 + 1,
+                    end_row = i * length(input$itemCols) * 2,
+                    label_row_css = "background-color: #666; color: #fff;"
+                )
+
+            shinydashboard::tabBox(
+                width = 12,
+                title = "Correlation Table with Confidence Intervals:",
+                side = "right",
+                tabPanel(
+                    "Overall",
+                    singleCorrTable,
+                    corrTableLegend
+                ),
+                tabPanel(
+                    "Group-wise",
+                    HTML(mgCorrTable),
+                    corrTableLegend
+                )
+            )
+        } else {
+            shinydashboard::box(
+                width = 12,
+                title = "Correlation Table with Confidence Intervals:",
+                singleCorrTable,
+                corrTableLegend
+            )
+        }
+    })
+
+    mvnTestResult <- reactiveValues(
+        raw = NULL,
+        estimator = "ML"
+    )
+
+    observeEvent(input$estimator, {
+        mvnTestResult$estimator <- input$estimator
+    })
+
+    output$mvnTable <- renderUI({
+        req(userDataGroup())
+
+        mvnTestResult$raw <- tryCatch(
+            MVN::mvn(userDataGroup()[, input$itemCols]),
+            warning = function(w) w,
+            error = function(e) e
+        )
+
+        #req(mvnTestResult$raw)
+
+        if (class(mvnTestResult$raw$multivariateNormality) == "data.frame") {
+            mvnTestResult$estimator <- ifelse(
+                any(
+                    as.numeric(
+                        as.character(
+                            mvnTestResult$raw$multivariateNormality[-3, "p value"]
+                        )
+                    ) < input$mvnSL
+                ),
+                "MLR",
+                "ML"
+            )
+
+            updateRadioButtons(
+                session,
+                "estimator",
+                selected = mvnTestResult$estimator
+            )
+        }
+
+        if (class(mvnTestResult$raw)[1] == "list") {
+            mvnUV <- data.frame(Test = as.character(mvnTestResult$raw$univariateNormality$Test),
+                                Item = as.character(mvnTestResult$raw$univariateNormality$Variable),
+                                Statistic = as.numeric(mvnTestResult$raw$univariateNormality$Statistic),
+                                p = suppressWarnings(as.numeric(mvnTestResult$raw$univariateNormality$`p value`)),
+                                stringsAsFactors = F)
+
+            mvnUV$p[is.na(mvnUV$p)] <- 0
+            mvnUV$Signif. <- ifelse(mvnUV$p < input$mvnSL, "*", "")
+            mvnUV$p <- ifelse(
+                mvnUV$p < 0.001,
+                "< 0.001",
+                sprintf("%.3f", round(mvnUV$p, 3))
+            )
+
+            HTML(shinyCTT:::makeKable(mvnUV, bootstrap_options = "basic"))
+        } else {
+            div(
+                style = paste0("color:red"),
+                HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message))
+            )
+        }
+    })
+
+    output$mvnComment <- renderUI({
+        req(userDataGroup())
+
+        if (class(mvnTestResult$raw$multivariateNormality) == "data.frame") {
+            mvnMV <- data.frame(Test = as.character(mvnTestResult$raw$multivariateNormality$Test),
+                                Statistic = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$Statistic)),
+                                p = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$`p value`)),
+                                Signif. = as.character(mvnTestResult$raw$multivariateNormality$Result),
+                                stringsAsFactors = F)[-3,]
+
+            mvnMV$Signif. <- ifelse(mvnMV$p < input$mvnSL, "*", "")
+            mvnMV$p <- ifelse(
+                mvnMV$p < 0.001,
+                "< 0.001",
+                sprintf("%.3f", round(mvnMV$p, 3))
+            )
+
+            if ("*" %in% mvnMV$Signif.) {
+                tagList(
+                    sprintf("At least one of the hypotheses that Mardia's Skewness statistic
+                            or Mardias' Kurtosis statistic matches one of a
+                            normal distribution has to be discarded on a significance
+                            level of %s. Test result:", input$mvnSL),
+                    HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
+                    HTML("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator.")
+                )
+            } else {
+                tagList(
+                    sprintf("The hypotheses that Mardia's Skewness statistic
+                        and Mardias' Kurtosis statistic match those of a
+                        normal distribution can be maintained on a significance
+                        level of %s. Test result:", input$mvnSL),
+                    HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
+                    HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator.")
+                )
+            }
+        }
+    })
+
+    output$mvnPlotBox <- renderUI({
+        output$mvnPlot <- renderPlot({
+
+            if (input$mvnPlotType == "qq")
+                tryCatch(
+                    MVN::mvn(userDataGroup()[, input$itemCols], multivariatePlot = input$mvnPlotType),
+                    warning = function(w) w,
+                    error = function(e) e
+                )
+            else
+                tryCatch(
+                    MVN::mvn(userDataGroup()[, c(input$mvnItemX, input$mvnItemY)], multivariatePlot = input$mvnPlotType),
+                    warning = function(w) w,
+                    error = function(e) e
+                )
+        })
+
+        shinydashboard::box(
+            width = NULL,
+            title = "Multivariate Plot:",
+            fluidRow(
+                column(
+                    width = 4,
+                    selectInput(
+                        "mvnPlotType",
+                        "Choose the type of Plot:",
+                        choices = c(
+                            "Q-Q Plot (all items)" = "qq",
+                            "Perspective Plot" = "persp",
+                            "Contour Plot" = "contour"
+                        )
+                    )
+                ),
+                column(
+                    width = 4,
+                    conditionalPanel(
+                        "input.mvnPlotType != 'qq'",
+                        selectInput(
+                            "mvnItemX",
+                            "Select item on the abscissa:",
+                            input$itemCols
+                        )
+                    )
+                ),
+                column(
+                    width = 4,
+                    conditionalPanel(
+                        "input.mvnPlotType != 'qq'",
+                        selectInput(
+                            "mvnItemY",
+                            "Select item on the ordinate:",
+                            input$itemCols,
+                            selected = input$itemCols[2]
+                        )
+                    )
+                )
+            ),
+            plotOutput("mvnPlot")
+        )
     })
 }
