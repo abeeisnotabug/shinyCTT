@@ -222,35 +222,52 @@ shinydashboard::dashboardPage(
                 tabName = "testParamTab",
                 fluidRow(
                     column(
-                        width = 3,
+                        width = 5,
                         shinydashboard::box(
                             width = NULL,
-                            radioButtons(
-                                "estimator",
-                                "Choose estimator based on test result:",
-                                choices = c("Maximum Likelihood" = "ML",
-                                            "Robust Maximum Likelihood" = "MLR"),
-                                selected = "ML"
-                            )
-                        ),
-                        shinydashboard::box(
-                            width = NULL,
-                            numericInput(
-                                "sigLvl",
-                                "Enter the significance level:",
-                                value = 0.05,
-                                min = 0,
-                                max = 1,
-                                step = 0.001
-                            )
-                        ),
-                        shinydashboard::box(
-                            width = NULL,
-                            shinyjs::disabled(
-                                radioButtons(
-                                    "para",
-                                    "Choose parameterization:",
-                                    choices = c("Std. Eta", "Std. Alpha")
+                            fluidRow(
+                                column(
+                                    width = 6,
+                                    radioButtons(
+                                        "estimator",
+                                        "Choose estimator:",
+                                        choices = c("Maximum Likelihood" = "ML",
+                                                    "Robust Maximum Likelihood" = "MLR"),
+                                        selected = "ML"
+                                    )
+                                ),
+                                column(
+                                    width = 6,
+                                    numericInput(
+                                        "sigLvl",
+                                        "Enter the significance level:",
+                                        value = 0.05,
+                                        min = 0,
+                                        max = 1,
+                                        step = 0.001
+                                    )
+                                )
+                            ),
+                            fluidRow(
+                                column(
+                                    width = 6,
+                                    shinyjs::disabled(
+                                        radioButtons(
+                                            "para",
+                                            "Choose parameterization:",
+                                            choices = c("Std. Eta", "Std. Alpha")
+                                        )
+                                    )
+                                ),
+                                column(
+                                    width = 6,
+                                    shinyjs::disabled(
+                                        checkboxInput(
+                                            "doMg",
+                                            "Perform Multigroup Tests",
+                                            value = FALSE
+                                        )
+                                    )
                                 )
                             )
                         ),
@@ -260,7 +277,7 @@ shinydashboard::dashboardPage(
                         )
                     ),
                     column(
-                        width = 9,
+                        width = 7,
                         shinydashboard::box(
                             width = NULL,
                             title = "Choose models to test and compare:",
@@ -593,6 +610,14 @@ shinydashboard::dashboardPage(
                         )
                     )
                 )
+            ),
+            shinydashboard::tabItem(
+                tabName = "panelModelTests",
+                tabsetPanel(id = "compTabsets", type = "pills")
+            ),
+            shinydashboard::tabItem(
+                tabName = "panelParTables",
+                tabsetPanel(id = "parTabsets", type = "pills")
             )
         )
     )
