@@ -1,4 +1,4 @@
-extractParameters <- function(fittedModel, alpha = 0.05) {
+extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
   nGroups <- fittedModel@Data@ngroups
   nItems <- length(lavaan::lavNames(fittedModel))
 
@@ -53,53 +53,55 @@ extractParameters <- function(fittedModel, alpha = 0.05) {
   df$CI <- sprintf("[%.3f, %.3f]", df$ci.lower, df$ci.upper)
   df <- df[grep("epsilon|alpha|lambda|eta|rel|std", df$label), -c(5, 6)]
 
-  # Prepare the names for HTML
-  df$label <- gsub("_g(\\d+)", "", df$label)
+  if (display) {
+    # Prepare the names for HTML
+    df$label <- gsub("_g(\\d+)", "", df$label)
 
-  df$label <- gsub("sigma_epsilon_(\\d+)",
-                   "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>\\1</sub></sub>",
-                   df$label)
-  df$label <- gsub("lambda_(\\d+)",
-                   "&lambda;&#x302;<sub>\\1</sub>",
-                   df$label)
-  df$label <- gsub("alpha_(\\d+)",
-                   "&alpha;&#x302;<sub>\\1</sub>",
-                   df$label)
-  df$label[grep("rel_", df$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavaan::lavNames(fittedModel)))
-  df$label[grep("sumrel", df$label)] <- "R&#x302;<sub>&Sigma;</sub>"
-  df$label[grep("sigma_eta", df$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
+    df$label <- gsub("sigma_epsilon_(\\d+)",
+                     "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>\\1</sub></sub>",
+                     df$label)
+    df$label <- gsub("lambda_(\\d+)",
+                     "&lambda;&#x302;<sub>\\1</sub>",
+                     df$label)
+    df$label <- gsub("alpha_(\\d+)",
+                     "&alpha;&#x302;<sub>\\1</sub>",
+                     df$label)
+    df$label[grep("rel_", df$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavaan::lavNames(fittedModel)))
+    df$label[grep("sumrel", df$label)] <- "R&#x302;<sub>&Sigma;</sub>"
+    df$label[grep("sigma_eta", df$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
 
-  # Split by groups and bind -----------------------------------------------------------------------------------------------
-  splitDf <- lapply(
-    split(df, df$group),
-    function(subDf) {
-      rbind(cbind(Item = lavaan::lavNames(fittedModel),
-                  subDf[grep("lambda", subDf$label), -1],
-                  subDf[grep("std", subDf$label), -c(1, 2)],
-                  subDf[grep("alpha", subDf$label), -1],
-                  subDf[grep("epsilon", subDf$label), -1],
-                  subDf[grep("R&#x302;", subDf$label)[1:nItems], -1]),
-            c(Item = NA,
-              label = NA,
-              est = NA,
-              se = NA,
-              CI = NA,
-              est = NA,
-              se = NA,
-              CI = NA,
-              label = NA,
-              est = NA,
-              se = NA,
-              CI = NA,
-              subDf[grep("eta", subDf$label), -1],
-              subDf[grep("R&#x302;<sub>&Sigma;", subDf$label), -1])
-      )
-    }
-  )
+    # Split by groups and bind -----------------------------------------------------------------------------------------------
+    splitDf <- lapply(
+      split(df, df$group),
+      function(subDf) {
+        rbind(cbind(Item = lavaan::lavNames(fittedModel),
+                    subDf[grep("lambda", subDf$label), -1],
+                    subDf[grep("std", subDf$label), -c(1, 2)],
+                    subDf[grep("alpha", subDf$label), -1],
+                    subDf[grep("epsilon", subDf$label), -1],
+                    subDf[grep("R&#x302;", subDf$label)[1:nItems], -1]),
+              c(Item = NA,
+                label = NA,
+                est = NA,
+                se = NA,
+                CI = NA,
+                est = NA,
+                se = NA,
+                CI = NA,
+                label = NA,
+                est = NA,
+                se = NA,
+                CI = NA,
+                subDf[grep("eta", subDf$label), -1],
+                subDf[grep("R&#x302;<sub>&Sigma;", subDf$label), -1])
+        )
+      }
+    )
 
-  boundDf <- do.call(rbind, splitDf)
+    boundDf <- do.call(rbind, splitDf)
 
-  rownames(boundDf) <- NULL
+    rownames(boundDf) <- NULL
 
-  boundDf
+    boundDf
+  }
 }

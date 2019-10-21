@@ -65,7 +65,7 @@ shinydashboard::dashboardPage(
                         shinydashboard::box(
                             width = NULL,
                             title = "Raw data:",
-                            dataTableOutput("dataOverview")
+                            DT::dataTableOutput("dataOverview")
                         )
                     )
                 )
@@ -612,12 +612,72 @@ shinydashboard::dashboardPage(
                 )
             ),
             shinydashboard::tabItem(
-                tabName = "panelModelTests",
-                tabsetPanel(id = "compTabsets", type = "pills")
+                tabName = "modelTests",
+                htmlOutput("modelTestsCont")
             ),
             shinydashboard::tabItem(
-                tabName = "panelParTables",
-                tabsetPanel(id = "parTabsets", type = "pills")
+                tabName = "modelTestsMg",
+                htmlOutput("modelTestsContMg")
+            ),
+            shinydashboard::tabItem(
+                tabName = "parTables",
+                fluidRow(
+                    shinydashboard::tabBox(
+                        id = "parTabsetTab",
+                        title = "Estimated Paramters",
+                        width = 12
+                    )
+                )
+            ),
+            shinydashboard::tabItem(
+                tabName = "parTablesMg",
+                fluidRow(
+                    shinydashboard::tabBox(
+                        id = "parTabsetTabMg",
+                        title = "Estimated Paramters",
+                        width = 12
+                    )
+                )
+            ),
+            shinydashboard::tabItem(
+                tabName = "facScores",
+                fluidRow(
+                    shinydashboard::tabBox(
+                        id = "fsTabsetTab",
+                        title = HTML("Predicted Factor Scores (&eta;&#x302;)"),
+                        width = 12
+                    )
+                )
+            ),
+            shinydashboard::tabItem(
+                tabName = "facScoresMg",
+                fluidRow(
+                    shinydashboard::tabBox(
+                        id = "fsTabsetTabMg",
+                        title = HTML("Predicted Factor Scores (&eta;&#x302;)"),
+                        width = 12
+                    )
+                )
+            ),
+            shinydashboard::tabItem(
+                tabName = "modelCode",
+                fluidRow(
+                    shinydashboard::tabBox(
+                        id = "mcTabsetTab",
+                        title = "Model Code",
+                        width = 12
+                    )
+                )
+            ),
+            shinydashboard::tabItem(
+                tabName = "modelCodeMg",
+                fluidRow(
+                    shinydashboard::tabBox(
+                        id = "mcTabsetTabMg",
+                        title = "Model Code",
+                        width = 12
+                    )
+                )
             )
         )
     )

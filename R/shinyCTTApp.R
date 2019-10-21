@@ -6,7 +6,7 @@ shinyCTTApp <- function(launch.browser = TRUE) {
   }
 
   # For some reason, the app lags on startup if mvn has not run before at least once
-  suppressMessages(invisible(MVN::mvn(rnorm(10))))
+  # suppressMessages(invisible(MVN::mvn(rnorm(10))))
 
   shiny::runApp(appDir, display.mode = "normal", launch.browser = launch.browser)
 }

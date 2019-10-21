@@ -204,7 +204,7 @@ function(input, output, session) {
             shinyjs::runjs("location.reload()")
     })
 
-    output$dataOverview <- renderDataTable(userDataRaw(), options = list(pageLength = 10))
+    output$dataOverview <- DT::renderDataTable(userDataRaw(), options = list(pageLength = 10))
 
     itemColsRV <- reactiveVal()
     groupColRV <- reactiveVal()
@@ -1337,43 +1337,97 @@ function(input, output, session) {
     })
 
     observeEvent(input$goModels, {
-        dataMenuList$menuList[[9]] <- dataMenuList$menuList[[7]]
-        dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
-            "5. Test results",
-            shinydashboard::menuSubItem(
-                "Model Comparison Tests",
-                tabName = "panelModelTests",
-                selected = TRUE
-            ),
-            shinydashboard::menuSubItem(
-                "Parameter Tables and Factor Scores",
-                tabName = "panelParTables"
-            ),
-            icon = icon("chart-bar"),
-            startExpanded = TRUE
-        )
-        dataMenuList$menuList[[8]] <- hr()
+        dataMenuList$menuList[[12]] <- dataMenuList$menuList[[7]]
+        if (input$doMg) {
+            dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
+                "5. Model Comparison Tests",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "modelTests",
+                    selected = TRUE
+                ),
+                shinydashboard::menuSubItem(
+                    "Multigroup",
+                    tabName = "modelTestsMg"
+                ),
+                icon = icon("chart-bar"),
+                startExpanded = TRUE
+            )
+            dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
+                "6. Parameter Tables",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "parTables"
+                ),
+                shinydashboard::menuSubItem(
+                    "Multigroup",
+                    tabName = "parTablesMg"
+                ),
+                icon = icon("chart-bar")
+            )
+            dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
+                "7. Factor Scores",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "facScores"
+                ),
+                shinydashboard::menuSubItem(
+                    "Multigroup",
+                    tabName = "facScoresMg"
+                ),
+                icon = icon("chart-bar")
+            )
+            dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
+                "8. Model Code",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "modelCode"
+                ),
+                shinydashboard::menuSubItem(
+                    "Multigroup",
+                    tabName = "modelCodeMg"
+                ),
+                icon = icon("chart-bar")
+            )
+        } else {
+            dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
+                "5. Model Comparison Tests",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "modelTests",
+                    selected = TRUE
+                ),
+                icon = icon("chart-bar"),
+                startExpanded = TRUE
+            )
+            dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
+                "6. Parameter Tables",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "parTables"
+                ),
+                icon = icon("chart-bar")
+            )
+            dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
+                "7. Factor Scores",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "facScores"
+                ),
+                icon = icon("chart-bar")
+            )
+            dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
+                "8. Model Code",
+                shinydashboard::menuSubItem(
+                    "Single Group",
+                    tabName = "modelCode"
+                ),
+                icon = icon("chart-bar")
+            )
+        }
+        dataMenuList$menuList[[11]] <- hr()
 
         modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
-
-        #appendTab(
-        #    inputId = "navbar",
-        #    tabPanel(
-        #        "Model Comparison Tests",
-        #        value = "panelModelTests",
-        #        tabsetPanel(id = "compTabsets", type = "pills")
-        #    ),
-        #    select = TRUE
-        #)
-
-        #appendTab(
-        #    inputId = "navbar",
-        #    tabPanel(
-        #        "Parameter Tables and Factor Scores",
-        #        value = "panelParTables",
-        #        tabsetPanel(id = "parTabsets", type = "pills")
-        #    )
-        #)
 
         lapply(
             append(list(FALSE), if (isTRUE(input$doMg)) input$groupCol),
@@ -1555,18 +1609,18 @@ function(input, output, session) {
                     infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
 
                 # Make tabs for single/multigroup --------------------------------------------------------------------------
-                appendTab(
-                    inputId = "parTabsets",
-                    tabPanel(
-                        ifelse(isFALSE(groupName),
-                               "Singlegroup",
-                               "Multigroup"),
-                        tabsetPanel(
-                            id = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)])
-                        )
-                    ),
-                    select = isFALSE(groupName)
-                )
+                #appendTab(
+                #    inputId = "parTabsets",
+                #    tabPanel(
+                #        ifelse(isFALSE(groupName),
+                #               "Singlegroup",
+                #               "Multigroup"),
+                #        tabsetPanel(
+                #            id = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)])
+                #        )
+                #    ),
+                #    select = isFALSE(groupName)
+                #)
 
                 # Generate Paramter Tables, Fits and Fit Tables ------------------------------------------------------------
                 for (model in goodModels) {
@@ -1772,11 +1826,12 @@ function(input, output, session) {
                         # Factor Scores ------------------------------------------------------------------------------------
                         output[[
                             paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
-                            ]] <<- renderDataTable(
+                            ]] <<- DT::renderDataTable(
                                 shinyCTT:::getPredictedScores(
                                     fittedModelsWarns[[thisModel]],
                                     userDataGroup()[, input$groupCol]
-                                )
+                                ),
+                                options = list(pageLength = 10)
                             )
 
                         output[[
@@ -1831,66 +1886,72 @@ function(input, output, session) {
                             inputId = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)]),
                             tabPanel(
                                 title = HTML(modelsLong[thisModel]),
-                                h4("Estimated Paramters"),
-                                HTML(parTableWithCIs),
-                                h4("Additional Information"),
-                                tabsetPanel(
-                                    tabPanel(
-                                        "Model Code",
-                                        h5("The following R code can be used to fit this model with lavaan:"),
-                                        verbatimTextOutput(paste0(thisModel, "Code", c("Mg")[!isFALSE(groupName)]))
-                                    ),
-                                    tabPanel(
-                                        HTML("Predicted Factor Scores (&eta;&#x302;)"),
-                                        sidebarLayout(
-                                            sidebarPanel(
-                                                h4("Download Predicted Factor Scores as CSV"),
-                                                textInput(
-                                                    paste0(thisModel, "Filename"),
-                                                    "Filename:",
-                                                    sprintf(
-                                                        "%s_%s_factorscores.csv",
-                                                        switch(
-                                                            input$source,
-                                                            "Workspace" = input$objectFromWorkspace,
-                                                            "CSV" = gsub("\\.csv", "", input$CSVFile$name),
-                                                            "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
-                                                        ),
-                                                        thisModel
-                                                    )
+                                HTML(parTableWithCIs)
+                            ),
+                            select = as.logical(whichModel == 1)
+                        )
+
+                        appendTab(
+                            inputId = paste0("mcTabsetTab", c("Mg")[!isFALSE(groupName)]),
+                            tabPanel(
+                                title = HTML(modelsLong[thisModel]),
+                                h5("The following R code can be used to fit this model with lavaan:"),
+                                verbatimTextOutput(paste0(thisModel, "Code", c("Mg")[!isFALSE(groupName)]))
+                            ),
+                            select = as.logical(whichModel == 1)
+                        )
+
+                        appendTab(
+                            inputId = paste0("fsTabsetTab", c("Mg")[!isFALSE(groupName)]),
+                            tabPanel(
+                                title = HTML(modelsLong[thisModel]),
+                                sidebarLayout(
+                                    sidebarPanel(
+                                        h4("Download Predicted Factor Scores as CSV"),
+                                        textInput(
+                                            paste0(thisModel, "Filename"),
+                                            "Filename:",
+                                            sprintf(
+                                                "%s_%s_factorscores.csv",
+                                                switch(
+                                                    input$source,
+                                                    "Workspace" = input$objectFromWorkspace,
+                                                    "CSV" = gsub("\\.csv", "", input$CSVFile$name),
+                                                    "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)
                                                 ),
-                                                hr(),
-                                                radioButtons(
-                                                    paste0(thisModel, "Sep"),
-                                                    "Separator",
-                                                    choices = c(Comma = ",",
-                                                                Semicolon = ";",
-                                                                Tab = "\t"),
-                                                    selected = ","
-                                                ),
-                                                radioButtons(
-                                                    paste0(thisModel, "Dec"),
-                                                    "Decimal Separator",
-                                                    choices = c(Comma = ",",
-                                                                Dot = "."),
-                                                    selected = "."
-                                                ),
-                                                hr(),
-                                                div(
-                                                    align = "center",
-                                                    downloadButton(
-                                                        paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
-                                                        "Download Factor Scores"
-                                                    )
-                                                ),
-                                                width = 3
-                                            ),
-                                            mainPanel(
-                                                h4("Data Overview"),
-                                                dataTableOutput(
-                                                    paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
-                                                )
+                                                thisModel
                                             )
+                                        ),
+                                        hr(),
+                                        radioButtons(
+                                            paste0(thisModel, "Sep"),
+                                            "Separator",
+                                            choices = c(Comma = ",",
+                                                        Semicolon = ";",
+                                                        Tab = "\t"),
+                                            selected = ","
+                                        ),
+                                        radioButtons(
+                                            paste0(thisModel, "Dec"),
+                                            "Decimal Separator",
+                                            choices = c(Comma = ",",
+                                                        Dot = "."),
+                                            selected = "."
+                                        ),
+                                        hr(),
+                                        div(
+                                            align = "center",
+                                            downloadButton(
+                                                paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
+                                                "Download Factor Scores"
+                                            )
+                                        ),
+                                        width = 3
+                                    ),
+                                    mainPanel(
+                                        h4("Data Overview"),
+                                        DT::dataTableOutput(
+                                            paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
                                         )
                                     )
                                 )
@@ -1902,7 +1963,7 @@ function(input, output, session) {
 
                 if (length(goodModels) > 0) {
                     # Hierarchical model comparison plot -------------------------------------------------------------------
-                    output[[paste0("hierPlot", groupName)]] <- renderPlot({
+                    output[[paste0("hierPlot", groupName)]] <<- renderPlot({
                         modelNumbs <- which(models %in% goodModels)
 
                         chisqs <- dfs <- pvalues <- rep(NA, 5)
@@ -2170,112 +2231,163 @@ function(input, output, session) {
                         modelsAbbrev
 
                     # Put them in a tab ------------------------------------------------------------------------------------
-                    appendTab(
-                        inputId = "compTabsets",
-                        tabPanel(
-                            ifelse(isFALSE(groupName),
-                                   "Singlegroup",
-                                   "Multigroup"),
-                            wellPanel(
-                                h5(sprintf(
-                                    "Lavaan status: %i warnings, %i errors.",
-                                    sum(warns),
-                                    sum(errs)
-                                )),
-                                lavErrsMsg,
-                                lavWarnsMsg
-                            ),
-                            h4("Hierarchical model comparison plot:"),
-                            plotOutput(paste0("hierPlot", groupName)),
-                            h4("Hierarchical model comparison table:"),
-                            HTML(paste0(
-                                "<table align = \"center\", width = \"100%\"><tr><td>",
-                                hierTables[[1]],
-                                "</td><td>&nbsp;</td><td>",
-                                hierTables[[2]],
-                                "</td></tr></table>"
-                            )),
-                            h4("Fit index table"),
-                            HTML(
-                                kableExtra::column_spec(
-                                    kableExtra::column_spec(
-                                        shinyCTT:::makeKable(
-                                            fits[, -c(9, 10)],
-                                            col.names = c("df",
-                                                          paste0(mvnTestResult$estimator, "-&chi;&sup2;"),
-                                                          "p",
-                                                          "RMSEA",
-                                                          "p",
-                                                          "95%-CI",
-                                                          paste0(mvnTestResult$estimator, "-CFI"),
-                                                          "SRMR")
-                                        ),
-                                        1,
-                                        bold = TRUE
-                                    ),
-                                    c(4, 7),
-                                    border_right = "1px solid lightgrey"
-                                )
-                            ),
-                            h4(HTML("&chi;&sup2;-Comparison Table:")),
-                            HTML(
-                                kableExtra::add_header_above(
-                                    kableExtra::column_spec(
-                                        shinyCTT:::makeKable(combCompTable),
-                                        1,
-                                        bold = TRUE
-                                    ),
-                                    headerNames,
-                                    escape = FALSE
-                                )
-                            ),
-                            h4("AIC/BIC-Comparison Table:"),
-                            HTML(paste0("<table align = \"center\", width = \"100%\">
+                    output[[
+                        paste0("modelTestsCont", c("Mg")[!isFALSE(groupName)])
+                        ]] <<- renderUI({
+                            fluidPage(
+                                fluidRow(
+                                    shinydashboard::box(
+                                        title = "Hierarchical model comparison plot:",
+                                        width = 12,
+                                        plotOutput(paste0("hierPlot", groupName))
+                                    )
+                                ),
+                                fluidRow(
+                                    shinydashboard::box(
+                                        title = "Hierarchical model comparison table:",
+                                        width = 12,
+                                        HTML(
+                                            paste0(
+                                                "<table align = \"center\", width = \"100%\"><tr><td>",
+                                                hierTables[[1]],
+                                                "</td><td>&nbsp;</td><td>",
+                                                hierTables[[2]],
+                                                "</td></tr></table>"
+                                            )
+                                        )
+                                    )
+                                ),
+                                fluidRow(
+                                    shinydashboard::box(
+                                        title = "Fit index table",
+                                        width = 12,
+                                        HTML(
+                                            kableExtra::column_spec(
+                                                kableExtra::column_spec(
+                                                    shinyCTT:::makeKable(
+                                                        fits[, -c(9, 10)],
+                                                        col.names = c("df",
+                                                                      paste0(mvnTestResult$estimator, "-&chi;&sup2;"),
+                                                                      "p",
+                                                                      "RMSEA",
+                                                                      "p",
+                                                                      "95%-CI",
+                                                                      paste0(mvnTestResult$estimator, "-CFI"),
+                                                                      "SRMR")
+                                                    ),
+                                                    1,
+                                                    bold = TRUE
+                                                ),
+                                                c(4, 7),
+                                                border_right = "1px solid lightgrey"
+                                            )
+                                        )
+                                    )
+                                ),
+                                fluidRow(
+                                    shinydashboard::box(
+                                        title = HTML("&chi;&sup2;-Comparison Table:"),
+                                        width = 12,
+                                        HTML(
+                                            kableExtra::add_header_above(
+                                                kableExtra::column_spec(
+                                                    shinyCTT:::makeKable(combCompTable),
+                                                    1,
+                                                    bold = TRUE
+                                                ),
+                                                headerNames,
+                                                escape = FALSE
+                                            )
+                                        )
+                                    )
+                                ),
+                                fluidRow(
+                                    shinydashboard::box(
+                                        title = "AIC/BIC-Comparison Table:",
+                                        width = 12,
+                                        HTML(
+                                            paste0("<table align = \"center\", width = \"100%\">
                                 <tr><td>
                                 <table align = \"center\">
                                 <tr><td><h5>AIC:</h5>",
-                                        kableExtra::column_spec(
-                                            shinyCTT:::makeKable(infCompTable$aic),
-                                            1,
-                                            bold = TRUE
-                                        ),
-                                        "</td></tr></table>
+                                                   kableExtra::column_spec(
+                                                       shinyCTT:::makeKable(infCompTable$aic),
+                                                       1,
+                                                       bold = TRUE
+                                                   ),
+                                                   "</td></tr></table>
                                 </td>
                                 <td>&nbsp;</td>
                                 <td><table align = \"center\">
                                 <tr><td><h5>BIC:</h5>",
-                                        kableExtra::column_spec(
-                                            shinyCTT:::makeKable(infCompTable$bic),
-                                            1,
-                                            bold = TRUE
-                                        ),
-                                        "</td></tr></table>
+                                                   kableExtra::column_spec(
+                                                       shinyCTT:::makeKable(infCompTable$bic),
+                                                       1,
+                                                       bold = TRUE
+                                                   ),
+                                                   "</td></tr></table>
                                 </td></tr></table>")
+                                        )
+                                    )
+                                )
                             )
-                        ),
-                        select = isFALSE(groupName)
-                    )
+                        })
+
+                    #appendTab(
+                    #    inputId = "compTabsets",
+                    #    tabPanel(
+                    #        ifelse(isFALSE(groupName),
+                    #               "Singlegroup",
+                    #               "Multigroup"),
+                    #        wellPanel(
+                    #            h5(sprintf(
+                    #                "Lavaan status: %i warnings, %i errors.",
+                    #                sum(warns),
+                    #                sum(errs)
+                    #            )),
+                    #            lavErrsMsg,
+                    #            lavWarnsMsg
+                    #        ),
+                    #
+                    #    ),
+                    #    select = isFALSE(groupName)
+                    #)
                 } else {
-                    appendTab(
-                        inputId = "compTabsets",
-                        tabPanel(
-                            ifelse(isFALSE(groupName),
-                                   "No Singlegroup Models have been fitted",
-                                   "No Multigroup Models have been fitted"),
-                            wellPanel(
-                                h5(sprintf(
-                                    "Lavaan status: %i warnings, %i errors.",
-                                    sum(warns),
-                                    sum(errs)
-                                )),
-                                lavErrsMsg,
-                                lavWarnsMsg
+                    output[[
+                        paste0("modelTestsCont", c("Mg")[!isFALSE(groupName)])
+                        ]] <- renderUI({
+                            tagList(
+                                wellPanel(
+                                    h5(sprintf(
+                                        "Lavaan status: %i warnings, %i errors.",
+                                        sum(warns),
+                                        sum(errs)
+                                    )),
+                                    lavErrsMsg,
+                                    lavWarnsMsg
+                                )
                             )
-                        ),
-                        select = isFALSE(groupName)
-                    )
-                    removeTab(inputId = "navbar",
-                              target = "panelParTables")
+                        })
+                    #appendTab(
+                    #    inputId = "compTabsets",
+                    #    tabPanel(
+                    #        ifelse(isFALSE(groupName),
+                    #               "No Singlegroup Models have been fitted",
+                    #               "No Multigroup Models have been fitted"),
+                    #        wellPanel(
+                    #            h5(sprintf(
+                    #                "Lavaan status: %i warnings, %i errors.",
+                    #                sum(warns),
+                    #                sum(errs)
+                    #            )),
+                    #            lavErrsMsg,
+                    #            lavWarnsMsg
+                    #        )
+                    #    ),
+                    #    select = isFALSE(groupName)
+                    #)
+                    #removeTab(inputId = "navbar",
+                    #          target = "panelParTables")
                 }
             }
         )
