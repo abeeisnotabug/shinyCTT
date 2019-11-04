@@ -204,11 +204,22 @@ function(input, output, session) {
             shinyjs::runjs("location.reload()")
     })
 
-    output$dataOverview <- DT::renderDataTable(userDataRaw(), options = list(pageLength = 10))
+    # Display NAs correctly in datatable
+    options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
+
+    observeEvent(userDataRaw(), {
+        output$dataOverview <- DT::renderDataTable(
+            DT::formatRound(
+                DT::datatable(userDataRaw()),
+                columns = seq_along(userDataRaw())[sapply(userDataRaw(), is.numeric)],
+                digits = 3
+            )
+        )
+    })
 
     itemColsRV <- reactiveVal()
     groupColRV <- reactiveVal()
-    naRowRV <- reactiveVal()
+    incompleteCasesRV <- reactiveVal()
 
     output$itemColsChooser <- renderUI({
         possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
@@ -335,17 +346,20 @@ function(input, output, session) {
     output$groupInfoBox <- shinydashboard::renderValueBox({
         shinydashboard::valueBox(
             value = groupColRV(),
+            color = "blue",
             subtitle = "possible group column(s) found",
             icon = icon("users")
         )
     })
 
     output$naInfoBox <- shinydashboard::renderValueBox({
-        naRowRV(length(unique(which(is.na(userDataChosen()), arr.ind = TRUE)[, "row"])))
+        incompleteCasesRV(!complete.cases(userDataChosen()))
+        output$incompleteCasesBoolRV <- reactive({any(incompleteCasesRV())})
+        outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
 
         shinydashboard::valueBox(
-            value = naRowRV(),
-            color = if (naRowRV() > 0) "yellow" else "green",
+            value = sum(incompleteCasesRV()),
+            color = if (any(incompleteCasesRV())) "yellow" else "green",
             subtitle = "rows with missing values found",
             icon = icon("exclamation-triangle")
         )
@@ -359,9 +373,15 @@ function(input, output, session) {
 
     output$obsTable <- renderUI({
         nTotal <- nrow(userDataChosen())
-        nComplete <- nTotal - naRowRV()
+        nComplete <- sum(!incompleteCasesRV())
 
-        HTML(shinyCTT:::makeKable(data.frame(Total = nTotal, Complete = nComplete)))
+        tagList(
+            HTML(shinyCTT:::makeKable(data.frame(Total = nTotal, Complete = nComplete))),
+            checkboxInput(
+                "excludeIncompleteCases",
+                "Exclude incomplete cases"
+            )
+        )
     })
 
     output$obsPerGroupTable <- renderUI({
@@ -378,6 +398,7 @@ function(input, output, session) {
         shinyjs::disable("groupCol")
         shinyjs::disable("groups")
         shinyjs::disable("subsetSelectButton")
+        shinyjs::disable("excludeIncompleteCases")
 
         dataMenuList$menuList[[7]] <- dataMenuList$menuList[[4]]
         dataMenuList$menuList[[4]] <- shinydashboard::menuItem(
@@ -406,17 +427,32 @@ function(input, output, session) {
         dataMenuList$menuList[[6]] <- hr()
 
         if (input$groupCol != "noGroupSelected") {
+
+            if (input$excludeIncompleteCases) {
+                ccSubset <- (userDataChosen()[, input$groupCol] %in% input$groups) & !incompleteCasesRV()
+            } else {
+                ccSubset <- userDataChosen()[, input$groupCol] %in% input$groups
+            }
+
             userDataGroup(
                 subset(
                     userDataChosen(),
-                    subset = userDataChosen()[, input$groupCol] %in% input$groups,
+                    subset = ccSubset,
                     select = c(input$groupCol, input$itemCols)
                 )
             )
         } else {
+
+            if (input$excludeIncompleteCases) {
+                ccSubset <- !incompleteCasesRV()
+            } else {
+                ccSubset <- rep(TRUE, nrow(userDataChosen()))
+            }
+
             userDataGroup(
                 subset(
                     userDataChosen(),
+                    subset = ccSubset,
                     select = input$itemCols
                 )
             )
@@ -1272,7 +1308,7 @@ function(input, output, session) {
 
             if (input$mvnPlotType == "qq")
                 tryCatch(
-                    MVN::mvn(userDataGroup()[, input$itemCols], multivariatePlot = input$mvnPlotType),
+                    MVN::mvn(userDataGroup()[complete.cases(userDataGroup()), input$itemCols], multivariatePlot = input$mvnPlotType),
                     warning = function(w) w,
                     error = function(e) e
                 )
@@ -1283,6 +1319,8 @@ function(input, output, session) {
                     error = function(e) e
                 )
         })
+
+
 
         shinydashboard::box(
             width = NULL,
@@ -1323,6 +1361,10 @@ function(input, output, session) {
                         )
                     )
                 )
+            ),
+            conditionalPanel(
+                "input.mvnPlotType == 'qq' && !input.excludeIncompleteCases && output.incompleteCasesBoolRV",
+                helpText("Warning: Incomplete cases have been removed from the data for the Q-Q Plot.")
             ),
             plotOutput("mvnPlot")
         )
