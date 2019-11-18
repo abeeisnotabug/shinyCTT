@@ -7,14 +7,14 @@ theme_blue_gradient <- dashboardthemes::shinyDashboardThemeDIY(
     ,bodyBackColor = "#FFFFFF"
 
     ### header
-    ,logoBackColor = "#6B9E1E"
+    ,logoBackColor = "#99CC00"
 
-    ,headerButtonBackColor = "#6B9E1E"
+    ,headerButtonBackColor = "#99CC00"
     ,headerButtonIconColor = "#FFFFFF"
     ,headerButtonBackColorHover = "#666666"
     ,headerButtonIconColorHover = "#FFFFFF"
 
-    ,headerBackColor = "#6B9E1E"
+    ,headerBackColor = "#99CC00"
     ,headerBoxShadowColor = "#AAAAAA"
     ,headerBoxShadowSize = "2px 2px 2px"
 
@@ -58,7 +58,7 @@ theme_blue_gradient <- dashboardthemes::shinyDashboardThemeDIY(
     ,boxShadowSize = "0px 1px 1px"
     ,boxShadowColor = "rgba(0,0,0,.1)"
     ,boxTitleSize = 16
-    ,boxDefaultColor = "#6B9E1E"
+    ,boxDefaultColor = "#99CC00"
 
     ,boxPrimaryColor = "rgba(44,222,235,1)"
     ,boxInfoColor = "rgb(210,214,220)"
@@ -71,7 +71,7 @@ theme_blue_gradient <- dashboardthemes::shinyDashboardThemeDIY(
     ,tabBoxTabTextColor = "#000000"
     ,tabBoxTabTextColorSelected = "#000000"
     ,tabBoxBackColor = "#FFFFFF"
-    ,tabBoxHighlightColor = "#6B9E1E"
+    ,tabBoxHighlightColor = "#99CC00"
     ,tabBoxBorderRadius = 5
 
     ### inputs
@@ -111,8 +111,8 @@ shinydashboard::dashboardPage(
 
         tags$head(tags$style(".checkbox-inline {margin: 0 !important;}"),
                   tags$style(HTML(".navbar-custom-menu>.navbar-nav>li>.dropdown-menu {width:600px;}")),
-                  tags$style(".small-box.bg-green { background-color: #6B9E1E !important; color: #FFFFFF !important; }"),
-                  tags$style(".small-box.bg-blue { background-color: ##193A6B !important; color: #FFFFFF !important; }")
+                  tags$style(".small-box.bg-green { background-color: #99CC00 !important; color: #FFFFFF !important; }"),
+                  tags$style(".small-box.bg-blue { background-color: #003F8A !important; color: #FFFFFF !important; }")
         ),
         shinyjs::useShinyjs(),
         shinydashboard::tabItems(
