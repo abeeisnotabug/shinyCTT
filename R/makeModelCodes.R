@@ -1,4 +1,4 @@
-makeModelCodes <- function(inputData, itemCols, group = FALSE) {
+makeModelCodes <- function(inputData, itemCols, group = FALSE, etaIntFree = FALSE) {
   itemNames <- colnames(inputData[, itemCols])
   nItems <- length(itemCols)
 
@@ -60,7 +60,7 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE) {
       etaVar <- sprintf("eta ~~ c(%s) * eta",
                          paste(paste0("sigma_eta_g", 1:nGroups), collapse = ", "))
 
-      #Item Reliabilities per Group:
+      #Item Reliabilities per group:
       defNames <- gsub("lambda_1", "1", discPar[[model]])
       itemRels <- paste(
         sapply(
@@ -117,7 +117,7 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE) {
         collapse = "\n"
       )
 
-      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRels, sep = "\n")
+      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRels, if (etaIntFree) "#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n")
     } else {
       errVars <- paste(sprintf("%s ~~ %s * %s",
                                 itemNames,
@@ -156,7 +156,7 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE) {
                         discParSumSq,
                         errVarSumBySigma)
 
-      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRel, sep = "\n")
+      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRel, if (etaIntFree) "#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n")
     }
   })
 

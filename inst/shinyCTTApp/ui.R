@@ -356,12 +356,10 @@ shinydashboard::dashboardPage(
                             fluidRow(
                                 column(
                                     width = 6,
-                                    shinyjs::disabled(
-                                        radioButtons(
-                                            "para",
-                                            "Choose parameterization:",
-                                            choices = c("Std. Eta", "Std. Alpha")
-                                        )
+                                    radioButtons(
+                                        "etaIntFree",
+                                        "Choose parameterization:",
+                                        choices = c("Std. Eta" = FALSE, "Std. Alpha" = TRUE)
                                     )
                                 ),
                                 column(

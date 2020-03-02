@@ -1,5 +1,7 @@
 extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
-  nGroups <- fittedModel@Data@ngroups
+  nGroups <- fittedModel@Data@ngroups           # Look for multigroup
+  etaIntFree <- fittedModel@Options$int.lv.free # Look for standardization
+
   nItems <- length(lavaan::lavNames(fittedModel))
 
   if (nGroups > 1) {
@@ -50,7 +52,10 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
   df$ci.upper[grep("rel_", df$label)] <- relsCiU
   # -----------------------------------------------------------------------------------------------------------------------
 
-  df$CI <- sprintf("[%.3f, %.3f]", df$ci.lower, df$ci.upper)
+  # If there are fixed parameters, omit se and ci
+  df[df$se == 0 | is.na(df$se), c("se", "ci.lower", "ci.upper")] <- NA
+
+  df$CI <- ifelse(is.na(df$ci.lower) & is.na(df$ci.upper), NA, sprintf("[%.3f, %.3f]", df$ci.lower, df$ci.upper))
   df <- df[grep("epsilon|alpha|lambda|eta|rel|std", df$label), -c(5, 6)]
 
   if (display) {
@@ -69,6 +74,7 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
     df$label[grep("rel_", df$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavaan::lavNames(fittedModel)))
     df$label[grep("sumrel", df$label)] <- "R&#x302;<sub>&Sigma;</sub>"
     df$label[grep("sigma_eta", df$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
+    df$label[grep("mu_eta", df$label)] <- "&mu;&#x302;<sub>&eta;</sub>"
 
     # Split by groups and bind -----------------------------------------------------------------------------------------------
     splitDf <- lapply(
@@ -88,11 +94,8 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
                 est = NA,
                 se = NA,
                 CI = NA,
-                label = NA,
-                est = NA,
-                se = NA,
-                CI = NA,
-                subDf[grep("eta", subDf$label), -1],
+                if (etaIntFree) subDf[subDf$label == "&mu;&#x302;<sub>&eta;</sub>", -1] else c(label = NA, est = NA, se = NA, CI = NA),
+                subDf[subDf$label == "&sigma;&#x302;&sup2;<sub>&eta;</sub>", -1],
                 subDf[grep("R&#x302;<sub>&Sigma;", subDf$label), -1])
         )
       }

@@ -1,6 +1,6 @@
 function(input, output, session) {
     # Preparation: Names and colors ----------------------------------------------------------------------------------------
-    if (T) {
+    if (TRUE) {
         goodColor <- "darkgreen"
         badColor <- "darkred"
         textColor <- "white"
@@ -540,11 +540,6 @@ function(input, output, session) {
                     ),
                     5,
                     border_right = "1px solid lightgrey"
-                    #ifelse(
-                    #    length(groups) > 1,
-                    #    "1px solid lightgrey",
-                    #    FALSE
-                    #)
                 )
 
             shinydashboard::tabBox(
@@ -1379,6 +1374,10 @@ function(input, output, session) {
     })
 
     observeEvent(input$goModels, {
+        shinyjs::disable("doMg")
+        shinyjs::disable("etaIntFree")
+        shinyjs::disable("estimator")
+
         dataMenuList$menuList[[12]] <- dataMenuList$menuList[[7]]
         if (input$doMg) {
             dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
@@ -1478,16 +1477,27 @@ function(input, output, session) {
                 # Try fitting and capture warning and error messages -------------------------------------------------------
                 modelCodes <- shinyCTT:::makeModelCodes(inputData = userDataGroup(),
                                                         itemCols = input$itemCols,
-                                                        group = groupName)
+                                                        group = groupName,
+                                                        etaIntFree = as.logical(input$etaIntFree))
 
                 if (isFALSE(groupName)) {
                     fittedModelsWarns <- lapply(
                         modelCodes[modelsToTest],
                         FUN = function(model) {
-                            tryCatch(lavaan::cfa(model = model,
-                                                 data = userDataGroup(),
-                                                 meanstructure = TRUE,
-                                                 estimator = mvnTestResult$estimator),
+                            tryCatch(lavaan::lavaan(model = model,
+                                                    data = userDataGroup(),
+                                                    meanstructure = TRUE,
+                                                    estimator = mvnTestResult$estimator,
+                                                    int.ov.free = TRUE,
+                                                    int.lv.free = as.logical(input$etaIntFree),
+                                                    auto.fix.first = TRUE,
+                                                    auto.fix.single = TRUE,
+                                                    auto.var = TRUE,
+                                                    auto.cov.lv.x = TRUE,
+                                                    auto.efa = TRUE,
+                                                    auto.th = TRUE,
+                                                    auto.delta = TRUE,
+                                                    auto.cov.y = TRUE),
                                      error = function(e) e,
                                      warning = function(w) w)
                         }
@@ -1496,10 +1506,20 @@ function(input, output, session) {
                         modelCodes[modelsToTest],
                         FUN = function(model) {
                             suppressWarnings(
-                                tryCatch(lavaan::cfa(model = model,
-                                                     data = userDataGroup(),
-                                                     meanstructure = TRUE,
-                                                     estimator = mvnTestResult$estimator),
+                                tryCatch(lavaan::lavaan(model = model,
+                                                        data = userDataGroup(),
+                                                        meanstructure = TRUE,
+                                                        estimator = mvnTestResult$estimator,
+                                                        int.ov.free = TRUE,
+                                                        int.lv.free = as.logical(input$etaIntFree),
+                                                        auto.fix.first = TRUE,
+                                                        auto.fix.single = TRUE,
+                                                        auto.var = TRUE,
+                                                        auto.cov.lv.x = TRUE,
+                                                        auto.efa = TRUE,
+                                                        auto.th = TRUE,
+                                                        auto.delta = TRUE,
+                                                        auto.cov.y = TRUE),
                                          error = function(e) e)
                             )
                         }
@@ -1508,12 +1528,22 @@ function(input, output, session) {
                     fittedModelsWarns <- lapply(
                         modelCodes[modelsToTest],
                         FUN = function(model) {
-                            tryCatch(lavaan::cfa(model = model,
-                                                 data = userDataGroup(),
-                                                 meanstructure = TRUE,
-                                                 group = groupName,
-                                                 group.equal = c("loadings", "intercepts"),
-                                                 estimator = mvnTestResult$estimator),
+                            tryCatch(lavaan::lavaan(model = model,
+                                                    data = userDataGroup(),
+                                                    meanstructure = TRUE,
+                                                    group = groupName,
+                                                    group.equal = c("loadings", "intercepts"),
+                                                    estimator = mvnTestResult$estimator,
+                                                    int.ov.free = TRUE,
+                                                    int.lv.free = as.logical(input$etaIntFree),
+                                                    auto.fix.first = TRUE,
+                                                    auto.fix.single = TRUE,
+                                                    auto.var = TRUE,
+                                                    auto.cov.lv.x = TRUE,
+                                                    auto.efa = TRUE,
+                                                    auto.th = TRUE,
+                                                    auto.delta = TRUE,
+                                                    auto.cov.y = TRUE),
                                      error = function(e) e,
                                      warning = function(w) w)
                         }
@@ -1522,12 +1552,22 @@ function(input, output, session) {
                         modelCodes[modelsToTest],
                         FUN = function(model) {
                             suppressWarnings(
-                                tryCatch(lavaan::cfa(model = model,
-                                                     data = userDataGroup(),
-                                                     meanstructure = TRUE,
-                                                     group = groupName,
-                                                     group.equal = c("loadings", "intercepts"),
-                                                     estimator = mvnTestResult$estimator),
+                                tryCatch(lavaan::lavaan(model = model,
+                                                        data = userDataGroup(),
+                                                        meanstructure = TRUE,
+                                                        group = groupName,
+                                                        group.equal = c("loadings", "intercepts"),
+                                                        estimator = mvnTestResult$estimator,
+                                                        int.ov.free = TRUE,
+                                                        int.lv.free = as.logical(input$etaIntFree),
+                                                        auto.fix.first = TRUE,
+                                                        auto.fix.single = TRUE,
+                                                        auto.var = TRUE,
+                                                        auto.cov.lv.x = TRUE,
+                                                        auto.efa = TRUE,
+                                                        auto.th = TRUE,
+                                                        auto.delta = TRUE,
+                                                        auto.cov.y = TRUE),
                                          error = function(e) e)
                             )
                         }
@@ -1649,20 +1689,6 @@ function(input, output, session) {
                 compTable$chisq[lower.tri(diag(5), diag = TRUE)] <-
                     infCompTable$aic[lower.tri(diag(5), diag = TRUE)] <-
                     infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
-
-                # Make tabs for single/multigroup --------------------------------------------------------------------------
-                #appendTab(
-                #    inputId = "parTabsets",
-                #    tabPanel(
-                #        ifelse(isFALSE(groupName),
-                #               "Singlegroup",
-                #               "Multigroup"),
-                #        tabsetPanel(
-                #            id = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)])
-                #        )
-                #    ),
-                #    select = isFALSE(groupName)
-                #)
 
                 # Generate Paramter Tables, Fits and Fit Tables ------------------------------------------------------------
                 for (model in goodModels) {
@@ -1844,7 +1870,7 @@ function(input, output, session) {
                                 bold = TRUE),
                             c(" ",
                               "Discrimination Parameters (Factor Loadings)" = 7,
-                              "Easiness Parameters" = 4,
+                              "Easiness Parameters (Intercepts)" = 4,
                               "Variances" = 4,
                               "Reliabilities" = 4)
                         )
@@ -2374,26 +2400,6 @@ function(input, output, session) {
                                 )
                             )
                         })
-
-                    #appendTab(
-                    #    inputId = "compTabsets",
-                    #    tabPanel(
-                    #        ifelse(isFALSE(groupName),
-                    #               "Singlegroup",
-                    #               "Multigroup"),
-                    #        wellPanel(
-                    #            h5(sprintf(
-                    #                "Lavaan status: %i warnings, %i errors.",
-                    #                sum(warns),
-                    #                sum(errs)
-                    #            )),
-                    #            lavErrsMsg,
-                    #            lavWarnsMsg
-                    #        ),
-                    #
-                    #    ),
-                    #    select = isFALSE(groupName)
-                    #)
                 } else {
                     output[[
                         paste0("modelTestsCont", c("Mg")[!isFALSE(groupName)])
@@ -2410,26 +2416,6 @@ function(input, output, session) {
                                 )
                             )
                         })
-                    #appendTab(
-                    #    inputId = "compTabsets",
-                    #    tabPanel(
-                    #        ifelse(isFALSE(groupName),
-                    #               "No Singlegroup Models have been fitted",
-                    #               "No Multigroup Models have been fitted"),
-                    #        wellPanel(
-                    #            h5(sprintf(
-                    #                "Lavaan status: %i warnings, %i errors.",
-                    #                sum(warns),
-                    #                sum(errs)
-                    #            )),
-                    #            lavErrsMsg,
-                    #            lavWarnsMsg
-                    #        )
-                    #    ),
-                    #    select = isFALSE(groupName)
-                    #)
-                    #removeTab(inputId = "navbar",
-                    #          target = "panelParTables")
                 }
             }
         )
