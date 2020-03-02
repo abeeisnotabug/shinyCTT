@@ -117,7 +117,7 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE, etaIntFree = FALS
         collapse = "\n"
       )
 
-      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRels, if (etaIntFree) "#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n")
+      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRels, if (etaIntFree) paste("#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n"), sep = "\n")
     } else {
       errVars <- paste(sprintf("%s ~~ %s * %s",
                                 itemNames,
@@ -156,7 +156,7 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE, etaIntFree = FALS
                         discParSumSq,
                         errVarSumBySigma)
 
-      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRel, if (etaIntFree) "#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n")
+      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRel, if (etaIntFree) paste("#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n"), sep = "\n")
     }
   })
 
