@@ -23,6 +23,7 @@ LazyData: true
 Depends: R (>= 3.5.1),
     shiny (>= 1.2.0)
 Imports: shinydashboard (>= 0.7.1),
+    dashboardthemes (>= 1.0.5),
     shinyjs (>= 1.0),
     MVN (>= 5.6),
     moments (>= 0.14),
@@ -31,6 +32,7 @@ Imports: shinydashboard (>= 0.7.1),
     haven (>= 2.1.0),
     ggplot2 (>= 3.0.0),
     lavaan (>= 0.6.3.1296)
+Remotes: nik01010/dashboardthemes
 RoxygenNote: 6.1.0
 Suggests: knitr,
     rmarkdown
