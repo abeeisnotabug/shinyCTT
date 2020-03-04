@@ -1,103 +1,3 @@
-### creating custom theme object
-theme_blue_gradient <- dashboardthemes::shinyDashboardThemeDIY(
-
-    ### general
-    appFontFamily = "Arial"
-    ,appFontColor = "#000000"
-    ,bodyBackColor = "#FFFFFF"
-
-    ### header
-    ,logoBackColor = "#99CC00"
-
-    ,headerButtonBackColor = "#99CC00"
-    ,headerButtonIconColor = "#FFFFFF"
-    ,headerButtonBackColorHover = "#666666"
-    ,headerButtonIconColorHover = "#FFFFFF"
-
-    ,headerBackColor = "#99CC00"
-    ,headerBoxShadowColor = "#AAAAAA"
-    ,headerBoxShadowSize = "2px 2px 2px"
-
-    ### sidebar
-    ,sidebarBackColor = "#FFFFFF"
-    ,sidebarPadding = 0
-
-    ,sidebarMenuBackColor = "transparent"
-    ,sidebarMenuPadding = 0
-    ,sidebarMenuBorderRadius = 0
-
-    ,sidebarShadowRadius = "3px 5px 5px"
-    ,sidebarShadowColor = "#AAAAAA"
-
-    ,sidebarUserTextColor = "#000000"
-
-    ,sidebarSearchBackColor = "rgb(55,72,80)"
-    ,sidebarSearchIconColor = "rgb(153,153,153)"
-    ,sidebarSearchBorderColor = "#CCCCCC"
-
-    ,sidebarTabTextColor = "#000000"
-    ,sidebarTabTextSize = 13
-    ,sidebarTabBorderStyle = "none none solid none"
-    ,sidebarTabBorderColor = "#CCCCCC"
-    ,sidebarTabBorderWidth = 1
-
-    ,sidebarTabBackColorSelected = "#EEEEEE"
-    ,sidebarTabTextColorSelected = "#000000"
-    ,sidebarTabRadiusSelected = "0px 0px 0px 0px"
-
-    ,sidebarTabBackColorHover = "#EEEEEE"
-    ,sidebarTabTextColorHover = "#000000"
-    ,sidebarTabBorderStyleHover = "none none solid none"
-    ,sidebarTabBorderColorHover = "#CCCCCC"
-    ,sidebarTabBorderWidthHover = 1
-    ,sidebarTabRadiusHover = "0px 0px 0px 0px"
-
-    ### boxes
-    ,boxBackColor = "#FFFFFF"
-    ,boxBorderRadius = 5
-    ,boxShadowSize = "0px 1px 1px"
-    ,boxShadowColor = "rgba(0,0,0,.1)"
-    ,boxTitleSize = 16
-    ,boxDefaultColor = "#99CC00"
-
-    ,boxPrimaryColor = "rgba(44,222,235,1)"
-    ,boxInfoColor = "rgb(210,214,220)"
-    ,boxSuccessColor = "rgba(0,255,213,1)"
-    ,boxWarningColor = "rgb(244,156,104)"
-    ,boxDangerColor = "rgb(255,88,55)"
-
-    ,tabBoxTabColor = "#FFFFFF"
-    ,tabBoxTabTextSize = 14
-    ,tabBoxTabTextColor = "#000000"
-    ,tabBoxTabTextColorSelected = "#000000"
-    ,tabBoxBackColor = "#FFFFFF"
-    ,tabBoxHighlightColor = "#99CC00"
-    ,tabBoxBorderRadius = 5
-
-    ### inputs
-    ,buttonBackColor = "#FFFFFF"
-    ,buttonTextColor = "#000000"
-    ,buttonBorderColor = "#DDDDDD"
-    ,buttonBorderRadius = 5
-
-    ,buttonBackColorHover = "#FFFFFF"
-    ,buttonTextColorHover = "#000000"
-    ,buttonBorderColorHover = "#999999"
-
-    ,textboxBackColor = "rgb(255,255,255)"
-    ,textboxBorderColor = "rgb(200,200,200)"
-    ,textboxBorderRadius = 5
-    ,textboxBackColorSelect = "rgb(245,245,245)"
-    ,textboxBorderColorSelect = "rgb(200,200,200)"
-
-    ### tables
-    ,tableBackColor = "rgb(255,255,255)"
-    ,tableBorderColor = "rgb(240,240,240)"
-    ,tableBorderTopSize = 1
-    ,tableBorderRowSize = 1
-
-)
-
 shinydashboard::dashboardPage(
     shinydashboard::dashboardHeader(
         title = "shinyCTT",
@@ -107,7 +7,7 @@ shinydashboard::dashboardPage(
         shinydashboard::sidebarMenuOutput("dataMenuOut")
     ),
     shinydashboard::dashboardBody(
-        theme_blue_gradient,
+        shinyCTT:::dashboardthemeFU,
 
         tags$head(tags$style(".checkbox-inline {margin: 0 !important;}"),
                   tags$style(HTML(".navbar-custom-menu>.navbar-nav>li>.dropdown-menu {width:600px;}")),

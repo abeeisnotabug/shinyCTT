@@ -1,4 +1,10 @@
 makeModelCodes <- function(inputData, itemCols, group = FALSE, etaIntFree = FALSE) {
+  stdModelCode <- paste(
+      "alpha_1 == 0      # Fix first easyness parameter",
+      "eta ~ mu_eta * 1  # Allow free estimation of intercept of latent variable\n",
+      sep = "\n"
+    )
+
   itemNames <- colnames(inputData[, itemCols])
   nItems <- length(itemCols)
 
@@ -116,8 +122,6 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE, etaIntFree = FALS
         ),
         collapse = "\n"
       )
-
-      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRels, if (etaIntFree) paste("#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n"), sep = "\n")
     } else {
       errVars <- paste(sprintf("%s ~~ %s * %s",
                                 itemNames,
@@ -151,13 +155,15 @@ makeModelCodes <- function(inputData, itemCols, group = FALSE, etaIntFree = FALS
               collapse = " + ")
       )
 
-      sumRel <- sprintf("sumrel := %s / (%s + %s)",
-                        discParSumSq,
-                        discParSumSq,
-                        errVarSumBySigma)
-
-      paste(etaDep, errVars, alphas, etaVar, itemRels, sumRel, if (etaIntFree) paste("#Standardization:", "alpha_1 == 0", "eta ~ mu_eta * 1", sep = "\n"), sep = "\n")
+      sumRels <- sprintf(
+        "sumrel := %s / (%s + %s)",
+        discParSumSq,
+        discParSumSq,
+        errVarSumBySigma
+      )
     }
+
+    paste(etaDep, errVars, alphas, if (etaIntFree) paste0(stdModelCode, etaVar) else etaVar, "\n# Reliability calculation:", itemRels, sumRels, sep = "\n")
   })
 
   names(modelCodes) <- models
