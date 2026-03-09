@@ -1,9 +1,9 @@
 Package: shinyCTT
 Type: Package
 Title: Easy to use analysis tools for psychometric tests in the CTT framework
-Version: 0.3.0
+Version: 0.4.0
 Authors@R: c(
-    person("R. Maximilian", "Bee", email = "r.maximilian.bee@fu-berlin.de",
+    person("R. Maximilian", "Bee", email = "richard.maximilian.bee@uni-jena.de",
     role = c("aut", "cre")),
     person("Michael", "Eid", email = "michael.eid@fu-berlin.de",
     role = "aut"))

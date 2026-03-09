@@ -1,1 +1,2 @@
-options(knitr.kable.NA = "")
+options(knitr.kable.NA = "",
+        knitr.table.format = "html")

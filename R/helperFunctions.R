@@ -1,42 +1,57 @@
-makeCorrTableWithCIs <- function(rawTable, goodColor, badColor, neutrColor, textColor, sigLvl, itemCols) {
+makeCorrTableWithCIs <- function(
+    rawTable,
+    goodColor,
+    badColor,
+    neutrColor,
+    textColor,
+    sigLvl,
+    itemCols) {
+
   CIs <- rawTable$test
 
   corrTableRaw <- rawTable$cor
-  corrTableCors <- corrTableCIs <- matrix(NA, nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
+
+  corrTableCors <-
+    corrTableCIs <-
+      matrix(NA, nrow = nrow(corrTableRaw), ncol = ncol(corrTableRaw))
+
   corrTableComb <- rbind(corrTableCors, corrTableCIs)
 
+  # correlations
   corrTableCors[lower.tri(corrTableCors)] <- kableExtra::cell_spec(
+
     sprintf("%.3f", corrTableRaw[lower.tri(corrTableRaw)]),
+
     color = textColor,
     background = ifelse(
       CIs$p[lower.tri(CIs$p)] < sigLvl,
       ifelse(
         corrTableRaw[lower.tri(corrTableRaw)] >= 0,
-        goodColor,
-        badColor
-      ),
-      neutrColor
-    )
-  )
+        yes = goodColor,
+        no = badColor),
+      neutrColor))
+
+  # diagonal of correlations
   diag(corrTableCors) <- 1
 
+  # confidence intervals
   corrTableCIs[lower.tri(corrTableCIs)] <- kableExtra::cell_spec(
+
     sprintf(
       "[%.3f, %.3f]",
       CIs$lowCI[lower.tri(CIs$lowCI)],
-      CIs$uppCI[lower.tri(CIs$uppCI)]
-    ),
+      CIs$uppCI[lower.tri(CIs$uppCI)]),
+
     color = textColor,
     background = ifelse(
       CIs$p[lower.tri(CIs$p)] < sigLvl,
       ifelse(
         corrTableRaw[lower.tri(corrTableRaw)] >= 0,
-        goodColor,
-        badColor
-      ),
-      neutrColor
-    )
-  )
+        yes = goodColor,
+        no = badColor),
+      neutrColor))
+
+  # diagonal of confidence intervals
   diag(corrTableCIs) <- "-"
 
   corrTableComb[seq(1, nrow(corrTableComb), 2), ] <- corrTableCors
@@ -56,8 +71,9 @@ makeKable <- function(table,
                       col.names = NA,
                       row.names = NA,
                       ...) {
+
   kableExtra::kable_styling(
-    kableExtra::kable(table,
+    kableExtra::kbl(table,
                       digits = digits,
                       escape = FALSE,
                       col.names = col.names,
@@ -75,8 +91,7 @@ extractFitParameters <- function(fittedModel) {
   paramsDfLeft <- as.data.frame(t(
     rawParams[c(
       paste0(c("df", "chisq", "pvalue"), scaledAddon),
-      paste0(c("rmsea", "rmsea.pvalue"), scaledAddon)
-    )]
+      paste0(c("rmsea", "rmsea.pvalue"), scaledAddon))]
   ))
 
   paramsDfRight <- as.data.frame(t(
@@ -84,8 +99,7 @@ extractFitParameters <- function(fittedModel) {
       paste0("cfi", scaledAddon),
       "srmr",
       "aic",
-      "bic"
-    )]
+      "bic")]
   ))
 
   paramsDf <- cbind(paramsDfLeft,
@@ -109,22 +123,22 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
   out <- data.frame(
     n = 1:n,
     eta.hat = numeric(n),
-    se = numeric(n)
-  )
+    se = numeric(n))
 
   scores <- lavaan::lavPredict(
     fittedModel,
     method = "regression",
-    se = "standard"
-  )
+    se = "standard")
 
   if (fittedModel@Data@ngroups > 1) {
+
     for (group in fittedModel@Data@group.label) {
       out$eta.hat[groupVar == group] <- as.numeric(scores[[which(fittedModel@Data@group.label == group)]])
       out$se[groupVar == group] <- as.numeric(attr(scores, "se")[[which(fittedModel@Data@group.label == group)]])
     }
 
     out[[fittedModel@Data@group]] <- groupVar
+
   } else {
     out$eta.hat <- as.numeric(scores)
 
@@ -227,7 +241,7 @@ fitLine
 )
 }
 
-# Code to generate the custum FU theme:
+# Code to generate the custom FU theme:
 if (FALSE) {
   dashboardthemeFU <- dashboardthemes::shinyDashboardThemeDIY(
 
