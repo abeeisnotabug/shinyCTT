@@ -1126,23 +1126,28 @@ server <- function(input, output, session) {
     req(userDataGroup())
 
     mvnTestResult$raw <- tryCatch(
-      MVN::mvn(userDataGroup()[, input$itemCols]),
+      MVN::mvn(userDataGroup()[, input$itemCols],
+               mvn_test = "mardia"),
       warning = function(w) w,
       error = function(e) e)
 
     #req(mvnTestResult$raw)
 
     ## mvnTable if result of MVN test is data.frame ----
-    if (class(mvnTestResult$raw$multivariateNormality) == "data.frame") {
+    if (is.data.frame(mvnTestResult$raw$multivariate_normality)) {
 
       mvnTestResult$estimator <- ifelse(
-        test = any(
-          as.numeric(as.character(
-            mvnTestResult$raw$multivariateNormality[-3, "p value"]))
-          < input$mvnSL),
+        test = is.numeric(mvnTestResult$raw$multivariate_normality[, "p.value"]),
 
-        yes = "MLR",
-        no = "ML")
+        yes = ifelse(
+          test = any(mvnTestResult$raw$multivariate_normality[, "p.value"] < input$mvnSL),
+          yes = "MLR",
+          no = "ML"),
+
+        no = ifelse(
+          test = any(mvnTestResult$raw$multivariate_normality[, "p.value"] == "<0.001"),
+          yes = "MLR",
+          no = "ML"))
 
       updateRadioButtons(
         session,
@@ -1151,12 +1156,12 @@ server <- function(input, output, session) {
     }
 
     ## mvnTable if no error ----
-    if (class(mvnTestResult$raw)[1] == "list") {
+    if (class(mvnTestResult$raw)[1] == "mvn") {
 
-      mvnUV <- data.frame(Test = as.character(mvnTestResult$raw$univariateNormality$Test),
-                          Item = as.character(mvnTestResult$raw$univariateNormality$Variable),
-                          Statistic = as.numeric(mvnTestResult$raw$univariateNormality$Statistic),
-                          p = suppressWarnings(as.numeric(mvnTestResult$raw$univariateNormality$`p value`)),
+      mvnUV <- data.frame(Test = mvnTestResult$raw$univariate_normality$Test,
+                          Item = mvnTestResult$raw$univariate_normality$Variable,
+                          Statistic = mvnTestResult$raw$univariate_normality$Statistic,
+                          p = suppressWarnings(as.numeric(mvnTestResult$raw$univariate_normality$p.value)),
                           stringsAsFactors = F)
 
       mvnUV$p[is.na(mvnUV$p)] <- 0
@@ -1178,14 +1183,14 @@ server <- function(input, output, session) {
 
     req(userDataGroup())
 
-    if (class(mvnTestResult$raw$multivariateNormality) == "data.frame") {
+    if (is.data.frame(mvnTestResult$raw$multivariate_normality)) {
 
-      mvnMV <- data.frame(Test = as.character(mvnTestResult$raw$multivariateNormality$Test),
-                          Statistic = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$Statistic)),
-                          p = as.numeric(as.character(mvnTestResult$raw$multivariateNormality$`p value`)),
-                          Signif. = as.character(mvnTestResult$raw$multivariateNormality$Result),
-                          stringsAsFactors = F)[-3,]
+      mvnMV <- data.frame(Test = mvnTestResult$raw$multivariate_normality$Test,
+                          Statistic = mvnTestResult$raw$multivariate_normality$Statistic,
+                          p = suppressWarnings(as.numeric(mvnTestResult$raw$multivariate_normality$p.value)),
+                          stringsAsFactors = F)
 
+      mvnMV$p[is.na(mvnMV$p)] <- 0
       mvnMV$Signif. <- ifelse(mvnMV$p < input$mvnSL, "*", "")
       mvnMV$p <- ifelse(mvnMV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnMV$p, 3)))
 
