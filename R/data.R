@@ -4,7 +4,7 @@
 #'
 #' @format A data frame with 238 rows and 7 variables:
 #' \describe{
-#'   \item{geschl}{Gender of participant}
+#'   \item{gender}{Gender of participant}
 #'   \item{item_1:item_6}{Logarithmic reaction times}
 #'   ...
 #' }

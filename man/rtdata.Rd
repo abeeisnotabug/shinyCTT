@@ -4,12 +4,14 @@
 \name{rtdata}
 \alias{rtdata}
 \title{Emotional something reaction time data}
-\format{A data frame with 238 rows and 7 variables:
+\format{
+A data frame with 238 rows and 7 variables:
 \describe{
-  \item{geschl}{Gender of participant}
+  \item{gender}{Gender of participant}
   \item{item_1:item_6}{Logarithmic reaction times}
   ...
-}}
+}
+}
 \source{
 \url{http://www3.hogrefe.de/buecher/lehrbuecher/psychlehrbuchplus/lehrbuecher/testtheorie-und-testkonstruktion/zusatzmaterial/}
 }
