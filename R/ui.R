@@ -249,7 +249,7 @@ ui <- shinydashboard::dashboardPage(
                 "corrIndSL",
                 "Enter the significance level for this test:",
                 value = 0.05,
-                min = 0,
+                min = 0.001,
                 max = 1,
                 step = 0.001),
               htmlOutput("corrInd")),
@@ -266,7 +266,7 @@ ui <- shinydashboard::dashboardPage(
                 "corrTabSL",
                 "Enter the significance level for the correlation tests:",
                 value = 0.05,
-                min = 0,
+                min = 0.001,
                 max = 1,
                 step = 0.001))),
           column(
@@ -289,7 +289,7 @@ ui <- shinydashboard::dashboardPage(
                 "mvnSL",
                 "Enter the significance level for the tests:",
                 value = 0.05,
-                min = 0,
+                min = 0.001,
                 max = 1,
                 step = 0.001)),
             shinydashboard::box(
