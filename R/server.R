@@ -1,4 +1,4 @@
-function(input, output, session) {
+server <- function(input, output, session) {
   # Preparation: Names and colors ----
   if (TRUE) {
     goodColor <- "darkgreen"
@@ -88,8 +88,8 @@ function(input, output, session) {
       "1b. Choose data object from Workspace",
       Filter(
         function(object) !is.null(dim(get(object))) && typeof(get(object)) != "character",
-        ls(envir = globalenv()))
-    )})
+        ls(envir = globalenv())))
+    })
 
   userDataRaw <- reactiveVal()
   userDataChosen <- reactiveVal()
@@ -167,6 +167,7 @@ function(input, output, session) {
     if (all(
       is.null(notifications$notList$noNumeric),
       is.null(notifications$notList$oneCol))) {
+
       shinyjs::enable("dataSelectButton")
     }
   })
@@ -209,11 +210,12 @@ function(input, output, session) {
   options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
 
   observeEvent(userDataRaw(), {
-    output$dataOverview <- DT::renderDataTable(
+    output$dataOverview <- userDataRaw() %>%
+      DT::datatable() %>%
       DT::formatRound(
-        DT::datatable(userDataRaw()),
         columns = seq_along(userDataRaw())[sapply(userDataRaw(), is.numeric)],
-        digits = 3))
+        digits = 3) %>%
+      DT::renderDataTable()
   })
 
   itemColsRV <- reactiveVal()
@@ -285,37 +287,39 @@ function(input, output, session) {
     list(input$groupCol,
          input$groups,
          input$itemCols), {
-      #req(input$itemCols)
+    #req(input$itemCols)
 
-      if (input$dataSelectButton > 0) {
-        if (length(input$itemCols) <= 1 ||
-            (input$groupCol != "noGroupSelected" && length(input$groups) == 0)) {
-          shinyjs::disable("subsetSelectButton") # subset of items
-        } else {
-          shinyjs::enable("subsetSelectButton")
-        }
+    if (input$dataSelectButton > 0) {
 
-        notifications$notList$numItems <- switch(
-          as.character(length(input$itemCols)),
-          "0" = shinydashboard::notificationItem(
-            text = "No item selected. No analysis possible.",
-            icon = icon("times"),
-            status = "danger"),
-          "1" = shinydashboard::notificationItem(
-            text = "Only one item selected. No analysis possible.",
-            icon = icon("times"),
-            status = "danger"),
-          "2" = shinydashboard::notificationItem(
-            text = HTML("Only two items selected. Unable to test the &tau;-kongeneric and
-                        the ess. &tau;-equivalent model."),
-            icon = icon("exclamation-triangle"),
-            status = "warning"),
-          "3" = shinydashboard::notificationItem(
-            text = HTML("Only three items selected. Unable to test the &tau;-kongeneric model."),
-            icon = icon("exclamation-triangle"),
-            status = "warning"),
-          NULL)
+      if (length(input$itemCols) <= 1 ||
+          (input$groupCol != "noGroupSelected" && length(input$groups) == 0)) {
+
+        shinyjs::disable("subsetSelectButton") # subset of items
+      } else {
+        shinyjs::enable("subsetSelectButton")
       }
+
+      notifications$notList$numItems <- switch(
+        as.character(length(input$itemCols)),
+        "0" = shinydashboard::notificationItem(
+          text = "No item selected. No analysis possible.",
+          icon = icon("times"),
+          status = "danger"),
+        "1" = shinydashboard::notificationItem(
+          text = "Only one item selected. No analysis possible.",
+          icon = icon("times"),
+          status = "danger"),
+        "2" = shinydashboard::notificationItem(
+          text = HTML("Only two items selected. Unable to test the &tau;-kongeneric and
+                      the ess. &tau;-equivalent model."),
+          icon = icon("exclamation-triangle"),
+          status = "warning"),
+        "3" = shinydashboard::notificationItem(
+          text = HTML("Only three items selected. Unable to test the &tau;-kongeneric model."),
+          icon = icon("exclamation-triangle"),
+          status = "warning"),
+        NULL)
+    }
   })
 
   ## subsetSelectionTab itemInfoBox ----
@@ -462,8 +466,8 @@ function(input, output, session) {
 
     table <- t(apply(
       userDataGroup()[, input$itemCols],
-      2,
-      function(col) {
+      MARGIN = 2,
+      FUN = function(col) {
         c(Mean = mean(col, na.rm = TRUE),
           Sd = sd(col, na.rm = TRUE),
           Skew = moments::skewness(col, na.rm = TRUE),
@@ -488,13 +492,14 @@ function(input, output, session) {
               subset(
                 userDataGroup()[, input$itemCols],
                 userDataGroup()[, input$groupCol] == group),
-              2,
-              function(col) {
+              MARGIN = 2,
+              FUN = function(col) {
                 c(Mean = mean(col, na.rm = TRUE), SD = sd(col, na.rm = TRUE),
                   Skew = moments::skewness(col, na.rm = TRUE),
                   Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
               }
-          ))} # t(apply(
+          )) # t(apply(
+        }
       ) # lapply
 
       descrGroupHeader <- c(1, rep(4, length(groups)))
