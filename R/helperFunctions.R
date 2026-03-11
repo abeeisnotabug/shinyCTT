@@ -70,18 +70,25 @@ makeKable <- function(table,
                       bootstrap_options = "striped",
                       col.names = NA,
                       row.names = NA,
+                      bold_cols = integer(0),
                       ...) {
 
-  kableExtra::kable_styling(
+  this_kbl <- kableExtra::kable_styling(
     kableExtra::kbl(table,
-                      digits = digits,
-                      escape = FALSE,
-                      col.names = col.names,
-                      row.names = row.names),
+                    digits = digits,
+                    escape = FALSE,
+                    col.names = col.names,
+                    row.names = row.names),
     full_width = full_width,
     position = position,
     bootstrap_options = bootstrap_options,
     ...)
+
+  if (length(bold_cols)) {
+    kableExtra::column_spec(this_kbl, column = 1, bold = TRUE)
+  } else {
+    this_kbl
+  }
 }
 
 extractFitParameters <- function(fittedModel) {
