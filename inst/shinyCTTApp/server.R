@@ -474,13 +474,8 @@ function(input, output, session) {
     nHeader <- c(1, 4)
     names(nHeader) <- c(" ", sprintf("n<sub>all</sub> = %i", nrow(userDataGroup())))
 
-    overallDescrTable <- shinyCTT:::makeKable(table) %>%
-      kableExtra::column_spec(
-        column = 1,
-        bold = TRUE) %>%
-      kableExtra::add_header_above(
-        header = nHeader,
-        escape = FALSE) %>%
+    overallDescrTable <- shinyCTT:::makeKable(table, bold_cols = 1) %>%
+      kableExtra::add_header_above(header = nHeader, escape = FALSE) %>%
       HTML()
 
     if (input$groupCol != "noGroupSelected") {
@@ -517,11 +512,8 @@ function(input, output, session) {
         mgDescrTableListTagged[i] <-
           shinyCTT:::makeKable(
               do.call(cbind,
-                      mgDescrTableList[(2 * i - 1):min(2 * i, length(groups))])) %>%
-
-            kableExtra::column_spec(
-              column = 1,
-              bold = TRUE) %>%
+                      mgDescrTableList[(2 * i - 1):min(2 * i, length(groups))]),
+              bold_cols = 1) %>%
 
             kableExtra::add_header_above(
               header = descrGroupHeader[c(1, (2 * i):min(2 * i + 1, length(groups) + 1))],
@@ -583,14 +575,14 @@ function(input, output, session) {
       ### output object groupHist ----
       output$groupHist <- renderPlot({
         ggplot2::ggplot(
-          data = data.frame(
+          data.frame(
             group = userDataGroup()[
               userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
               input$groupCol],
             item = userDataGroup()[
               userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
               input$histItemGroup]),
-          aes = ggplot2::aes(x = item, fill = group)) +
+          ggplot2::aes(x = item, fill = group)) +
 
           ggplot2::geom_histogram(
             if (input$groupDens) ggplot2::aes(y = ggplot2::after_stat(density)),
@@ -734,10 +726,8 @@ function(input, output, session) {
       for (i in 1:length(mgCovMatList))
         mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
 
-      mgCovMatTable <- kableExtra::column_spec(
-        shinyCTT:::makeKable(do.call(rbind, mgCovMatList)),
-        column = 1,
-        bold = TRUE)
+      mgCovMatTable <- shinyCTT:::makeKable(do.call(rbind, mgCovMatList),
+                                            bold_cols = 1)
 
       groupRowHeaders <- sprintf(
         "Group: %s (n = %i)",
@@ -745,13 +735,14 @@ function(input, output, session) {
         c(table(userDataGroup()[, input$groupCol]))[as.character(groups)])
 
       for (i in 1:length(groups))
-        mgCovMatTable <- kableExtra::group_rows(
-          mgCovMatTable,
-          group_label = groupRowHeaders[i],
-          start_row = (i - 1) * length(input$itemCols) + 1,
-          end_row = i * length(input$itemCols),
-          label_row_css = "background-color: #666; color: #fff;")
+        mgCovMatTable <- mgCovMatTable %>%
+          kableExtra::group_rows(
+            group_label = groupRowHeaders[i],
+            start_row = (i - 1) * length(input$itemCols) + 1,
+            end_row = i * length(input$itemCols),
+            label_row_css = "background-color: #666; color: #fff;")
 
+      # output if groups
       shinydashboard::tabBox(
         width = 12,
         title = "Covariance Matrix:",
@@ -759,29 +750,27 @@ function(input, output, session) {
 
         tabPanel(
           title = "Overall",
-          HTML(
-            kableExtra::column_spec(
-              shinyCTT:::makeKable(table),
-              column = 1,
-              bold = TRUE))),
+          shinyCTT:::makeKable(table, bold_cols = 1) %>%
+            HTML()),
 
         tabPanel(
           "Group-wise",
-          HTML(mgCovMatTable)))
+          HTML(mgCovMatTable))
 
+      ) # tabBox
 
     } ## covMatBox if (input$groupCol == "noGroupSelected") ----
     else {
 
+      # output if NO groups
       shinydashboard::box(
         width = 12,
         title = "Covariance Matrix:",
 
-        HTML(
-          kableExtra::column_spec(
-            shinyCTT:::makeKable(table),
-            column = 1,
-            bold = TRUE)))
+        shinyCTT:::makeKable(table, bold_cols = 1) %>%
+          HTML()
+
+      ) # box
     }
   })
 
@@ -810,38 +799,28 @@ function(input, output, session) {
 
       if (!is.na(input$corrIndSL) && input$corrIndSL < 1 && input$corrIndSL > 0) {
 
-        ### corrInd if (class(corrIndRaw)[1] == "lavaan") if signif ----
-        if (corrInd[3] < input$corrIndSL) {
-          tagList(
-            strong("Test result:"),
+        tagList(
+          strong("Test result:"),
 
-            p(HTML(
-              sprintf(
-                "The hypothesis that all correlations are equal to
-                  zero has to be discarded on a significance level of
-                  %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                input$corrIndSL, # %s
-                input$corrIndEst, # %s
-                corrInd[1], # %.3f
-                corrInd[2], # %i
-                ifelse(corrInd[3] < 0.001, "< 0.001", sprintf("= %.3f", corrInd[3]))))))
+          sprintf(
+            ifelse(
+              corrInd[3] < input$corrIndSL,
+              yes = "The hypothesis that all correlations are equal to
+                      zero has to be discarded on a significance level of
+                      %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
+              no = "The hypothesis that all correlations are equal to
+                    zero can be maintained on a significance level of
+                    %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)."),
+            input$corrIndSL, # %s
+            input$corrIndEst, # %s
+            corrInd[1], # %.3f
+            corrInd[2], # %i
+            ifelse(corrInd[3] < 0.001, "< 0.001", sprintf("= %.3f", corrInd[3]))) %>%
 
-        } ### corrInd if (class(corrIndRaw)[1] == "lavaan") if NOT signif ----
-        else {
-          tagList(
-            strong("Test result:"),
+            HTML() %>%
+            p()
 
-            p(HTML(
-              sprintf(
-                "The hypothesis that all correlations are equal to
-                  zero can be maintained on a significance level of
-                  %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                input$corrIndSL,
-                input$corrIndEst,
-                corrInd[1],
-                corrInd[2],
-                ifelse(corrInd[3] < 0.001, "< 0.001", sprintf("= %.3f", corrInd[3]))))))
-        }
+        ) # tagList
 
       } else {
         div(
@@ -853,10 +832,8 @@ function(input, output, session) {
     else {
       tagList(
         strong("Test result:"),
-
         div(
           style = paste0("color:red"),
-
           HTML(paste("There was an ERROR/WARNING:", corrIndRaw$message))))
     }
   })
@@ -937,27 +914,27 @@ function(input, output, session) {
           title = "Group-wise",
 
           fluidRow(
-              column(
-                width = 4,
-                selectInput(
-                  "scatterItemXGroup",
-                  "Select item on the abscissa:",
-                  choices = input$itemCols)),
-              column(
-                width = 4,
-                selectInput(
-                  "scatterItemYGroup",
-                  "Select item on the ordinate:",
-                  choices = input$itemCols,
-                  selected = input$itemCols[2])),
-              column(
-                width = 4,
-                checkboxGroupInput(
-                  "scatterGroupGroups",
-                  "Select the groups to include:",
-                  choices = unique(userDataGroup()[, input$groupCol]),
-                  selected = unique(userDataGroup()[, input$groupCol]),
-                  inline = TRUE))),
+            column(
+              width = 4,
+              selectInput(
+                "scatterItemXGroup",
+                "Select item on the abscissa:",
+                choices = input$itemCols)),
+            column(
+              width = 4,
+              selectInput(
+                "scatterItemYGroup",
+                "Select item on the ordinate:",
+                choices = input$itemCols,
+                selected = input$itemCols[2])),
+            column(
+              width = 4,
+              checkboxGroupInput(
+                "scatterGroupGroups",
+                "Select the groups to include:",
+                choices = unique(userDataGroup()[, input$groupCol]),
+                selected = unique(userDataGroup()[, input$groupCol]),
+                inline = TRUE))),
 
           plotOutput("groupScatter"))
       ) # tabBox
@@ -971,13 +948,12 @@ function(input, output, session) {
 
         fluidRow(
           column(
-              width = 4,
-              selectInput(
-                "scatterItemX",
-                "Select item on the abscissa:",
-                choices = input$itemCols
-              )
-          ),
+            width = 4,
+            selectInput(
+              "scatterItemX",
+              "Select item on the abscissa:",
+              choices = input$itemCols)),
+
           column(
               width = 4,
               selectInput(
@@ -1009,47 +985,44 @@ function(input, output, session) {
 
     corrTableLegend <- tagList(
       h5("Legend:"),
-      HTML(
+
+      cbind(
+        kableExtra::cell_spec(
+          "Sig. pos.",
+          color = textColor,
+          background = goodColor),
+        kableExtra::cell_spec(
+          "Sig. neg.",
+          color = textColor,
+          background = badColor),
+        kableExtra::cell_spec(
+          "Not sig.",
+          color = textColor,
+          background = neutrColor)) %>%
 
         shinyCTT:::makeKable(
-          cbind(
-            kableExtra::cell_spec(
-              "Sig. pos.",
-              color = textColor,
-              background = goodColor),
-            kableExtra::cell_spec(
-              "Sig. neg.",
-              color = textColor,
-              background = badColor),
-            kableExtra::cell_spec(
-              "Not sig.",
-              color = textColor,
-              background = neutrColor)),
-
           bootstrap_options = "bordered",
-          position = "left")
-      )
+          position = "left") %>%
+        HTML()
+
     ) # tagList
 
     ## corrTableBox singleCorrTable if no errors: ----
     if (class(corrTableWithCIsRaw$test)[1] == "list") {
 
-      singleCorrTable <- HTML(
-        kableExtra::column_spec(
+      singleCorrTable <- shinyCTT:::makeCorrTableWithCIs(
+        rawTable = corrTableWithCIsRaw,
+        goodColor,
+        badColor,
+        neutrColor,
+        textColor,
+        sigLvl = input$corrTabSL,
+        itemCols = input$itemCols) %>%
 
-          shinyCTT:::makeKable(
-            shinyCTT:::makeCorrTableWithCIs(
-              rawTable = corrTableWithCIsRaw,
-              goodColor,
-              badColor,
-              neutrColor,
-              textColor,
-              sigLvl = input$corrTabSL,
-              itemCols = input$itemCols),
-            bootstrap_options = c("condensed", "striped")),
-
-          column = 1,
-          bold = TRUE))
+        shinyCTT:::makeKable(
+          bootstrap_options = c("condensed", "striped"),
+          bold_cols = 1) %>%
+        HTML()
 
     } ## corrTableBox singleCorrTable if errors: ----
     else {
@@ -1087,23 +1060,21 @@ function(input, output, session) {
       })
 
       # join each group corrTable
-      mgCorrTable <- kableExtra::column_spec(
-        shinyCTT:::makeKable(
-          do.call(rbind, mgCorrTableList),
-          bootstrap_options = c("condensed", "striped")),
-        column = 1,
-        bold = TRUE)
+      mgCorrTable <- shinyCTT:::makeKable(
+        do.call(rbind, mgCorrTableList),
+        bootstrap_options = c("condensed", "striped"),
+        bold_cols = 1)
 
       # add group headers
       groupRowHeaders <- sprintf("Group: %s", unique(userDataGroup()[, input$groupCol]))
 
       for (i in 1:length(unique(userDataGroup()[, input$groupCol])))
-        mgCorrTable <- kableExtra::group_rows(
-          mgCorrTable,
-          group_label = groupRowHeaders[i],
-          start_row = (i - 1) * length(input$itemCols) * 2 + 1,
-          end_row = i * length(input$itemCols) * 2,
-          label_row_css = "background-color: #666; color: #fff;")
+        mgCorrTable <- mgCorrTable %>%
+          kableExtra::group_rows(
+            group_label = groupRowHeaders[i],
+            start_row = (i - 1) * length(input$itemCols) * 2 + 1,
+            end_row = i * length(input$itemCols) * 2,
+            label_row_css = "background-color: #666; color: #fff;")
 
       # assemble in tabBox
       shinydashboard::tabBox(
@@ -1141,7 +1112,7 @@ function(input, output, session) {
 
   # observeEvent input$estimatro ----
   observeEvent(input$estimator, {
-      mvnTestResult$estimator <- input$estimator
+    mvnTestResult$estimator <- input$estimator
   })
 
   # output mvnTable ----
@@ -1150,9 +1121,9 @@ function(input, output, session) {
     req(userDataGroup())
 
     mvnTestResult$raw <- tryCatch(
-        MVN::mvn(userDataGroup()[, input$itemCols]),
-        warning = function(w) w,
-        error = function(e) e)
+      MVN::mvn(userDataGroup()[, input$itemCols]),
+      warning = function(w) w,
+      error = function(e) e)
 
     #req(mvnTestResult$raw)
 
@@ -1168,10 +1139,10 @@ function(input, output, session) {
         yes = "MLR",
         no = "ML")
 
-        updateRadioButtons(
-          session,
-          "estimator",
-          selected = mvnTestResult$estimator)
+      updateRadioButtons(
+        session,
+        "estimator",
+        selected = mvnTestResult$estimator)
     }
 
     ## mvnTable if no error ----
@@ -1191,9 +1162,9 @@ function(input, output, session) {
 
     } ## mvnTable if error ----
     else {
-        div(
-          style = paste0("color:red"),
-          HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message)))
+      div(
+        style = paste0("color:red"),
+        HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message)))
     }
   })
 
@@ -1225,13 +1196,13 @@ function(input, output, session) {
 
       } else {
 
-          tagList(
-            sprintf("The hypotheses that Mardia's Skewness statistic
-                      and Mardias' Kurtosis statistic match those of a
-                      normal distribution can be maintained on a significance
-                      level of %s. Test result:", input$mvnSL),
-            HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
-            HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
+        tagList(
+          sprintf("The hypotheses that Mardia's Skewness statistic
+                    and Mardias' Kurtosis statistic match those of a
+                    normal distribution can be maintained on a significance
+                    level of %s. Test result:", input$mvnSL),
+          HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
+          HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
       }
     }
   })
@@ -1510,19 +1481,13 @@ function(input, output, session) {
 
             div(
               style = "color:orange",
-              HTML(
-                kableExtra::column_spec(
-
-                  kableExtra::kable(
-                    cbind(paste0(modelsLong[warnModels], ":&emsp;"),
+              cbind(paste0(modelsLong[warnModels], ":&emsp;"),
                           sapply(fittedModelsWarns[warnModels],
-                                 function(model) model$message)),
-                    row.names = FALSE,
-                    escape = FALSE),
-
-                  column = 1,
-                  bold = TRUE)))
-            ) # tagList
+                                 function(model) model$message)) %>%
+                kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
+                kableExtra::column_spec(column = 1, bold = TRUE) %>%
+                HTML())
+          ) # tagList
 
         } else {
           lavWarnsMsg <- NULL
@@ -1536,17 +1501,12 @@ function(input, output, session) {
 
             div(
               style = "color:red",
-              HTML(
-                kableExtra::column_spec(
-                  kableExtra::kable(
-                    cbind(paste0(modelsLong[errModels], ":&emsp;"),
-                          sapply(fittedModelsErrs[errModels],
-                                 function(model) model$message)),
-                    row.names = FALSE,
-                    escape = FALSE),
-
-                  colum = 1,
-                  bold = TRUE)))
+              cbind(paste0(modelsLong[errModels], ":&emsp;"),
+                    sapply(fittedModelsErrs[errModels],
+                           function(model) model$message)) %>%
+                kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
+                kableExtra::column_spec(column = 1, bold = TRUE) %>%
+                HTML())
             ) # tagList
 
         } else {
@@ -1739,51 +1699,40 @@ function(input, output, session) {
             #### parameter tables ----
             SECIestName <- paste0(c("SE", "CI"), "<sub>", mvnTestResult$estimator, "</sub>")
 
-            parTableWithCIs <- kableExtra::add_header_above(
+            parTableWithCIs <- shinyCTT:::makeKable(
+              shinyCTT:::extractParameters(
+                fittedModelsWarns[[thisModel]],
+                alpha = input$sigLvl),
+              col.names = c(
+                "Item",
+
+                "&lambda;&#x302;<sub>i</sub>",
+
+                "Est.", SECIestName,
+                "Std. Est.", SECIestName,
+
+                "&alpha;&#x302;<sub>i</sub>",
+
+                "Est.", SECIestName,
+
+                "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
+
+                "Est.", SECIestName,
+
+                "R&#x302;<sub>i</sub>",
+
+                "Est.", SECIestName),
+              bold_cols = 1) %>%
+
               kableExtra::row_spec(
-
-                kableExtra::column_spec(
-                  shinyCTT:::makeKable(
-
-                    shinyCTT:::extractParameters(
-                      fittedModelsWarns[[thisModel]],
-                      alpha = input$sigLvl),
-
-                    col.names = c(
-                      "Item",
-
-                      "&lambda;&#x302;<sub>i</sub>",
-
-                      "Est.", SECIestName,
-                      "Std. Est.", SECIestName,
-
-                      "&alpha;&#x302;<sub>i</sub>",
-
-                      "Est.", SECIestName,
-
-                      "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
-
-                      "Est.", SECIestName,
-
-                      "R&#x302;<sub>i</sub>",
-
-                      "Est.", SECIestName)
-
-                    ), # makeKable
-
-                  column = 1,
-                  bold = TRUE), # column_spec
-
                 row = (length(input$itemCols) + 1) * 1:thisModelsNgroups,
-                bold = TRUE), # row_spec
-
-              header =c(" ",
-                "Discrimination Parameters (Factor Loadings)" = 7,
-                "Easiness Parameters (Intercepts)" = 4,
-                "Variances" = 4,
-                "Reliabilities" = 4)
-
-            ) # add_header_above
+                bold = TRUE) %>%
+              kableExtra::add_header_above(
+                header =c(" ",
+                          "Discrimination Parameters (Factor Loadings)" = 7,
+                          "Easiness Parameters (Intercepts)" = 4,
+                          "Variances" = 4,
+                          "Reliabilities" = 4))
 
             ##### modify parameter tables if there are groups ----
             if (!isFALSE(groupName)) {
@@ -1977,8 +1926,8 @@ function(input, output, session) {
 
                   label = ifelse(
                     is.na(chisq),
-                    "No~Comparison",
-                    sprintf(
+                    yes = "No~Comparison",
+                    no = sprintf(
                       "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
                       mvnTestResult$estimator, # %s
                       chisq, # %.3f
@@ -2066,16 +2015,8 @@ function(input, output, session) {
 
                 rownames(hierTable) <- modelsAbbrev[rownames(hierTable)]
 
-
-                kableExtra::row_spec(
-
-                  kableExtra::column_spec(
-                    shinyCTT:::makeKable(hierTable),
-                    column = 1,
-                    bold = TRUE),
-
-                  row = 1,
-                  background = "lightgrey")
+                shinyCTT:::makeKable(hierTable, bold_cols = 1) %>%
+                  kableExtra::row_spec(row = 1, background = "lightgrey")
 
               } else {
                 NULL
@@ -2188,68 +2129,52 @@ function(input, output, session) {
                 shinydashboard::box(
                   title = "Fit index table",
                   width = 12,
-                  HTML(
+                  shinyCTT:::makeKable(
+                    fits[, -c(9, 10)],
+                    col.names = c("df",
+                                  paste0(mvnTestResult$estimator, "-&chi;&sup2;"), "p",
+                                  "RMSEA", "p",
+                                  "95%-CI",
+                                  paste0(mvnTestResult$estimator, "-CFI"),
+                                  "SRMR"),
+                    bold_cols = 1) %>%
+
                     kableExtra::column_spec(
-
-                      kableExtra::column_spec(
-                        shinyCTT:::makeKable(
-                          fits[, -c(9, 10)],
-                          col.names = c("df",
-                                        paste0(mvnTestResult$estimator, "-&chi;&sup2;"), "p",
-                                        "RMSEA", "p",
-                                        "95%-CI",
-                                        paste0(mvnTestResult$estimator, "-CFI"),
-                                        "SRMR")),
-                        column = 1,
-                        bold = TRUE), # column_spec
-
                       column = c(4, 7),
-                      border_right = "1px solid lightgrey")))),
+                      border_right = "1px solid lightgrey") %>%
+                  HTML())),
 
               fluidRow(
                 shinydashboard::box(
                   title = HTML("&chi;&sup2;-Comparison Table:"),
                   width = 12,
-                  HTML(
-                    kableExtra::add_header_above(
-
-                      kableExtra::column_spec(
-                        shinyCTT:::makeKable(combCompTable),
-                        column = 1,
-                        bold = TRUE), # column_spec
-
-                      headerNames,
-                      escape = FALSE)))),
+                  shinyCTT:::makeKable(combCompTable, bold_cols = 1) %>%
+                    kableExtra::add_header_above(headerNames, escape = FALSE) %>%
+                    HTML())),
 
               fluidRow(
                 shinydashboard::box(
                   title = "AIC/BIC-Comparison Table:",
                   width = 12,
-                  HTML(
-                    paste0(
+                  paste0(
                     "<table align = \"center\", width = \"100%\"> <tr><td>
                       <table align = \"center\"> <tr><td>
                         <h5>AIC:</h5>",
 
-                      kableExtra::column_spec(
-                        shinyCTT:::makeKable(infCompTable$aic),
-                        column = 1,
-                        bold = TRUE),
-
-                     "</td></tr></table>
-                    </td>
-                    <td>&nbsp;</td>
-                    <td>
-                      <table align = \"center\"> <tr><td>
-                        <h5>BIC:</h5>",
-
-                      kableExtra::column_spec(
-                        shinyCTT:::makeKable(infCompTable$bic),
-                        column = 1,
-                        bold = TRUE),
+                    shinyCTT:::makeKable(infCompTable$aic, bold_cols = 1),
 
                     "</td></tr></table>
-                  </td></tr></table>"))))
+                  </td>
+                  <td>&nbsp;</td>
+                  <td>
+                    <table align = \"center\"> <tr><td>
+                      <h5>BIC:</h5>",
+
+                    shinyCTT:::makeKable(infCompTable$bic, bold_cols = 1),
+
+                  "</td></tr></table>
+                </td></tr></table>") %>%
+                HTML()))
 
             ) # fluidPage
           })
