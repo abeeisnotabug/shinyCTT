@@ -2,12 +2,12 @@ ui <- shinydashboard::dashboardPage(
   # dashboardHeader ----
   shinydashboard::dashboardHeader(
     title = "shinyCTT",
-    shinydashboard::dropdownMenuOutput("infoMenu")
-  ),
+    shinydashboard::dropdownMenuOutput("infoMenu")),
+
   # dashboardSidebar ----
   shinydashboard::dashboardSidebar(
-    shinydashboard::sidebarMenuOutput("dataMenuOut")
-  ),
+    shinydashboard::sidebarMenuOutput("dataMenuOut")),
+
   # dashboardBody ----
   shinydashboard::dashboardBody(
 
@@ -115,8 +115,8 @@ ui <- shinydashboard::dashboardPage(
     tags$head(
       tags$style(".checkbox-inline {margin: 0 !important;}"),
       tags$style(HTML(".navbar-custom-menu>.navbar-nav>li>.dropdown-menu {width:600px;}")),
-      tags$style(".small-box.bg-green { background-color: #99CC00 !important; color: #FFFFFF !important; }"),
-      tags$style(".small-box.bg-blue { background-color: #003F8A !important; color: #FFFFFF !important; }")),
+      tags$style(".bg-green { background-color: #99CC00 !important; color: #FFFFFF !important; }"),
+      tags$style(".bg-blue { background-color: #003F8A !important; color: #FFFFFF !important; }")),
 
     shinyjs::useShinyjs(),
 
@@ -260,7 +260,7 @@ ui <- shinydashboard::dashboardPage(
                 "corrTabNA",
                 "Choose how to handle missing values:",
                 choices = c("Use pairwise complete observations" = "pairwise.complete.obs",
-                      "Use only complete observations" = "complete.obs"),
+                            "Use only complete observations" = "complete.obs"),
                 selected = "pairwise.complete.obs"),
               numericInput(
                 "corrTabSL",
@@ -279,6 +279,7 @@ ui <- shinydashboard::dashboardPage(
       ### tabItem mvnTab ----
       shinydashboard::tabItem(
         tabName = "mvnTab",
+        # fluidRow(shinydashboard::infoBox(title = "Hint:")),
         fluidRow(
           column(
             width = 4,
@@ -302,7 +303,14 @@ ui <- shinydashboard::dashboardPage(
               htmlOutput("mvnTable"))),
           column(
             width = 8,
-            htmlOutput("mvnPlotBox"))
+            fluidRow(htmlOutput("mvnPlotBox")),
+            fluidRow(shinydashboard::infoBox(
+              title = "Hint:",
+              subtitle = "For more extensive analyses on multivariate normality, load() the MVN package and open its shiny app via run_mvn_app()!",
+              icon = icon("lightbulb"),
+              color = "green",
+              width = 12,
+              fill = TRUE)))
         ) # fluidRow
       ), # tabItem
 
