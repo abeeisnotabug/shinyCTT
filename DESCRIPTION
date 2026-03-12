@@ -25,7 +25,7 @@ Depends: R (>= 3.5.1),
 Imports: 
     shinydashboard (>= 0.7.1),
     shinyjs (>= 1.0),
-    MVN (>= 5.6),
+    MVN (>= 6.0),
     moments (>= 0.14),
     corrplot (>= 0.84),
     kableExtra (>= 1.0.1),
@@ -33,6 +33,7 @@ Imports:
     ggplot2 (>= 3.0.0),
     lavaan (>= 0.6.3.1296),
     DT (>= 0.11),
+    MASS (>= 7.3-46),
     magrittr (>= 1.5)
 RoxygenNote: 7.3.3
 Suggests: knitr,
