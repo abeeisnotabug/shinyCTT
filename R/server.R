@@ -150,8 +150,15 @@ server <- function(input, output, session) {
         text = "No numeric columns found",
         icon = icon("times"),
         status = "danger")
+      showNotification(
+        "No numeric columns found",
+        duration = 5,
+        id = "noNumericNot",
+        type = "error")
+
     } else {
       notifications$notList$noNumeric <- NULL
+      removeNotification("noNumericNot")
     }
 
     if (length(userDataRaw()) <= 1) {
@@ -159,8 +166,15 @@ server <- function(input, output, session) {
         text = "Only one column found",
         icon = icon("times"),
         status = "danger")
+      showNotification(
+        "Only one column found",
+        duration = 5,
+        id = "oneColNot",
+        type = "error")
+
     } else {
       notifications$notList$oneCol <- NULL
+      removeNotification("oneColNot")
     }
 
     #### If all is good, enable the select button ----
@@ -261,14 +275,21 @@ server <- function(input, output, session) {
                          you might have selected an item as group column."
         possibleGroups <- NULL
 
-        notifications$notList$noNumeric <- shinydashboard::notificationItem(
+        notifications$notList$invalGroups <- shinydashboard::notificationItem(
           text = "Invalid groups found.",
           icon = icon("times"),
           status = "danger")
+        showNotification(
+          "Invalid groups found.",
+          duration = 5,
+          id = "invalGroups",
+          type = "error")
+
       } else {
         groupWarning <- ""
 
-        notifications$notList$noNumeric <- NULL
+        notifications$notList$invalGroups <- NULL
+        removeNotification("invalGroups")
       }
 
       tagList(
@@ -319,6 +340,18 @@ server <- function(input, output, session) {
           icon = icon("exclamation-triangle"),
           status = "warning"),
         NULL)
+
+      if (!is.null(notifications$notList$numItems)) {
+        showNotification(
+          ui = notifications$notList$numItems$children[[1]]$children[[2]],
+          duration = 5,
+          id = "numItemsNot",
+          type = ifelse(notifications$notList$numItems$children[[1]]$children[[1]]$attribs[[4]] == "text-danger",
+                        yes = "error",
+                        no = "warning"))
+      } else {
+        removeNotification("numItemsNot")
+      }
     }
   })
 
@@ -978,15 +1011,16 @@ server <- function(input, output, session) {
 
     ## corrTableBox create raw cor table and test for errors ----
     corrTableWithCIsRaw <- list(
-        cor = tryCatch(
-            cor(userDataGroup()[, input$itemCols], use = input$corrTabNA),
-            warning = function(w) NULL,
-            error = function(e) NULL),
-        test = tryCatch(
-            corrplot::cor.mtest(userDataGroup()[, input$itemCols],
-                                conf.level = (1 - input$corrTabSL)),
-            warning = function(w) w,
-            error = function(e) e))
+      cor = tryCatch(
+        cor(userDataGroup()[, input$itemCols],
+            use = input$corrTabNA),
+        warning = function(w) NULL,
+        error = function(e) NULL),
+      test = tryCatch(
+        corrplot::cor.mtest(userDataGroup()[, input$itemCols],
+                            conf.level = (1 - input$corrTabSL)),
+        warning = function(w) w,
+        error = function(e) e))
 
     corrTableLegend <- tagList(
       h5("Legend:"),
@@ -1123,6 +1157,12 @@ server <- function(input, output, session) {
   # output mvnTable ----
   output$mvnTable <- renderUI({
 
+    notifications$notList$mvnApp <- shinydashboard::notificationItem(
+      text = HTML("For more extensive analyses on multivariate normality,<br/>
+                    load() the MVN package and open its shiny app via run_mvn_app()!"),
+      icon = icon("lightbulb"),
+      status = "success")
+
     req(userDataGroup())
 
     mvnTestResult$raw <- tryCatch(
@@ -1148,6 +1188,18 @@ server <- function(input, output, session) {
           test = any(mvnTestResult$raw$multivariate_normality[, "p.value"] == "<0.001"),
           yes = "MLR",
           no = "ML"))
+
+      notifications$notList$noData <- shinydashboard::notificationItem(
+        text = "Updated estimator based on MVN test result.",
+        icon = icon("exclamation-triangle"),
+        status = "warning")
+
+      removeNotification("estUpdateNot")
+      showNotification(
+        ui = "Updated estimator based on MVN test result.",
+        duration = 5,
+        id = "estUpdateNot",
+        type = "warning")
 
       updateRadioButtons(
         session,
@@ -1223,20 +1275,31 @@ server <- function(input, output, session) {
     output$mvnPlot <- renderPlot({
 
       if (input$mvnPlotType == "qq") {
-        tryCatch(
-          MVN::mvn(userDataGroup()[complete.cases(userDataGroup()), input$itemCols], multivariatePlot = input$mvnPlotType),
-          warning = function(w) w,
-          error = function(e) e)
-      } else {
-        tryCatch(
-          MVN::mvn(userDataGroup()[, c(input$mvnItemX, input$mvnItemY)], multivariatePlot = input$mvnPlotType),
-          warning = function(w) w,
-          error = function(e) e)
+        MVN::multivariate_diagnostic_plot(
+          userDataGroup()[, input$itemCols],
+          type = "qq")
+
+      } else if (input$mvnPlotType == "persp") {
+        persp(x = MASS::kde2d(userDataGroup()[, input$mvnItemX],
+                              userDataGroup()[, input$mvnItemY],
+                              n = 100),
+              theta = 1, phi = 30, border = NA, shade = 0.5, box = T,
+              xlab = input$mvnItemX,
+              ylab = input$mvnItemY,
+              zlab = "Density")
+
+      } else if (input$mvnPlotType == "contour") {
+        contour(x = MASS::kde2d(userDataGroup()[, input$mvnItemX],
+                                userDataGroup()[, input$mvnItemY],
+                                n = 100),
+                nlevels = 20,
+                xlab = input$mvnItemX,
+                ylab = input$mvnItemY)
       }
     })
 
     shinydashboard::box(
-      width = NULL,
+      width = 12,
       title = "Multivariate Plot:",
 
       fluidRow(
@@ -1281,7 +1344,7 @@ server <- function(input, output, session) {
 
   # observeEvent input$sigLvl ----
   observeEvent(input$sigLvl, {
-    if ((input$sigLvl < 0 | input$sigLvl > 1) && !is.na(input$sigLvl))
+    if ((input$sigLvl < 0.001 | input$sigLvl > 1) && !is.na(input$sigLvl))
       updateNumericInput(session, "sigLvl", value = 0.05)
   })
 
@@ -1660,7 +1723,7 @@ server <- function(input, output, session) {
 
             #### write to lower.tri(chisq comp table) ----
             compsWithThisModel <- substring(
-              strig = comps[grep(thisModel, substr(comps, 1, 3))],
+              text = comps[grep(thisModel, substr(comps, 1, 3))],
               first = 4,
               last = 6)
 
