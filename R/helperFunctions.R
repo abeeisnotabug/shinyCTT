@@ -162,40 +162,38 @@ makeRCode <- function(input, modelCode, estimator, isSubset, model, isMg) {
     "rawData <- %s",
     switch(
       input$source,
+
       "Workspace" = input$objectFromWorkspace,
+
       "CSV" = sprintf(
 "read.csv(
   file = \"%s\",
   header = %s,
   sep = \"%s\",
   quote = \"%s\",
-  stringsAsFactors = FALSE
-)",
-        input$CSVFile$name,
-        input$header,
-        input$sep,
-        ifelse(input$quote == "\"", "\\\"", input$quote)
-      ),
+  stringsAsFactors = FALSE)",
+        input$CSVFile$name, # file =
+        input$header, # header =
+        input$sep, # sep =
+        ifelse(input$quote == "\"", "\\\"", input$quote)), # quote =
+
       "SPSS" = sprintf(
         "haven::read_spss(file = %s)",
-        input$SPSSFile$name
-      )
-    )
-  )
+        input$SPSSFile$name)
+    ) # switch(
+  ) # sprintf(
 
   if (isSubset)
     subsetData <- sprintf(
       "subsetData <- subset(rawData, rawData[, \"%s\"] %%in%% c(%s))",
       input$groupCol,
-      paste0("\"", paste(input$groups, collapse = "\", \""), "\"")
-    )
+      paste0("\"", paste(input$groups, collapse = "\", \""), "\""))
 
   modelCodeLine <- sprintf(
 "modelCode <- \"
 %s
 \"",
-    modelCode
-  )
+    modelCode)
 
   if (isMg) {
     fitLine <- sprintf(
@@ -205,28 +203,28 @@ makeRCode <- function(input, modelCode, estimator, isSubset, model, isMg) {
   meanstructure = TRUE,
   group = \"%s\",
   group.equal = c(\"loadings\", \"intercepts\"),
-  estimator = \"%s\"
-)",
+  estimator = \"%s\")",
+
       model,
       ifelse(isSubset, "subsetData", "rawData"),
       input$groupCol,
-      estimator
-    )
+      estimator)
+
   } else {
+
     fitLine <- sprintf(
 "%sFitted <- cfa(
   model = modelCode,
   data = %s,
   meanstructure = TRUE,
-  estimator = \"%s\"
-)",
+  estimator = \"%s\")",
+
       model,
       ifelse(isSubset, "subsetData", "rawData"),
-      estimator
-    )
+      estimator)
   }
 
-sprintf(
+  sprintf(
 "# Load necesary package: lavaan
 %s
 
@@ -238,12 +236,16 @@ sprintf(
 
 # Estimate the model:
 %s",
-head,
-dataInput,
-ifelse(isSubset, sprintf("# Select the subset of groups to include:
-%s
-", subsetData), ""),
-modelCodeLine,
-fitLine
-)
+    head,
+    dataInput,
+    ifelse(
+      isSubset,
+      yes = sprintf("# Select the subset of groups to include:
+%s",
+                    subsetData),
+      no = ""),
+
+  modelCodeLine,
+  fitLine)
+
 }

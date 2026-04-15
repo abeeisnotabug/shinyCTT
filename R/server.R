@@ -1350,13 +1350,14 @@ server <- function(input, output, session) {
 
   # observeEvent input$goModels ----
   observeEvent(input$goModels, {
+    shinyjs::disable("goModels")
     shinyjs::disable("doMg")
     shinyjs::disable("etaIntFree")
     shinyjs::disable("estimator")
 
     dataMenuList$menuList[[12]] <- dataMenuList$menuList[[7]]
 
-    ## observeEvent input$goModels if true ----
+    ## observeEvent input$goModels if doMg true ----
     if (input$doMg) {
 
       dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
@@ -1388,7 +1389,7 @@ server <- function(input, output, session) {
         shinydashboard::menuSubItem("Multigroup", tabName = "modelCodeMg"),
         icon = icon("chart-bar"))
 
-    } ## observeEvent input$goModels if false ----
+    } ## observeEvent input$goModels if doMg false ----
     else {
       dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
         "5. Model Comparison Tests",
@@ -1531,8 +1532,9 @@ server <- function(input, output, session) {
                          error = function(e) e))
           })
         }
-
-
+        # print(mvnTestResult$estimator)
+        # print(lavaan::lavInspect(fittedModelsWarns[[1]], "options")$estimator)
+        # save(fittedModelsWarns, fittedModelsErrs, file = "testfitsMgMLR.rda")
         #### warning and error counting and capturing ----
         warns <- sapply(
           lapply(fittedModelsWarns, class),
@@ -1641,10 +1643,11 @@ server <- function(input, output, session) {
           infCompTable$aic[lower.tri(diag(5), diag = TRUE)] <-
           infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
 
-        ### generate paramter tables, fits and fit tables ----
+        ### generate parameter tables, fits and fit tables ----
         for (model in goodModels) {
           local({
             thisModel <- model
+
             whichModel <- which(goodModels == thisModel)
 
             thisModelStr <- paste0(thisModel, thisModel)
@@ -1689,7 +1692,7 @@ server <- function(input, output, session) {
                 color = sigTxtColor,
                 italic = TRUE)
 
-            ##### Write to aic/bic comp table ----
+            ##### write to AIC/BIC comp table ----
             infCompTable$aic[thisModelStr] <-
               kableExtra::cell_spec(
                 sprintf("%.3f", fits[thisModel, "aic"]),
@@ -1759,12 +1762,12 @@ server <- function(input, output, session) {
               thisModelCompStr <- paste0(thisModel, thisComp)
 
               compTable$chisq[thisModelCompStr] <- kableExtra::cell_spec(
-                sprintf(paste0("+%.3f", sigAddon), fitCompsWithThisModel[1, thisComp]),
+                sprintf(paste0("+%.3f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp]),
                 background = sigColor,
                 color = sigTxtColor)
 
               compTable$df[thisModelCompStr] <- kableExtra::cell_spec(
-                sprintf("+%i", fitCompsWithThisModel[2, thisComp]),
+                sprintf("+%i", fitCompsWithThisModel["Df diff", thisComp]),
                 background = sigColor,
                 color = sigTxtColor)
             }
@@ -1853,7 +1856,7 @@ server <- function(input, output, session) {
             output[[thisModelCodeStr]] <<- renderPrint({
 
               isSubset <- (
-                input$groupCol != "noGroupSelected" &
+                input$groupCol != "noGroupSelected" &&
                   (length(unique(userDataGroup()[, input$groupCol])) <
                      length(unique(userDataRaw()[, input$groupCol]))))
 
@@ -1965,23 +1968,23 @@ server <- function(input, output, session) {
               teqNames <- paste0(rownames(succTable$teq)[1:(nrow(succTable$teq) - 1)],
                                  rownames(succTable$teq)[2:nrow(succTable$teq)])
 
-              chisqs[teqNames] <- succTable$teq[-1, 5]
-              dfs[teqNames] <- succTable$teq[-1, 6]
-              pvalues[teqNames] <- succTable$teq[-1, 7]
+              chisqs[teqNames] <- succTable$teq[-1, "Chisq diff"]
+              dfs[teqNames] <- succTable$teq[-1, "Df diff"]
+              pvalues[teqNames] <- succTable$teq[-1, "Pr(>Chisq)"]
             }
 
             if (!is.null(succTable$etp)) {
               etpNames <- paste0(rownames(succTable$etp)[1:(nrow(succTable$etp) - 1)],
                                  rownames(succTable$etp)[2:nrow(succTable$etp)])
 
-              chisqs[etpNames] <- succTable$etp[-1, 5]
-              dfs[etpNames] <- succTable$etp[-1, 6]
-              pvalues[etpNames] <- succTable$etp[-1, 7]
+              chisqs[etpNames] <- succTable$etp[-1, "Chisq diff"]
+              dfs[etpNames] <- succTable$etp[-1, "Df diff"]
+              pvalues[etpNames] <- succTable$etp[-1, "Pr(>Chisq)"]
             }
 
             modelTestDF$chisq <- chisqs
             modelTestDF$df <- dfs
-            modelTestDF$pvalue <- pvalue
+            modelTestDF$pvalue <- pvalues
 
             ##### ggplot code ----
             ggplot2::ggplot(modelTestDF,
@@ -1990,7 +1993,7 @@ server <- function(input, output, session) {
               ggplot2::geom_text(parse = TRUE, fontface = "bold", size = 5) +
               ggplot2::geom_segment(
                 ggplot2::aes(x = xstarts, y = ystarts, xend = xends, yend = yends),
-                size = 0.3) +
+                linewidth = 0.3) +
 
               ggplot2::geom_label(
                 ggplot2::aes(
@@ -2014,7 +2017,7 @@ server <- function(input, output, session) {
                 parse = TRUE) +
 
               ggplot2::scale_fill_manual(values = c(goodColor, badColor), na.value = neutrColor) +
-              ggplot2::guides(fill = FALSE) +
+              ggplot2::guides(fill = "none") +
               ggplot2::xlim(c(-4, 4)) +
               ggplot2::coord_fixed() +
               ggplot2::theme_void()
@@ -2041,7 +2044,7 @@ server <- function(input, output, session) {
                                         no = goodColor)
 
 
-                hierTable <- hierTable[, c(6, 5, 7, 2, 3, 8)]
+                hierTable <- hierTable[, c("Df diff", "Chisq diff", "Pr(>Chisq)", "AIC", "BIC", "CFI")]
 
                 hierTable[-1, "Chisq diff"] <- kableExtra::cell_spec(
                   sprintf("+%.3f", hierTable[-1, "Chisq diff"]),
