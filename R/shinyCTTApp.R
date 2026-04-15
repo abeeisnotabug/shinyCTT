@@ -1,5 +1,5 @@
 #' @export
-shinyCTTApp <- function(launch.browser = TRUE) {
+shinyCTTApp <- function() {
   # appDir <- system.file("shinyCTTApp", package = "shinyCTT")
   # if (appDir == "") {
   #   stop("Could not find directory. Try re-installing `shinyCTT`.", call. = FALSE)
@@ -11,5 +11,5 @@ shinyCTTApp <- function(launch.browser = TRUE) {
   shiny::shinyApp(
     ui = ui,
     server = server,
-    options = list(display.mode = "normal", launch.browser = launch.browser))
+    options = list(display.mode = "normal"))
 }
