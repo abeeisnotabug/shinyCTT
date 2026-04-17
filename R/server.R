@@ -1,5 +1,6 @@
 server <- function(input, output, session) {
-  # Preparation: Names and colors ----
+  # Preparation ----
+  ## Names and colors ----
   if (TRUE) {
     goodColor <- "darkgreen"
     badColor <- "darkred"
@@ -46,9 +47,22 @@ server <- function(input, output, session) {
                             labelxs = c(0, -2, 2, -2, 2),
                             labelys = c(5, 3, 3, 1, 1))
 
-  # Set up notifications ----
+  ## Reactive values ----
   notifications <- reactiveValues(notList = list())
 
+  dataMenuList <- reactiveValues()
+
+  userDataRaw <- reactiveVal()
+  userDataChosen <- reactiveVal()
+  userDataNA <- reactiveVal()
+  userDataGroup <- reactiveVal()
+
+  itemColsRV <- reactiveVal()
+  groupColRV <- reactiveVal()
+  incompleteCasesRV <- reactiveVal()
+  fimlRV <- reactiveVal()
+
+  ## Notifications ----
   output$infoMenu <- shinydashboard::renderMenu({
     if (any(sapply(notifications$notList, grepl, pattern = "danger"))) {
       status <- "danger"
@@ -62,8 +76,7 @@ server <- function(input, output, session) {
       badgeStatus = status)
   })
 
-  # Set up sidebar ----
-  dataMenuList <- reactiveValues()
+  ## Sidebar ----
   dataMenuList$menuList <- list(
     shinydashboard::menuItem(
       "1. Data selection",
@@ -89,11 +102,7 @@ server <- function(input, output, session) {
       Filter(
         function(object) !is.null(dim(get(object))) && typeof(get(object)) != "character",
         ls(envir = globalenv())))
-    })
-
-  userDataRaw <- reactiveVal()
-  userDataChosen <- reactiveVal()
-  userDataGroup <- reactiveVal()
+  })
 
   ## observeEvent data properties ----
   observeEvent(
@@ -132,7 +141,6 @@ server <- function(input, output, session) {
 
       userDataTmp <- get(input$objectFromWorkspace)
     }
-
 
     if (any(sapply(userDataTmp, is.factor))) {
       userDataTmp[sapply(userDataTmp, is.factor)] <- lapply(
@@ -211,7 +219,8 @@ server <- function(input, output, session) {
       icon = icon("sync"),
       selected = FALSE)
 
-    userDataChosen(userDataRaw())
+    userDataChosen(isolate(userDataRaw()))
+    userDataNA(isolate(userDataRaw()))
   })
 
   # reload button ----
@@ -232,10 +241,6 @@ server <- function(input, output, session) {
       DT::renderDataTable()
   })
 
-  itemColsRV <- reactiveVal()
-  groupColRV <- reactiveVal()
-  incompleteCasesRV <- reactiveVal()
-
   # subsetSelectionTab ----
   ## subsetSelectionTab itemColsChooser ----
   output$itemColsChooser <- renderUI({
@@ -244,7 +249,7 @@ server <- function(input, output, session) {
 
     checkboxGroupInput(
       "itemCols",
-      "2a. Select the item columns",
+      "2a. Select the item columns:",
       choices = possibleItemColumns,
       selected = possibleItemColumns,
       inline = TRUE)
@@ -257,7 +262,7 @@ server <- function(input, output, session) {
 
     selectInput(
         "groupCol",
-        "2b. Select the group column",
+        "2b. Select the group column:",
         choices = c(
           "No group column selected" = "noGroupSelected",
           possibleGroupCols))
@@ -268,7 +273,7 @@ server <- function(input, output, session) {
     req(input$groupCol)
 
     if (input$groupCol != "noGroupSelected" && input$groupCol %in% colnames(userDataChosen())) {
-      possibleGroups <- unique(userDataChosen()[, input$groupCol])
+      possibleGroups <- unique(na.omit(userDataChosen()[, input$groupCol]))
 
       if (any(c(table(userDataChosen()[, input$groupCol])) == 1)) {
         groupWarning <- "There are groups with only one observation,
@@ -300,6 +305,32 @@ server <- function(input, output, session) {
           selected = possibleGroups,
           inline = TRUE),
         helpText(groupWarning))
+    }
+  })
+
+  ## subsetSelectionTab observeEvent for userDataNA ----
+  observeEvent(
+    list(input$groupCol,
+         input$groups,
+         input$itemCols), {
+
+    if (input$dataSelectButton > 0) {
+
+      if (input$groupCol != "noGroupSelected") {
+
+        subset <- userDataChosen()[, input$groupCol] %in% input$groups
+        select <- c(input$groupCol, input$itemCols)
+      } else {
+
+        subset <- rep(TRUE, nrow(userDataChosen()))
+        select <- input$itemCols
+      }
+
+      userDataNA(
+        subset(
+          userDataChosen(),
+          subset = subset,
+          select = select))
     }
   })
 
@@ -381,14 +412,14 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab naInfoBox ----
   output$naInfoBox <- shinydashboard::renderValueBox({
-    incompleteCasesRV(!complete.cases(userDataChosen()))
+    incompleteCasesRV(!complete.cases(userDataNA()))
     output$incompleteCasesBoolRV <- reactive({any(incompleteCasesRV())})
     outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
 
     shinydashboard::valueBox(
       value = sum(incompleteCasesRV()),
       color = if (any(incompleteCasesRV())) "yellow" else "green",
-      subtitle = "rows with missing values found",
+      subtitle = "rows with missing values in this subset",
       icon = icon("exclamation-triangle"))
   })
 
@@ -399,13 +430,10 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab obsTable ----
   output$obsTable <- renderUI({
-    nTotal <- nrow(userDataChosen())
+    nTotal <- nrow(userDataNA())
     nComplete <- sum(!incompleteCasesRV())
 
-    tagList(
-      HTML(shinyCTT:::makeKable(data.frame(Total = nTotal, Complete = nComplete))),
-      checkboxInput("excludeIncompleteCases",
-                    "Exclude incomplete cases"))
+    HTML(shinyCTT:::makeKable(data.frame(Total = nTotal, Complete = nComplete)))
   })
 
   ## subsetSelectionTab obsPerGroupTable ----
@@ -426,6 +454,8 @@ server <- function(input, output, session) {
     shinyjs::disable("groups")
     shinyjs::disable("subsetSelectButton")
     shinyjs::disable("excludeIncompleteCases")
+
+    fimlRV(any(incompleteCasesRV()) & !input$excludeIncompleteCases)
 
     dataMenuList$menuList[[7]] <- dataMenuList$menuList[[4]]
 
@@ -468,9 +498,9 @@ server <- function(input, output, session) {
     } else {
 
       if (input$excludeIncompleteCases) {
-          ccSubset <- !incompleteCasesRV()
+        ccSubset <- !incompleteCasesRV()
       } else {
-          ccSubset <- rep(TRUE, nrow(userDataChosen()))
+        ccSubset <- rep(TRUE, nrow(userDataChosen()))
       }
 
       userDataGroup(
@@ -481,8 +511,8 @@ server <- function(input, output, session) {
     }
 
     if (input$groupCol != "noGroupSelected" &&
-      !any(c(table(userDataGroup()[, input$groupCol])) == 1) &&
-      length(input$groups) > 1) {
+        !any(c(table(userDataGroup()[, input$groupCol])) == 1) &&
+        length(input$groups) > 1) {
 
       shinyjs::enable("doMg")
 
@@ -490,6 +520,14 @@ server <- function(input, output, session) {
         session,
         "doMg",
         value = TRUE)
+    }
+
+    if (fimlRV()) {
+      updateRadioButtons(
+        inputId = "corrIndEst",
+        choices = c("(Full Information) Maximum Likelihood" = "ML",
+                    "Robust (Full Information) Maximum Likelihood" = "MLR"))
+      shinyjs::show(id = "corrTabNA")
     }
   })
 
@@ -826,7 +864,8 @@ server <- function(input, output, session) {
       lavaan::cfa(
         model = dummyModel,
         data = userDataGroup(),
-        estimator = input$corrIndEst),
+        estimator = input$corrIndEst,
+        missing = ifelse(fimlRV(), "fiml", "listwise")),
       warning = function(w) w,
       error = function(e) e)
 
@@ -1149,7 +1188,7 @@ server <- function(input, output, session) {
     raw = NULL,
     estimator = "ML")
 
-  # observeEvent input$estimatro ----
+  # observeEvent input$estimator ----
   observeEvent(input$estimator, {
     mvnTestResult$estimator <- input$estimator
   })

@@ -198,6 +198,21 @@ ui <- shinydashboard::dashboardPage(
               conditionalPanel(
                 condition = "input.groupCol != 'noGroupSelected'",
                 uiOutput("groupChooser"))),
+            conditionalPanel(
+              "output.incompleteCasesBoolRV",
+
+              shinydashboard::box(
+                width = NULL,
+                tagList(
+                  strong("2c. Choose how to handle missing values:"),
+                  checkboxInput(
+                    "excludeIncompleteCases",
+                    "Exclude (listwise/rowwise) cases with missing values
+                      (WARNING: only valid if missings are completely at random)?"),
+
+                  conditionalPanel(
+                    "!input.excludeIncompleteCases",
+                    strong("Since the data contain missing values, Full Information Maximum Likelihood (FI-ML) will be used."))))),
             shinydashboard::box(
               width = NULL,
               # subset of items
@@ -243,7 +258,7 @@ ui <- shinydashboard::dashboardPage(
                 "corrIndEst",
                 "Choose the estimator for this test:",
                 choices = c("Maximum Likelihood" = "ML",
-                      "Robust Maximum Likelihood" = "MLR"),
+                            "Robust Maximum Likelihood" = "MLR"),
                 selected = "ML"),
               numericInput(
                 "corrIndSL",
@@ -256,12 +271,13 @@ ui <- shinydashboard::dashboardPage(
             shinydashboard::box(
               width = NULL,
               title = "Correlation Table with Confidence Intervals:",
-              radioButtons(
-                "corrTabNA",
-                "Choose how to handle missing values:",
-                choices = c("Use pairwise complete observations" = "pairwise.complete.obs",
-                            "Use only complete observations" = "complete.obs"),
-                selected = "pairwise.complete.obs"),
+              shinyjs::hidden(
+                radioButtons(
+                  "corrTabNA",
+                  "Choose how to handle missing values:",
+                  choices = c("Use pairwise complete observations" = "pairwise.complete.obs",
+                              "Use only complete observations" = "complete.obs"),
+                  selected = "pairwise.complete.obs")),
               numericInput(
                 "corrTabSL",
                 "Enter the significance level for the correlation tests:",
