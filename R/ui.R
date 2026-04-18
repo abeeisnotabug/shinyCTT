@@ -129,10 +129,12 @@ ui <- shinydashboard::dashboardPage(
         fluidRow(
           column(
             width = 3,
+
             shinydashboard::box(
               width = NULL,
               selectInput("source", "1a. Choose source of data",
                           choices = c("Workspace", "CSV", "SPSS"))),
+
             shinydashboard::box(
               width = NULL,
               conditionalPanel(
@@ -164,8 +166,9 @@ ui <- shinydashboard::dashboardPage(
 
             shinydashboard::box(
               width = NULL,
-              actionButton("dataSelectButton", "Select", width = "100%"))),
+              actionButton("dataSelectButton", "Select", width = "100%"))
 
+          ), # column
           column(
             width = 9,
             shinydashboard::box(
@@ -187,17 +190,21 @@ ui <- shinydashboard::dashboardPage(
 
         #### subsetSelectionTab second row choosers ----
         fluidRow(
+
           column(
             width = 4,
+
             shinydashboard::box(
               width = NULL,
               uiOutput("itemColsChooser")),
+
             shinydashboard::box(
               width = NULL,
               uiOutput("groupColChooser"),
               conditionalPanel(
                 condition = "input.groupCol != 'noGroupSelected'",
                 uiOutput("groupChooser"))),
+
             conditionalPanel(
               "output.incompleteCasesBoolRV",
 
@@ -206,27 +213,40 @@ ui <- shinydashboard::dashboardPage(
                 tagList(
                   strong("2c. Choose how to handle missing values:"),
                   checkboxInput(
-                    "excludeIncompleteCases",
-                    "Exclude (listwise/rowwise) cases with missing values
-                      (WARNING: only valid if missings are completely at random)?"),
+                    "useFIML",
+                    "Use Full Information Maximum Likelihood (FIML) for all analyses in lavaan",
+                    value = TRUE),
 
                   conditionalPanel(
-                    "!input.excludeIncompleteCases",
-                    strong("Since the data contain missing values, Full Information Maximum Likelihood (FI-ML) will be used."))))),
+                    "!input.useFIML",
+                    div(
+                      style = paste0("color:red"),
+                      HTML("WARNING: Not using FIML in the presence of missing
+                              values implies listwise deletion in lavaan.
+                              This is only valid if the data are missing
+                              completely at random (MCAR) and reduces
+                              statistical power.")))))
+            ), # conditionalPanel
+
             shinydashboard::box(
               width = NULL,
               # subset of items
-              actionButton("subsetSelectButton", "Select", width = "100%"))),
+              actionButton("subsetSelectButton", "Select", width = "100%"))
+          ), # column
+
           column(
             width = 4,
+
             shinydashboard::box(
               width = NULL,
               title = "Observations:",
               htmlOutput("obsTable")),
+
             shinydashboard::box(
               width = NULL,
               title = "Observations per group:",
               htmlOutput("obsPerGroupTable"))),
+
           column(
             width = 4,
             shinydashboard::box(
@@ -251,6 +271,7 @@ ui <- shinydashboard::dashboardPage(
         fluidRow(
           column(
             width = 4,
+
             shinydashboard::box(
               width = NULL,
               title = "Test on Correlative Independence:",
@@ -268,6 +289,7 @@ ui <- shinydashboard::dashboardPage(
                 max = 1,
                 step = 0.001),
               htmlOutput("corrInd")),
+
             shinydashboard::box(
               width = NULL,
               title = "Correlation Table with Confidence Intervals:",
@@ -284,10 +306,14 @@ ui <- shinydashboard::dashboardPage(
                 value = 0.05,
                 min = 0.001,
                 max = 1,
-                step = 0.001))),
+                step = 0.001))
+          ), # column
+
           column(
             width = 8,
-            htmlOutput("scatterPlotBox"))),
+            htmlOutput("scatterBox"))
+        ), # fluidRow
+
         fluidRow(
           htmlOutput("corrTableBox"))
       ), # tabItem
@@ -299,6 +325,7 @@ ui <- shinydashboard::dashboardPage(
         fluidRow(
           column(
             width = 4,
+
             shinydashboard::box(
               width = NULL,
               title = "Normality tests:",
@@ -309,14 +336,18 @@ ui <- shinydashboard::dashboardPage(
                 min = 0.001,
                 max = 1,
                 step = 0.001)),
+
             shinydashboard::box(
               width = NULL,
               title = "Test on Multivariate Normality:",
               htmlOutput("mvnComment")),
+
             shinydashboard::box(
               width = NULL,
               title = "Tests on Univariate Normality:",
-              htmlOutput("mvnTable"))),
+              htmlOutput("mvnTable"))
+          ), # column
+
           column(
             width = 8,
             fluidRow(htmlOutput("mvnPlotBox")),

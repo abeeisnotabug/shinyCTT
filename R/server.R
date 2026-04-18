@@ -59,8 +59,15 @@ server <- function(input, output, session) {
 
   itemColsRV <- reactiveVal()
   groupColRV <- reactiveVal()
+  validGroupsRV <- reactiveVal()
+
   incompleteCasesRV <- reactiveVal()
-  fimlRV <- reactiveVal()
+  fimlRV <- reactiveVal(FALSE)
+  estimatorNameRV <- reactiveVal()
+
+  mvnTestResult <- reactiveValues(
+    raw = NULL,
+    estimator = "ML")
 
   ## Notifications ----
   output$infoMenu <- shinydashboard::renderMenu({
@@ -94,7 +101,26 @@ server <- function(input, output, session) {
       id = "dataMenu",
       .list = dataMenuList$menuList)})
 
-  # Data selection tab ----
+  ## observeEvent reload button ----
+  observeEvent(input$dataMenu, {
+    if (input$dataMenu == "reloadTab")
+      shinyjs::runjs("location.reload()")
+  })
+
+  ## Display NAs correctly in datatable ----
+  options(htmlwidgets.TOJSON_ARGS = list(na = "string"))
+
+  observeEvent(userDataRaw(), {
+    output$dataOverview <- userDataRaw() %>%
+      DT::datatable() %>%
+      DT::formatRound(
+        columns = seq_along(userDataRaw())[sapply(userDataRaw(), is.numeric)],
+        digits = 3) %>%
+      DT::renderDataTable()
+  })
+
+  # dataSelectionTab ----
+  ## dataSelectionTab objectsInWorkspace ----
   output$objectsInWorkspace <- renderUI({
     selectInput(
       "objectFromWorkspace",
@@ -104,7 +130,7 @@ server <- function(input, output, session) {
         ls(envir = globalenv())))
   })
 
-  ## observeEvent data properties ----
+  ## dataSelectionTab observeEvent data properties ----
   observeEvent(
     list(input$source,
          input$objectFromWorkspace,
@@ -194,7 +220,7 @@ server <- function(input, output, session) {
     }
   })
 
-  ## observeEvent dataSelectButton ----
+  ## dataSelectionTab observeEvent dataSelectButton ----
   observeEvent(input$dataSelectButton, {
     shinyjs::disable("source")
     shinyjs::disable("CSVFile")
@@ -221,24 +247,6 @@ server <- function(input, output, session) {
 
     userDataChosen(isolate(userDataRaw()))
     userDataNA(isolate(userDataRaw()))
-  })
-
-  # reload button ----
-  observeEvent(input$dataMenu, {
-    if (input$dataMenu == "reloadTab")
-      shinyjs::runjs("location.reload()")
-  })
-
-  # Display NAs correctly in datatable
-  options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
-
-  observeEvent(userDataRaw(), {
-    output$dataOverview <- userDataRaw() %>%
-      DT::datatable() %>%
-      DT::formatRound(
-        columns = seq_along(userDataRaw())[sapply(userDataRaw(), is.numeric)],
-        digits = 3) %>%
-      DT::renderDataTable()
   })
 
   # subsetSelectionTab ----
@@ -334,7 +342,7 @@ server <- function(input, output, session) {
     }
   })
 
-  ## subsetSelectionTab observeEvent select button and notifications ----
+  ## subsetSelectionTab observeEvent valid subset and notifications ----
   observeEvent(
     list(input$groupCol,
          input$groups,
@@ -447,17 +455,17 @@ server <- function(input, output, session) {
       }
   })
 
-  # observeEvent subsetSelectButton ----
+  ## subsetSelectionTab observeEvent subsetSelectButton ----
   observeEvent(input$subsetSelectButton, {
     shinyjs::disable("itemCols")
     shinyjs::disable("groupCol")
     shinyjs::disable("groups")
     shinyjs::disable("subsetSelectButton")
-    shinyjs::disable("excludeIncompleteCases")
+    shinyjs::disable("useFIML")
 
-    fimlRV(any(incompleteCasesRV()) & !input$excludeIncompleteCases)
+    fimlRV(any(incompleteCasesRV()) & input$useFIML)
 
-    dataMenuList$menuList[[7]] <- dataMenuList$menuList[[4]]
+    dataMenuList$menuList[[8]] <- dataMenuList$menuList[[4]]
 
     dataMenuList$menuList[[4]] <- shinydashboard::menuItem(
       "3. Statistics",
@@ -474,46 +482,37 @@ server <- function(input, output, session) {
       icon = icon("chart-bar"),
       startExpanded = TRUE)
 
-    dataMenuList$menuList[[5]] <- shinydashboard::menuItem(
+    dataMenuList$menuList[[5]] <- hr()
+
+    dataMenuList$menuList[[6]] <- shinydashboard::menuItem(
         "4. Testing Parameters",
         tabName = "testParamTab",
         icon = icon("cog"))
 
-    dataMenuList$menuList[[6]] <- hr()
+    dataMenuList$menuList[[7]] <- hr()
 
     if (input$groupCol != "noGroupSelected") {
 
-      if (input$excludeIncompleteCases) {
-        ccSubset <- (userDataChosen()[, input$groupCol] %in% input$groups) & !incompleteCasesRV()
-      } else {
-        ccSubset <- userDataChosen()[, input$groupCol] %in% input$groups
-      }
-
-      userDataGroup(
-        subset(
-          userDataChosen(),
-          subset = ccSubset,
-          select = c(input$groupCol, input$itemCols)))
-
+      subset <- userDataChosen()[, input$groupCol] %in% input$groups
+      select <- c(input$groupCol, input$itemCols)
     } else {
 
-      if (input$excludeIncompleteCases) {
-        ccSubset <- !incompleteCasesRV()
-      } else {
-        ccSubset <- rep(TRUE, nrow(userDataChosen()))
-      }
-
-      userDataGroup(
-        subset(
-          userDataChosen(),
-          subset = ccSubset,
-          select = input$itemCols))
+      subset <- rep(TRUE, nrow(userDataChosen()))
+      select <- input$itemCols
     }
 
-    if (input$groupCol != "noGroupSelected" &&
-        !any(c(table(userDataGroup()[, input$groupCol])) == 1) &&
-        length(input$groups) > 1) {
+    userDataGroup(
+      subset(
+        userDataChosen(),
+        subset = subset,
+        select = select))
 
+    validGroupsRV(
+      input$groupCol != "noGroupSelected" &&
+        !any(c(table(userDataGroup()[, input$groupCol])) == 1) &&
+        length(input$groups) > 1)
+
+    if (validGroupsRV()) {
       shinyjs::enable("doMg")
 
       updateCheckboxInput(
@@ -528,10 +527,31 @@ server <- function(input, output, session) {
         choices = c("(Full Information) Maximum Likelihood" = "ML",
                     "Robust (Full Information) Maximum Likelihood" = "MLR"))
       shinyjs::show(id = "corrTabNA")
+
+      updateRadioButtons(
+        inputId = "estimator",
+        choices = c("(Full Information) Maximum Likelihood" = "ML",
+                    "Robust (Full Information) Maximum Likelihood" = "MLR"))
+    }
+
+    if (any(incompleteCasesRV())) {
+      notifications$notList$NAhand <- shinydashboard::notificationItem(
+        text = HTML("For all plots and the multivariate normality analyses<br/>
+                      rows with missing values have been removed."),
+        icon = icon("exclamation-triangle"),
+        status = "warning")
+
+      showNotification(
+        ui = "For all plots and the multivariate normality analyses
+                rows with missing values have been removed.",
+        duration = 5,
+        id = "NAremovedNot",
+        type = "warning")
     }
   })
 
-  # descrBox ----
+  # statisticsTab ----
+  ## statisticsTab descrBox ----
   output$descrBox <- renderUI({
     req(userDataGroup())
 
@@ -553,7 +573,8 @@ server <- function(input, output, session) {
       kableExtra::add_header_above(header = nHeader, escape = FALSE) %>%
       HTML()
 
-    if (input$groupCol != "noGroupSelected") {
+    ## descrBox if (validGroupsRV()) { ----
+    if (validGroupsRV()) {
       groups <- unique(userDataGroup()[, input$groupCol])
 
       mgDescrTableList <- lapply(
@@ -616,9 +637,9 @@ server <- function(input, output, session) {
 
       ) # tabBox
 
-    } else {
+    } ## descrBox if (!validGroupsRV()) ----
+    else {
 
-      # output if NO groups
       shinydashboard::box(
         width = 6,
         title = "Descriptive statistics:",
@@ -626,13 +647,13 @@ server <- function(input, output, session) {
     }
   })
 
-  # histBox ----
+  ## statisticsTab histBox ----
   output$histBox <- renderUI({
 
-    ## histBox single hist ----
+    ## histBox output singleHist ----
     output$singleHist <- renderPlot({
       ggplot2::ggplot(
-        data.frame(item = userDataGroup()[, input$histItem]),
+        data.frame(item = na.omit(userDataGroup()[, input$histItem])),
         ggplot2::aes(x = item)) +
 
         ggplot2::geom_histogram(
@@ -645,19 +666,18 @@ server <- function(input, output, session) {
         ggplot2::theme_classic()
     })
 
-    ## histBox if (input$groupCol != "noGroupSelected") ----
-    if (input$groupCol != "noGroupSelected") {
+    ## histBox if (validGroupsRV()) ----
+    if (validGroupsRV()) {
 
-      ### output object groupHist ----
+      ### histBox output groupHist ----
       output$groupHist <- renderPlot({
         ggplot2::ggplot(
-          data.frame(
-            group = userDataGroup()[
-              userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
-              input$groupCol],
-            item = userDataGroup()[
-              userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
-              input$histItemGroup]),
+          subset(
+            userDataGroup(),
+            subset = userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
+            select = c(input$groupCol, input$histItemGroup)) %>%
+            na.omit() %>%
+            setNames(nm = c("group", "item")),
           ggplot2::aes(x = item, fill = group)) +
 
           ggplot2::geom_histogram(
@@ -671,12 +691,12 @@ server <- function(input, output, session) {
           ggplot2::theme_classic()
       })
 
-      ### tabBox histogram ----
+      ### histBox tabBox ----
       shinydashboard::tabBox(
         title = "Histogram:",
         side = "right",
 
-        #### tabBox histogram overall panel ----
+        #### histBox tabBox overall panel ----
         tabPanel(
           title = "Overall",
 
@@ -702,7 +722,7 @@ server <- function(input, output, session) {
                 choices = c("Density" = TRUE, "Frequency" = FALSE),
                 selected = FALSE)))),
 
-        #### tabBox histogram group-wise panel ----
+        #### histBox tabBox group-wise panel ----
         tabPanel(
           title = "Group-wise",
 
@@ -741,7 +761,7 @@ server <- function(input, output, session) {
         ) # tabPanel
       ) # tabBox
 
-    } ## histBox if (input$groupCol == "noGroupSelected") ----
+    } ## histBox if (!validGroupsRV()) ----
     else {
 
       shinydashboard::box(
@@ -776,17 +796,15 @@ server <- function(input, output, session) {
     }
   })
 
-  # covMatBox ----
+  ## statisticsTab covMatBox ----
   output$covMatBox <- renderUI({
-
     req(userDataGroup())
 
     table <- cov(userDataGroup()[, input$itemCols], use = "pairwise.complete.obs")
-
     table[upper.tri(table)] <- NA
 
-    ## covMatBox if (input$groupCol != "noGroupSelected") ----
-    if (input$groupCol != "noGroupSelected") {
+    ## covMatBox if (validGroupsRV()) ----
+    if (validGroupsRV()) {
       groups <- unique(userDataGroup()[, input$groupCol])
 
       mgCovMatList <- lapply(
@@ -835,7 +853,7 @@ server <- function(input, output, session) {
 
       ) # tabBox
 
-    } ## covMatBox if (input$groupCol == "noGroupSelected") ----
+    } ## covMatBox if (!validGroupsRV()) ----
     else {
 
       # output if NO groups
@@ -850,7 +868,8 @@ server <- function(input, output, session) {
     }
   })
 
-  # corrInd ----
+  # corrTab ----
+  ## corrTab corrInd ----
   output$corrInd <- renderUI({
 
     req(userDataGroup())
@@ -889,7 +908,7 @@ server <- function(input, output, session) {
                     zero can be maintained on a significance level of
                     %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)."),
             input$corrIndSL, # %s
-            input$corrIndEst, # %s
+            paste0(if (fimlRV()) "FI", input$corrIndEst), # %s
             corrInd[1], # %.3f
             corrInd[2], # %i
             ifelse(corrInd[3] < 0.001, "< 0.001", sprintf("= %.3f", corrInd[3]))) %>%
@@ -915,17 +934,18 @@ server <- function(input, output, session) {
     }
   })
 
-  # scatterPlotBox ----
-  output$scatterPlotBox <- renderUI({
+  ## corrTab scatterBox ----
+  output$scatterBox <- renderUI({
 
     req(userDataGroup())
 
-    ## scatterPlotBox output singleScatter ----
+    ## scatterBox output singleScatter ----
     output$singleScatter <- renderPlot({
       ggplot2::ggplot(
           data.frame(
               itemX = userDataGroup()[, input$scatterItemX],
-              itemY = userDataGroup()[, input$scatterItemY]),
+              itemY = userDataGroup()[, input$scatterItemY]) %>%
+            na.omit(),
           ggplot2::aes(x = itemX, y = itemY)) +
 
           ggplot2::geom_point(color = "#438BCA") +
@@ -934,23 +954,17 @@ server <- function(input, output, session) {
           ggplot2::theme_classic()
     })
 
-    ## scatterPlotBox groupScatter ----
-    if (input$groupCol != "noGroupSelected") {
+    ## scatterBox if (validGroupsRV()) ----
+    if (validGroupsRV()) {
 
       output$groupScatter <- renderPlot({
         ggplot2::ggplot(
-
-          data.frame(
-            group = userDataGroup()[
-              userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
-              input$groupCol],
-            itemX = userDataGroup()[
-              userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
-              input$scatterItemXGroup],
-            itemY = userDataGroup()[
-              userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
-              input$scatterItemYGroup]),
-
+          subset(
+            userDataGroup(),
+            subset = userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
+            select = c(input$groupCol, input$scatterItemXGroup, input$scatterItemYGroup)) %>%
+            na.omit() %>%
+            setNames(nm = c("group", "itemX", "itemY")),
           ggplot2::aes(x = itemX, y = itemY, color = group)) +
 
           ggplot2::geom_point() +
@@ -960,16 +974,18 @@ server <- function(input, output, session) {
           ggplot2::theme_classic()
       })
 
+      ### scatterBox tabBox ----
       shinydashboard::tabBox(
-        title = "Histogram:",
+        title = "Scatter plot:",
         width = NULL,
         side = "right",
 
-        ### scatterPlotBox groupScatter tabBox overall panel ----
+        #### scatterBox tabBox overall panel ----
         tabPanel(
           title = "Overall",
 
           fluidRow(
+
             column(
               width = 4,
               selectInput(
@@ -986,11 +1002,12 @@ server <- function(input, output, session) {
 
           plotOutput("singleScatter")),
 
-        ### scatterPlotBox groupScatter tabBox group-wise panel ----
+        #### scatterBox tabBox group-wise panel ----
         tabPanel(
           title = "Group-wise",
 
           fluidRow(
+
             column(
               width = 4,
               selectInput(
@@ -1016,7 +1033,7 @@ server <- function(input, output, session) {
           plotOutput("groupScatter"))
       ) # tabBox
 
-    } ## scatterPlotBox box singleScatter ----
+    } ## scatterBox if (!validGroupsRV()) ----
     else {
 
       shinydashboard::box(
@@ -1024,13 +1041,13 @@ server <- function(input, output, session) {
         width = NULL,
 
         fluidRow(
+
           column(
             width = 4,
             selectInput(
               "scatterItemX",
               "Select item on the abscissa:",
               choices = input$itemCols)),
-
           column(
               width = 4,
               selectInput(
@@ -1044,7 +1061,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # corrTableBox ----
+  ## corrTab corrTableBox ----
   output$corrTableBox <- renderUI({
     req(userDataGroup())
 
@@ -1110,7 +1127,7 @@ server <- function(input, output, session) {
     }
 
     ## corrTableBox if groups ----
-    if (input$groupCol != "noGroupSelected") {
+    if (validGroupsRV()) {
       mgCorrTableList <- lapply(
         unique(userDataGroup()[, input$groupCol]),
         function(group) {
@@ -1183,17 +1200,13 @@ server <- function(input, output, session) {
     }
   })
 
-  # mvnTestResult reactiveValues ----
-  mvnTestResult <- reactiveValues(
-    raw = NULL,
-    estimator = "ML")
-
   # observeEvent input$estimator ----
   observeEvent(input$estimator, {
     mvnTestResult$estimator <- input$estimator
   })
 
-  # output mvnTable ----
+  # mvnTab ----
+  ## mvnTab output mvnTable ----
   output$mvnTable <- renderUI({
 
     notifications$notList$mvnApp <- shinydashboard::notificationItem(
@@ -1205,12 +1218,12 @@ server <- function(input, output, session) {
     req(userDataGroup())
 
     mvnTestResult$raw <- tryCatch(
-      MVN::mvn(userDataGroup()[, input$itemCols],
+      MVN::mvn(na.omit(userDataGroup()[, input$itemCols]),
                mvn_test = "mardia"),
       warning = function(w) w,
       error = function(e) e)
 
-    #req(mvnTestResult$raw)
+    # req(mvnTestResult$raw)
 
     ## mvnTable if result of MVN test is data.frame ----
     if (is.data.frame(mvnTestResult$raw$multivariate_normality)) {
@@ -1228,12 +1241,11 @@ server <- function(input, output, session) {
           yes = "MLR",
           no = "ML"))
 
-      notifications$notList$noData <- shinydashboard::notificationItem(
+      notifications$notList$estUpdate <- shinydashboard::notificationItem(
         text = "Updated estimator based on MVN test result.",
         icon = icon("exclamation-triangle"),
         status = "warning")
 
-      removeNotification("estUpdateNot")
       showNotification(
         ui = "Updated estimator based on MVN test result.",
         duration = 5,
@@ -1269,11 +1281,12 @@ server <- function(input, output, session) {
     }
   })
 
-  # output mvnComment ----
+  ## mvnTab output mvnComment ----
   output$mvnComment <- renderUI({
 
     req(userDataGroup())
 
+    ## mvnComment if result of MVN test is data.frame ----
     if (is.data.frame(mvnTestResult$raw$multivariate_normality)) {
 
       mvnMV <- data.frame(Test = mvnTestResult$raw$multivariate_normality$Test,
@@ -1305,22 +1318,29 @@ server <- function(input, output, session) {
           HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
           HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
       }
+    } ## mvnComment if error ----
+    else {
+      div(
+        style = paste0("color:red"),
+        HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message)))
     }
   })
 
-  # output mvnPlotBox ----
+  ## mvnTab output mvnPlotBox ----
   output$mvnPlotBox <- renderUI({
 
     output$mvnPlot <- renderPlot({
 
+      userDataNAOmit <- na.omit(userDataGroup())
+
       if (input$mvnPlotType == "qq") {
         MVN::multivariate_diagnostic_plot(
-          userDataGroup()[, input$itemCols],
+          na.omit(userDataNAOmit[, input$itemCols]),
           type = "qq")
 
       } else if (input$mvnPlotType == "persp") {
-        persp(x = MASS::kde2d(userDataGroup()[, input$mvnItemX],
-                              userDataGroup()[, input$mvnItemY],
+        persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
+                              userDataNAOmit[, input$mvnItemY],
                               n = 100),
               theta = 1, phi = 30, border = NA, shade = 0.5, box = T,
               xlab = input$mvnItemX,
@@ -1328,8 +1348,8 @@ server <- function(input, output, session) {
               zlab = "Density")
 
       } else if (input$mvnPlotType == "contour") {
-        contour(x = MASS::kde2d(userDataGroup()[, input$mvnItemX],
-                                userDataGroup()[, input$mvnItemY],
+        contour(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
+                                userDataNAOmit[, input$mvnItemY],
                                 n = 100),
                 nlevels = 20,
                 xlab = input$mvnItemX,
@@ -1372,12 +1392,7 @@ server <- function(input, output, session) {
 
       ), # fluidRow
 
-      conditionalPanel(
-        "input.mvnPlotType == 'qq' && !input.excludeIncompleteCases && output.incompleteCasesBoolRV",
-        helpText("Warning: Incomplete cases have been removed from the data for the Q-Q Plot.")),
-
       plotOutput("mvnPlot")
-
     ) # box
   })
 
@@ -1394,12 +1409,14 @@ server <- function(input, output, session) {
     shinyjs::disable("etaIntFree")
     shinyjs::disable("estimator")
 
-    dataMenuList$menuList[[12]] <- dataMenuList$menuList[[7]]
+    estimatorNameRV(paste0(if (fimlRV()) "FI", input$estimator))
+
+    dataMenuList$menuList[[13]] <- dataMenuList$menuList[[8]]
 
     ## observeEvent input$goModels if doMg true ----
     if (input$doMg) {
 
-      dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
         "5. Model Comparison Tests",
 
         shinydashboard::menuSubItem("Single Group", tabName = "modelTests", selected = TRUE),
@@ -1407,21 +1424,21 @@ server <- function(input, output, session) {
         icon = icon("chart-bar"),
         startExpanded = TRUE)
 
-      dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
         "6. Parameter Tables",
 
         shinydashboard::menuSubItem("Single Group", tabName = "parTables"),
         shinydashboard::menuSubItem("Multigroup", tabName = "parTablesMg"),
         icon = icon("chart-bar"))
 
-      dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
         "7. Factor Scores",
 
         shinydashboard::menuSubItem("Single Group", tabName = "facScores"),
         shinydashboard::menuSubItem("Multigroup", tabName = "facScoresMg"),
         icon = icon("chart-bar"))
 
-      dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[11]] <- shinydashboard::menuItem(
         "8. Model Code",
 
         shinydashboard::menuSubItem("Single Group", tabName = "modelCode"),
@@ -1430,26 +1447,26 @@ server <- function(input, output, session) {
 
     } ## observeEvent input$goModels if doMg false ----
     else {
-      dataMenuList$menuList[[7]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
         "5. Model Comparison Tests",
 
         shinydashboard::menuSubItem("Single Group", tabName = "modelTests", selected = TRUE),
         icon = icon("chart-bar"),
         startExpanded = TRUE)
 
-      dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
         "6. Parameter Tables",
 
         shinydashboard::menuSubItem("Single Group", tabName = "parTables"),
         icon = icon("chart-bar"))
 
-      dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
         "7. Factor Scores",
 
         shinydashboard::menuSubItem("Single Group", tabName = "facScores"),
         icon = icon("chart-bar"))
 
-      dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
+      dataMenuList$menuList[[11]] <- shinydashboard::menuItem(
         "8. Model Code",
 
         shinydashboard::menuSubItem("Single Group", tabName = "modelCode"),
@@ -1457,7 +1474,7 @@ server <- function(input, output, session) {
     }
 
     ## test the models! ----
-    dataMenuList$menuList[[11]] <- hr()
+    dataMenuList$menuList[[12]] <- hr()
 
     modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
 
@@ -1571,9 +1588,7 @@ server <- function(input, output, session) {
                          error = function(e) e))
           })
         }
-        # print(mvnTestResult$estimator)
-        # print(lavaan::lavInspect(fittedModelsWarns[[1]], "options")$estimator)
-        # save(fittedModelsWarns, fittedModelsErrs, file = "testfitsMgMLR.rda")
+
         #### warning and error counting and capturing ----
         warns <- sapply(
           lapply(fittedModelsWarns, class),
@@ -1812,7 +1827,7 @@ server <- function(input, output, session) {
             }
 
             #### parameter tables ----
-            SECIestName <- paste0(c("SE", "CI"), "<sub>", mvnTestResult$estimator, "</sub>")
+            SECIestName <- paste0(c("SE", "CI"), "<sub>", estimatorNameRV(), "</sub>")
 
             parTableWithCIs <- shinyCTT:::makeKable(
               shinyCTT:::extractParameters(
@@ -1895,7 +1910,7 @@ server <- function(input, output, session) {
             output[[thisModelCodeStr]] <<- renderPrint({
 
               isSubset <- (
-                input$groupCol != "noGroupSelected" &&
+                validGroupsRV() &&
                   (length(unique(userDataGroup()[, input$groupCol])) <
                      length(unique(userDataRaw()[, input$groupCol]))))
 
@@ -2044,7 +2059,7 @@ server <- function(input, output, session) {
                     yes = "No~Comparison",
                     no = sprintf(
                       "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
-                      mvnTestResult$estimator, # %s
+                      estimatorNameRV(), # %s
                       chisq, # %.3f
                       df, # %i
                       ifelse(pvalue < 0.001, "<0.001", sprintf("==%.3f", pvalue)))),
@@ -2082,8 +2097,7 @@ server <- function(input, output, session) {
                                         yes = badColor,
                                         no = goodColor)
 
-
-                hierTable <- hierTable[, c("Df diff", "Chisq diff", "Pr(>Chisq)", "AIC", "BIC", "CFI")]
+                hierTable <- hierTable[, c("Df diff", "Chisq diff", "Pr(>Chisq)", "RMSEA", "CFI", "AIC", "BIC")]
 
                 hierTable[-1, "Chisq diff"] <- kableExtra::cell_spec(
                   sprintf("+%.3f", hierTable[-1, "Chisq diff"]),
@@ -2100,20 +2114,25 @@ server <- function(input, output, session) {
                   color = textColor,
                   background = bgColIfSignif)
 
-                hierTable[-1, "AIC"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "AIC"]),
+                hierTable[-1, "RMSEA"] <- kableExtra::cell_spec(
+                  sprintf("%.3f", hierTable[-1, "RMSEA"]),
                   color = textColor,
-                  background = ifelse(AICdiff < 0, goodColor, badColor))
-
-                hierTable[-1, "BIC"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "BIC"]),
-                  color = textColor,
-                  background = ifelse(BICdiff < 0, goodColor, badColor))
+                  background = ifelse(hierTable[-1, "RMSEA"] < 0.05, goodColor, badColor))
 
                 hierTable[-1, "CFI"] <- kableExtra::cell_spec(
                   sprintf("%.3f", hierTable[-1, "CFI"]),
                   color = textColor,
-                  background = ifelse(CFIdiff > 0, goodColor, badColor))
+                  background = ifelse(CFIdiff >= 0, goodColor, badColor))
+
+                hierTable[-1, "AIC"] <- kableExtra::cell_spec(
+                  sprintf("%.3f", hierTable[-1, "AIC"]),
+                  color = textColor,
+                  background = ifelse(AICdiff <= 0, goodColor, badColor))
+
+                hierTable[-1, "BIC"] <- kableExtra::cell_spec(
+                  sprintf("%.3f", hierTable[-1, "BIC"]),
+                  color = textColor,
+                  background = ifelse(BICdiff <= 0, goodColor, badColor))
 
 
                 hierTable$AIC[1] <- sprintf("%.3f", as.numeric(hierTable$AIC[1]))
@@ -2122,11 +2141,12 @@ server <- function(input, output, session) {
 
 
                 names(hierTable) <- c("&Delta;df",
-                                      paste0(mvnTestResult$estimator, "-&Delta;&chi;&sup2;"),
+                                      paste0(estimatorNameRV(), "-&Delta;&chi;&sup2;"),
                                       "p",
+                                      "RMSEA<sub>D</sub>",
+                                      "CFI",
                                       "AIC",
-                                      "BIC",
-                                      paste0(mvnTestResult$estimator, "-CFI"))
+                                      "BIC")
 
                 rownames(hierTable) <- modelsAbbrev[rownames(hierTable)]
 
@@ -2201,7 +2221,7 @@ server <- function(input, output, session) {
           combCompTable[, seq(2, 10, 2)] <- matrix(compTable$chisq, ncol = 5, nrow = 5)
 
           colnames(combCompTable) <- rep(
-            c("&Delta;df", paste0(mvnTestResult$estimator, "-&Delta;&chi;&sup2;")),
+            c("&Delta;df", paste0(estimatorNameRV(), "-&Delta;&chi;&sup2;")),
             times = 5)
 
           headerNames <- c(1, rep(2, 5))
@@ -2247,10 +2267,10 @@ server <- function(input, output, session) {
                   shinyCTT:::makeKable(
                     fits[, -c(9, 10)],
                     col.names = c("df",
-                                  paste0(mvnTestResult$estimator, "-&chi;&sup2;"), "p",
+                                  paste0(estimatorNameRV(), "-&chi;&sup2;"), "p",
                                   "RMSEA", "p",
                                   "95%-CI",
-                                  paste0(mvnTestResult$estimator, "-CFI"),
+                                  "CFI",
                                   "SRMR"),
                     bold_cols = 1) %>%
 
