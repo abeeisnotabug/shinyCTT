@@ -255,12 +255,15 @@ server <- function(input, output, session) {
     possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
     itemColsRV(length(possibleItemColumns))
 
-    checkboxGroupInput(
-      "itemCols",
-      "2a. Select the item columns:",
-      choices = possibleItemColumns,
-      selected = possibleItemColumns,
-      inline = TRUE)
+    tagList(
+      checkboxGroupInput(
+        "itemCols",
+        "2a. Select the item columns:",
+        choices = possibleItemColumns,
+        selected = possibleItemColumns,
+        inline = TRUE),
+      fluidRow(actionLink("selectall", "Select all", style = "margin-left: 15px"),
+               actionLink("deselectall", "Unselect all", style = "margin-left: 15px")))
   })
 
   ## subsetSelectionTab groupColChooser ----
@@ -339,6 +342,35 @@ server <- function(input, output, session) {
           userDataChosen(),
           subset = subset,
           select = select))
+    }
+  })
+
+  ## subsetSelectionTab observeEvent selectall ----
+  observeEvent(input$selectall, {
+    if (input$selectall != 0) {
+      possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
+      itemColsRV(length(possibleItemColumns))
+
+      updateCheckboxGroupInput(
+        session,
+        "itemCols",
+        inline = TRUE,
+        choices = possibleItemColumns,
+        selected = possibleItemColumns)
+    }
+  })
+
+  ## subsetSelectionTab observeEvent deselectall ----
+  observeEvent(input$deselectall, {
+    if (input$deselectall != 0) {
+      possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
+      itemColsRV(length(possibleItemColumns))
+
+      updateCheckboxGroupInput(
+        session,
+        "itemCols",
+        inline = TRUE,
+        choices = possibleItemColumns)
     }
   })
 
@@ -1079,9 +1111,11 @@ server <- function(input, output, session) {
         error = function(e) e))
 
     corrTableLegend <- tagList(
-      h5("Legend:"),
+      # h5("Legend:"),
 
       cbind(
+        kableExtra::cell_spec(
+          "Legend:"),
         kableExtra::cell_spec(
           "Sig. pos.",
           color = textColor,
@@ -1096,7 +1130,7 @@ server <- function(input, output, session) {
           background = neutrColor)) %>%
 
         shinyCTT:::makeKable(
-          bootstrap_options = "bordered",
+          # bootstrap_options = "bordered",
           position = "left") %>%
         HTML()
 
@@ -1180,10 +1214,12 @@ server <- function(input, output, session) {
         tabPanel(
             "Overall",
             singleCorrTable,
+            br(),
             corrTableLegend),
         tabPanel(
             "Group-wise",
             HTML(mgCorrTable),
+            br(),
             corrTableLegend)
 
       ) # tabBox
@@ -1196,6 +1232,7 @@ server <- function(input, output, session) {
           title = "Correlation Table with Confidence Intervals:",
 
           singleCorrTable,
+          br(),
           corrTableLegend)
     }
   })
@@ -1714,7 +1751,7 @@ server <- function(input, output, session) {
             thisModelCodeStr <- paste0(thisModel, "Code", c("Mg")[!isFALSE(groupName)])
 
             #### write to diag(chisq comp table) ----
-            if (fits[thisModel, "pvalue"] < 0.05) {
+            if (fits[thisModel, "pvalue"] < input$sigLvl) {
               sigAddon <- "*"
               sigColor <- badColor
               sigTxtColor <- textColor
@@ -1791,23 +1828,24 @@ server <- function(input, output, session) {
               compsWithThisModel,
               function(thisComp) {
                 tmpTbl <- lavaan::lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
-                unlist(tmpTbl[2, c(5, 6, 7)])
+                unlist(tmpTbl[2, c("Chisq diff", "Df diff", "Pr(>Chisq)")])
             })
 
             for (thisComp in compsWithThisModel) {
 
-              if (fitCompsWithThisModel[3, thisComp] < 0.05) {
+              if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < input$sigLvl) {
                 sigAddon <- "*"
                 sigColor <- badColor
                 sigTxtColor <- textColor
 
-                if (fitCompsWithThisModel[3, thisComp] < 0.01)
+                if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.01)
                   sigAddon <- paste0(sigAddon, "*")
 
-                if (fitCompsWithThisModel[3, thisComp] < 0.001)
+                if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.001)
                   sigAddon <- paste0(sigAddon, "*")
 
               } else {
+
                 sigAddon <- ""
                 sigColor <- goodColor
                 sigTxtColor <- textColor
@@ -2064,13 +2102,16 @@ server <- function(input, output, session) {
                       df, # %i
                       ifelse(pvalue < 0.001, "<0.001", sprintf("==%.3f", pvalue)))),
 
-                  fill = c(pvalue < 0.05)),
+                  fill = c("nsig", "sig")[c(pvalue < input$sigLvl) + 1]), # aes
 
                 color = textColor,
                 size = 4.5,
-                parse = TRUE) +
+                parse = TRUE) + # geom_label
 
-              ggplot2::scale_fill_manual(values = c(goodColor, badColor), na.value = neutrColor) +
+              ggplot2::scale_fill_manual(
+                values = c("nsig" = goodColor, "sig" = badColor),
+                na.value = neutrColor) +
+
               ggplot2::guides(fill = "none") +
               ggplot2::xlim(c(-4, 4)) +
               ggplot2::coord_fixed() +
