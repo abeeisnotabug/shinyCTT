@@ -91,6 +91,157 @@ makeKable <- function(table,
   }
 }
 
+makeLegends <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, neutrColor, textColor) {
+  HTML(
+    shinyCTT:::makeKable(
+      switch(
+        whichLegend,
+
+        "hierTables" = cbind(
+          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(
+            paste(c("&Delta;df",
+                    paste0(estimatorName, "-&Delta;&chi;&sup2;"),
+                    "p:"), collapse = ", "),
+            escape = FALSE),
+          kableExtra::cell_spec(
+            sprintf("p >= %.3f", sigLvl),
+            color = textColor,
+            background = goodColor),
+          kableExtra::cell_spec(
+            sprintf("p < %.3f", sigLvl),
+            color = textColor,
+            background = badColor),
+
+          kableExtra::cell_spec(
+            "RMSEA<sub>D</sub>",
+            escape = FALSE),
+          kableExtra::cell_spec(
+            "< 0.05",
+            color = textColor,
+            background = goodColor),
+          kableExtra::cell_spec(
+            ">= 0.05",
+            color = textColor,
+            background = badColor),
+
+          kableExtra::cell_spec("CFI:"),
+          kableExtra::cell_spec(
+            "&nearr;",
+            color = textColor,
+            background = goodColor,
+            escape = FALSE),
+          kableExtra::cell_spec(
+            "&searr;",
+            color = textColor,
+            background = badColor,
+            escape = FALSE),
+
+          kableExtra::cell_spec("AIC, BIC:"),
+          kableExtra::cell_spec(
+            "&searr;",
+            color = textColor,
+            background = goodColor,
+            escape = FALSE),
+          kableExtra::cell_spec(
+            "&nearr;",
+            color = textColor,
+            background = badColor,
+            escape = FALSE)),
+
+        "fitIndexTable" = rbind(
+          cbind(
+            kableExtra::cell_spec("Legend:", bold = TRUE),
+            kableExtra::cell_spec(
+              paste(c("&Delta;df",
+                      paste0(estimatorName, "-&Delta;&chi;&sup2;"),
+                      "p:"), collapse = ", "),
+              escape = FALSE),
+            kableExtra::cell_spec(
+              sprintf("p >= %.3f", sigLvl),
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              sprintf("p < %.3f", sigLvl),
+              color = textColor,
+              background = badColor),
+            kableExtra::cell_spec(""), kableExtra::cell_spec(""), kableExtra::cell_spec(""), kableExtra::cell_spec(""),
+            kableExtra::cell_spec("CFI"),
+            kableExtra::cell_spec(
+              "> 0.95",
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              "<= 0.95",
+              color = textColor,
+              background = badColor),
+
+            kableExtra::cell_spec("SRMR"),
+            kableExtra::cell_spec(
+              "< 0.05",
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              ">= 0.05",
+              color = textColor,
+              background = badColor)),
+
+          cbind(
+            kableExtra::cell_spec(""),
+            kableExtra::cell_spec("RMSEA"),
+            kableExtra::cell_spec(
+              "< 0.05",
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              ">= 0.05",
+              color = textColor,
+              background = badColor),
+
+            kableExtra::cell_spec("95%-CI"),
+            kableExtra::cell_spec(
+              "< 0.05",
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              "> 0.05",
+              color = textColor,
+              background = badColor),
+            kableExtra::cell_spec(
+              "&ni; 0.05",
+              escape = FALSE,
+              color = textColor,
+              background = neutrColor),
+
+            kableExtra::cell_spec(
+              "p<sub>0.05</sub>",
+              escape = FALSE),
+            kableExtra::cell_spec(
+              sprintf(">= %.3f", sigLvl),
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              sprintf("< %.3f", sigLvl),
+              color = textColor,
+              background = badColor),
+
+            kableExtra::cell_spec(
+              "p<sub>0.08</sub>",
+              escape = FALSE),
+            kableExtra::cell_spec(
+              sprintf("< %.3f", sigLvl),
+              color = textColor,
+              background = goodColor),
+            kableExtra::cell_spec(
+              sprintf(">= %.3f", sigLvl),
+              color = textColor,
+              background = badColor))),
+        stop(sprintf("No legend available for table %s.", whichLegend))),
+
+      position = "left",
+      bootstrap_options = "condensed")) # HTML(shinyCTT:::makeKable(
+}
+
 extractFitParameters <- function(fittedModel) {
   scaledAddon <- switch(length(fittedModel@test), "", ".scaled")
   rawParams <- lavaan::lavInspect(fittedModel, what = "fit")
@@ -98,7 +249,8 @@ extractFitParameters <- function(fittedModel) {
   paramsDfLeft <- as.data.frame(t(
     rawParams[c(
       paste0(c("df", "chisq", "pvalue"), scaledAddon),
-      paste0(c("rmsea", "rmsea.pvalue"), scaledAddon))]
+      paste0(c("rmsea", "rmsea.ci.lower", "rmsea.ci.upper",
+               "rmsea.pvalue", "rmsea.notclose.pvalue"), scaledAddon))]
   ))
 
   paramsDfRight <- as.data.frame(t(
@@ -110,9 +262,9 @@ extractFitParameters <- function(fittedModel) {
   ))
 
   paramsDf <- cbind(paramsDfLeft,
-                    rmsea.ci = sprintf("[%.3f, %.3f]",
-                                       rawParams[paste0("rmsea.ci.lower", scaledAddon)],
-                                       rawParams[paste0("rmsea.ci.upper", scaledAddon)]),
+                    # rmsea.ci = sprintf("[%.3f, %.3f]",
+                    #                    rawParams[paste0("rmsea.ci.lower", scaledAddon)],
+                    #                    rawParams[paste0("rmsea.ci.upper", scaledAddon)]),
                     paramsDfRight,
                     stringsAsFactors = FALSE)
 

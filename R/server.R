@@ -2226,21 +2226,26 @@ server <- function(input, output, session) {
             color = textColor,
             background = ifelse(fits$rmsea < 0.05, goodColor, badColor))
 
+          fits$rmsea.ci <- kableExtra::cell_spec(
+            sprintf("[%.3f, %.3f]", fits$rmsea.ci.lower, fits$rmsea.ci.upper),
+            color = textColor,
+            background = ifelse(
+              fits$rmsea.ci.upper < 0.05,
+              yes = goodColor,
+              no = ifelse(
+                fits$rmsea.ci.lower < 0.05,
+                yes = neutrColor,
+                no = badColor)))
+
           fits$rmsea.pvalue <- kableExtra::cell_spec(
             sprintf("%.3f", fits$rmsea.pvalue),
             color = textColor,
             background = ifelse(fits$rmsea.pvalue < input$sigLvl, badColor, goodColor))
 
-          fits$rmsea.ci <- kableExtra::cell_spec(
-            fits$rmsea.ci,
+          fits$rmsea.notclose.pvalue <- kableExtra::cell_spec(
+            sprintf("%.3f", fits$rmsea.notclose.pvalue),
             color = textColor,
-            background = ifelse(
-              as.numeric(substr(fits$rmsea.ci, 9, 13)) < 0.05,
-              yes = goodColor,
-              no = ifelse(
-                as.numeric(substr(fits$rmsea.ci, 2, 6)) < 0.05,
-                yes = neutrColor,
-                no = badColor)))
+            background = ifelse(fits$rmsea.notclose.pvalue < input$sigLvl, goodColor, badColor))
 
           fits$cfi <- kableExtra::cell_spec(
             sprintf("%.3f", fits$cfi),
@@ -2293,32 +2298,43 @@ server <- function(input, output, session) {
                 shinydashboard::box(
                   title = "Hierarchical model comparison table:",
                   width = 12,
-                  HTML(
-                    paste0(
-                      "<table align = \"center\", width = \"100%\"><tr><td>",
-                      hierTables[[1]],
-                      "</td><td>&nbsp;</td><td>",
-                      hierTables[[2]],
-                      "</td></tr></table>")))),
+                  paste0(
+                    "<table align = \"center\", width = \"100%\"><tr><td>",
+                    hierTables[[1]],
+                    "</td><td>&nbsp;</td><td>",
+                    hierTables[[2]],
+                    "</td></tr></table>") %>%
+
+                    # "<br>",
+                    # shinyCTT:::makeLegends("hierTables", estimatorNameRV(), input$sigLvl,
+                    #                        goodColor, badColor, neutrColor, textColor)) %>%
+
+                    HTML())),
 
               fluidRow(
                 shinydashboard::box(
                   title = "Fit index table",
                   width = 12,
-                  shinyCTT:::makeKable(
-                    fits[, -c(9, 10)],
-                    col.names = c("df",
-                                  paste0(estimatorNameRV(), "-&chi;&sup2;"), "p",
-                                  "RMSEA", "p",
-                                  "95%-CI",
-                                  "CFI",
-                                  "SRMR"),
-                    bold_cols = 1) %>%
+                  paste0(
 
-                    kableExtra::column_spec(
-                      column = c(4, 7),
-                      border_right = "1px solid lightgrey") %>%
-                  HTML())),
+                    shinyCTT:::makeKable(
+                      fits[, c("df", "chisq", "pvalue",
+                               "rmsea", "rmsea.ci", "rmsea.pvalue", "rmsea.notclose.pvalue",
+                               "cfi", "srmr")],
+                      col.names = c("df", paste0(estimatorNameRV(), "-&chi;&sup2;"), "p",
+                                    "RMSEA", "95%-CI", "p<sub>H0:RMSEA<=0.05</sub>", "p<sub>H0:RMSEA>=0.08</sub>",
+                                    "CFI", "SRMR"),
+                      bold_cols = 1) %>%
+
+                      kableExtra::column_spec(
+                        column = c(4, 8),
+                        border_right = "1px solid lightgrey")) %>%
+
+                    # "<br><br>",
+                    # shinyCTT:::makeLegends("fitIndexTable", estimatorNameRV(), input$sigLvl,
+                    #                        goodColor, badColor, neutrColor, textColor)) %>%
+
+                    HTML())),
 
               fluidRow(
                 shinydashboard::box(
