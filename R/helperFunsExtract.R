@@ -1,3 +1,34 @@
+extractFitIndices <- function(fittedModel) {
+  scaledAddon <- switch(length(fittedModel@test), "", ".scaled")
+  rawParams <- lavaan::lavInspect(fittedModel, what = "fit")
+
+  paramsDfLeft <- as.data.frame(t(
+    rawParams[c(
+      paste0(c("df", "chisq", "pvalue"), scaledAddon),
+      paste0(c("rmsea", "rmsea.ci.lower", "rmsea.ci.upper",
+               "rmsea.pvalue", "rmsea.notclose.pvalue"), scaledAddon))]
+  ))
+
+  paramsDfRight <- as.data.frame(t(
+    rawParams[c(
+      paste0("cfi", scaledAddon),
+      "srmr",
+      "aic",
+      "bic")]
+  ))
+
+  paramsDf <- cbind(paramsDfLeft,
+                    # rmsea.ci = sprintf("[%.3f, %.3f]",
+                    #                    rawParams[paste0("rmsea.ci.lower", scaledAddon)],
+                    #                    rawParams[paste0("rmsea.ci.upper", scaledAddon)]),
+                    paramsDfRight,
+                    stringsAsFactors = FALSE)
+
+  names(paramsDf) <- gsub(".scaled", "", names(paramsDf))
+
+  paramsDf
+}
+
 extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
   nGroups <- fittedModel@Data@ngroups           # Look for multigroup
   etaIntFree <- fittedModel@Options$int.lv.free # Look for standardization

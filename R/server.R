@@ -923,7 +923,7 @@ server <- function(input, output, session) {
     ## corrInd if (class(corrIndRaw)[1] == "lavaan") ---
     if (class(corrIndRaw)[1] == "lavaan") {
 
-      corrInd <- unlist(shinyCTT:::extractFitParameters(corrIndRaw)[, c(2, 1, 3)])
+      corrInd <- unlist(shinyCTT:::extractFitIndices(corrIndRaw)[, c(2, 1, 3)])
 
       if (!is.na(input$corrIndSL) && input$corrIndSL < 1 && input$corrIndSL > 0) {
 
@@ -951,18 +951,17 @@ server <- function(input, output, session) {
         ) # tagList
 
       } else {
-        div(
-          style = paste0("color:red"),
-          HTML("Please enter a valid significance level"))
+        HTML("Please enter a valid significance level") %>%
+          div(style = "color:red")
       }
 
     } ## corrInd if (class(corrIndRaw)[1] != "lavaan") ----
     else {
       tagList(
         strong("Test result:"),
-        div(
-          style = paste0("color:red"),
-          HTML(paste("There was an ERROR/WARNING:", corrIndRaw$message))))
+        paste("There was an ERROR/WARNING:", corrIndRaw$message) %>%
+          HTML() %>%
+          div(style = "color:red"))
     }
   })
 
@@ -1155,9 +1154,10 @@ server <- function(input, output, session) {
 
     } ## corrTableBox singleCorrTable if errors: ----
     else {
-      singleCorrTable <- div(
-        style = paste0("color:red"),
-        HTML(paste("There was an ERROR/WARNING:", corrTableWithCIsRaw$test)))
+      singleCorrTable <-
+        paste("There was an ERROR/WARNING:", corrTableWithCIsRaw$test) %>%
+        HTML() %>%
+        div(style = "color:red")
     }
 
     ## corrTableBox if groups ----
@@ -1215,12 +1215,14 @@ server <- function(input, output, session) {
             "Overall",
             singleCorrTable,
             br(),
-            corrTableLegend),
+            HTML(makeLegend("corrTable", estimatorNameRV(), input$sigLvl,
+                            goodColor, badColor, neutrColor, textColor))),
         tabPanel(
             "Group-wise",
             HTML(mgCorrTable),
             br(),
-            corrTableLegend)
+            HTML(makeLegend("corrTable", estimatorNameRV(), input$sigLvl,
+                            goodColor, badColor, neutrColor, textColor)))
 
       ) # tabBox
 
@@ -1312,9 +1314,9 @@ server <- function(input, output, session) {
 
     } ## mvnTable if error ----
     else {
-      div(
-        style = paste0("color:red"),
-        HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message)))
+      paste("There was an ERROR/WARNING:", mvnTestResult$raw$message) %>%
+        HTML() %>%
+        div(style = "color:red")
     }
   })
 
@@ -1357,9 +1359,9 @@ server <- function(input, output, session) {
       }
     } ## mvnComment if error ----
     else {
-      div(
-        style = paste0("color:red"),
-        HTML(paste("There was an ERROR/WARNING:", mvnTestResult$raw$message)))
+      paste("There was an ERROR/WARNING:", mvnTestResult$raw$message) %>%
+        HTML() %>%
+        div(style = "color:red")
     }
   })
 
@@ -1645,14 +1647,13 @@ server <- function(input, output, session) {
           lavWarnsMsg <- tagList(
             h6("The following models produced warnings:"),
 
-            div(
-              style = "color:orange",
-              cbind(paste0(modelsLong[warnModels], ":&emsp;"),
-                          sapply(fittedModelsWarns[warnModels],
-                                 function(model) model$message)) %>%
-                kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
-                kableExtra::column_spec(column = 1, bold = TRUE) %>%
-                HTML())
+            cbind(paste0(modelsLong[warnModels], ":&emsp;"),
+                  sapply(fittedModelsWarns[warnModels],
+                         function(model) model$message)) %>%
+              kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
+              kableExtra::column_spec(column = 1, bold = TRUE) %>%
+              HTML() %>%
+              div(style = "color:orange")
           ) # tagList
 
         } else {
@@ -1665,14 +1666,13 @@ server <- function(input, output, session) {
           lavErrsMsg <- tagList(
             h6("The following models produced errors:"),
 
-            div(
-              style = "color:red",
-              cbind(paste0(modelsLong[errModels], ":&emsp;"),
-                    sapply(fittedModelsErrs[errModels],
-                           function(model) model$message)) %>%
-                kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
-                kableExtra::column_spec(column = 1, bold = TRUE) %>%
-                HTML())
+            cbind(paste0(modelsLong[errModels], ":&emsp;"),
+                  sapply(fittedModelsErrs[errModels],
+                         function(model) model$message)) %>%
+              kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
+              kableExtra::column_spec(column = 1, bold = TRUE) %>%
+              HTML() %>%
+              div(style = "color:red")
             ) # tagList
 
         } else {
@@ -1680,7 +1680,7 @@ server <- function(input, output, session) {
         }
 
         ### generate comparative fit table and tab ----
-        fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], shinyCTT:::extractFitParameters))
+        fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], shinyCTT:::extractFitIndices))
         comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
 
         succTable <- list()
@@ -1865,42 +1865,9 @@ server <- function(input, output, session) {
             }
 
             #### parameter tables ----
-            SECIestName <- paste0(c("SE", "CI"), "<sub>", estimatorNameRV(), "</sub>")
-
-            parTableWithCIs <- shinyCTT:::makeKable(
-              shinyCTT:::extractParameters(
-                fittedModelsWarns[[thisModel]],
-                alpha = input$sigLvl),
-              col.names = c(
-                "Item",
-
-                "&lambda;&#x302;<sub>i</sub>",
-
-                "Est.", SECIestName,
-                "Std. Est.", SECIestName,
-
-                "&alpha;&#x302;<sub>i</sub>",
-
-                "Est.", SECIestName,
-
-                "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
-
-                "Est.", SECIestName,
-
-                "R&#x302;<sub>i</sub>",
-
-                "Est.", SECIestName),
-              bold_cols = 1) %>%
-
-              kableExtra::row_spec(
-                row = (length(input$itemCols) + 1) * 1:thisModelsNgroups,
-                bold = TRUE) %>%
-              kableExtra::add_header_above(
-                header =c(" ",
-                          "Discrimination Parameters (Factor Loadings)" = 7,
-                          "Easiness Parameters (Intercepts)" = 4,
-                          "Variances" = 4,
-                          "Reliabilities" = 4))
+            parTableWithCIs <- makeParTableWithCIs(fittedModelsWarns[[thisModel]], estimatorNameRV(),
+                                                   input$sigLvl, input$itemCols,
+                                                   thisModelsNgroups)
 
             ##### modify parameter tables if there are groups ----
             if (!isFALSE(groupName)) {
@@ -2021,11 +1988,11 @@ server <- function(input, output, session) {
 
                     hr(),
 
-                    div(
-                      align = "center",
-                      downloadButton(
-                        paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
-                        "Download Factor Scores")),
+                    downloadButton(
+                      paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
+                      "Download Factor Scores") %>%
+
+                      div(align = "center"),
 
                     width = 3
                   ), # sidebarPanel
@@ -2125,140 +2092,17 @@ server <- function(input, output, session) {
             c("teq", "etp"),
 
             function(model) {
-
               if (!is.null(succTable[[model]])) {
-                hierTable <- as.data.frame(succTable[[model]])
-                hierTable$CFI <- fits[rownames(hierTable), "cfi"]
 
-                AICdiff <- diff(hierTable$AIC)
-                BICdiff <- diff(hierTable$BIC)
-                CFIdiff <- diff(hierTable$CFI)
-
-                bgColIfSignif <- ifelse(hierTable[-1, "Pr(>Chisq)"] < input$sigLvl,
-                                        yes = badColor,
-                                        no = goodColor)
-
-                hierTable <- hierTable[, c("Df diff", "Chisq diff", "Pr(>Chisq)", "RMSEA", "CFI", "AIC", "BIC")]
-
-                hierTable[-1, "Chisq diff"] <- kableExtra::cell_spec(
-                  sprintf("+%.3f", hierTable[-1, "Chisq diff"]),
-                  color = textColor,
-                  background = bgColIfSignif)
-
-                hierTable[-1, "Df diff"] <- kableExtra::cell_spec(
-                  sprintf("+%i", hierTable[-1, "Df diff"]),
-                  color = textColor,
-                  background = bgColIfSignif)
-
-                hierTable[-1, "Pr(>Chisq)"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "Pr(>Chisq)"]),
-                  color = textColor,
-                  background = bgColIfSignif)
-
-                hierTable[-1, "RMSEA"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "RMSEA"]),
-                  color = textColor,
-                  background = ifelse(hierTable[-1, "RMSEA"] < 0.05, goodColor, badColor))
-
-                hierTable[-1, "CFI"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "CFI"]),
-                  color = textColor,
-                  background = ifelse(CFIdiff >= 0, goodColor, badColor))
-
-                hierTable[-1, "AIC"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "AIC"]),
-                  color = textColor,
-                  background = ifelse(AICdiff <= 0, goodColor, badColor))
-
-                hierTable[-1, "BIC"] <- kableExtra::cell_spec(
-                  sprintf("%.3f", hierTable[-1, "BIC"]),
-                  color = textColor,
-                  background = ifelse(BICdiff <= 0, goodColor, badColor))
-
-
-                hierTable$AIC[1] <- sprintf("%.3f", as.numeric(hierTable$AIC[1]))
-                hierTable$BIC[1] <- sprintf("%.3f", as.numeric(hierTable$BIC[1]))
-                hierTable$CFI[1] <- sprintf("%.3f", as.numeric(hierTable$CFI[1]))
-
-
-                names(hierTable) <- c("&Delta;df",
-                                      paste0(estimatorNameRV(), "-&Delta;&chi;&sup2;"),
-                                      "p",
-                                      "RMSEA<sub>D</sub>",
-                                      "CFI",
-                                      "AIC",
-                                      "BIC")
-
-                rownames(hierTable) <- modelsAbbrev[rownames(hierTable)]
-
-                shinyCTT:::makeKable(hierTable, bold_cols = 1) %>%
-                  kableExtra::row_spec(row = 1, background = "lightgrey")
-
+                succTableTmp <- as.data.frame(succTable[[model]])
+                makeHierTable(succTableTmp, fits[rownames(succTableTmp), "cfi"],
+                              estimatorNameRV(), input$sigLvl,
+                              goodColor, badColor, textColor, modelsAbbrev)
               } else {
                 NULL
               }
             } # function(model)
           ) # lapply
-
-          #### Table with all fit indices ----
-          bgColIfSignif <- ifelse(fits$pvalue < input$sigLvl,
-                                  badColor,
-                                  goodColor)
-
-
-          fits$df <- kableExtra::cell_spec(
-            sprintf("%i", fits$df),
-            color = textColor,
-            background = bgColIfSignif)
-
-          fits$chisq <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$chisq),
-            color = textColor,
-            background = bgColIfSignif)
-
-          fits$pvalue <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$pvalue),
-            color = textColor,
-            background = bgColIfSignif)
-
-          fits$rmsea <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$rmsea),
-            color = textColor,
-            background = ifelse(fits$rmsea < 0.05, goodColor, badColor))
-
-          fits$rmsea.ci <- kableExtra::cell_spec(
-            sprintf("[%.3f, %.3f]", fits$rmsea.ci.lower, fits$rmsea.ci.upper),
-            color = textColor,
-            background = ifelse(
-              fits$rmsea.ci.upper < 0.05,
-              yes = goodColor,
-              no = ifelse(
-                fits$rmsea.ci.lower < 0.05,
-                yes = neutrColor,
-                no = badColor)))
-
-          fits$rmsea.pvalue <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$rmsea.pvalue),
-            color = textColor,
-            background = ifelse(fits$rmsea.pvalue < input$sigLvl, badColor, goodColor))
-
-          fits$rmsea.notclose.pvalue <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$rmsea.notclose.pvalue),
-            color = textColor,
-            background = ifelse(fits$rmsea.notclose.pvalue < input$sigLvl, goodColor, badColor))
-
-          fits$cfi <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$cfi),
-            color = textColor,
-            background = ifelse(fits$cfi < 0.95, badColor, goodColor))
-
-          fits$srmr <- kableExtra::cell_spec(
-            sprintf("%.3f", fits$srmr),
-            color = textColor,
-            background = ifelse(fits$srmr < 0.05, goodColor, badColor))
-
-
-          rownames(fits) <- modelsAbbrev[rownames(fits)]
 
           #### Chisq comparison table ----
           combCompTable <- matrix(NA, nrow = 5, ncol = 10)
@@ -2304,37 +2148,15 @@ server <- function(input, output, session) {
                     "</td><td>&nbsp;</td><td>",
                     hierTables[[2]],
                     "</td></tr></table>") %>%
-
-                    # "<br>",
-                    # shinyCTT:::makeLegends("hierTables", estimatorNameRV(), input$sigLvl,
-                    #                        goodColor, badColor, neutrColor, textColor)) %>%
-
                     HTML())),
 
               fluidRow(
                 shinydashboard::box(
                   title = "Fit index table",
                   width = 12,
-                  paste0(
-
-                    shinyCTT:::makeKable(
-                      fits[, c("df", "chisq", "pvalue",
-                               "rmsea", "rmsea.ci", "rmsea.pvalue", "rmsea.notclose.pvalue",
-                               "cfi", "srmr")],
-                      col.names = c("df", paste0(estimatorNameRV(), "-&chi;&sup2;"), "p",
-                                    "RMSEA", "95%-CI", "p<sub>H0:RMSEA<=0.05</sub>", "p<sub>H0:RMSEA>=0.08</sub>",
-                                    "CFI", "SRMR"),
-                      bold_cols = 1) %>%
-
-                      kableExtra::column_spec(
-                        column = c(4, 8),
-                        border_right = "1px solid lightgrey")) %>%
-
-                    # "<br><br>",
-                    # shinyCTT:::makeLegends("fitIndexTable", estimatorNameRV(), input$sigLvl,
-                    #                        goodColor, badColor, neutrColor, textColor)) %>%
-
-                    HTML())),
+                  HTML(makeFitsTable(fits, estimatorNameRV(), input$sigLvl,
+                                     goodColor, badColor, neutrColor, textColor,
+                                     modelsAbbrev)))),
 
               fluidRow(
                 shinydashboard::box(
