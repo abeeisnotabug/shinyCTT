@@ -1520,8 +1520,9 @@ server <- function(input, output, session) {
     lapply(
       append(list(FALSE), if (isTRUE(input$doMg)) input$groupCol),
       function(groupName) {
+        groupAppend <- c("Mg")[!isFALSE(groupName)]
         hierPlotStr <- paste0("hierPlot", groupName)
-        modelTestsContStr <- paste0("modelTestsCont", c("Mg")[!isFALSE(groupName)])
+        modelTestsContStr <- paste0("modelTestsCont", groupAppend)
 
         ### try fitting and capture warning and error messages ----
         modelCodes <- shinyCTT:::makeModelCodes(inputData = userDataGroup(),
@@ -1744,11 +1745,11 @@ server <- function(input, output, session) {
             thisModelStr <- paste0(thisModel, thisModel)
             thisModelsNgroups <- fittedModelsWarns[[thisModel]]@Data@ngroups
 
-            thisModelScoresStr <- paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])
-            thisModelScoresDLStr <- paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)])
-            thisModelScoresDLFileStr <- paste0(thisModel, "Filename", c("Mg")[!isFALSE(groupName)])
+            thisModelScoresStr <- paste0(thisModel, "Scores", groupAppend)
+            thisModelScoresDLStr <- paste0(thisModel, "ScoresDownload", groupAppend)
+            thisModelScoresDLFileStr <- paste0(thisModel, "Filename", groupAppend)
 
-            thisModelCodeStr <- paste0(thisModel, "Code", c("Mg")[!isFALSE(groupName)])
+            thisModelCodeStr <- paste0(thisModel, "Code", groupAppend)
 
             #### write to diag(chisq comp table) ----
             if (fits[thisModel, "pvalue"] < input$sigLvl) {
@@ -1932,7 +1933,7 @@ server <- function(input, output, session) {
 
             #### make tabs for each model ----
             appendTab(
-              inputId = paste0("parTabsetTab", c("Mg")[!isFALSE(groupName)]),
+              inputId = paste0("parTabsetTab", groupAppend),
 
               tabPanel(
                 title = HTML(modelsLong[thisModel]),
@@ -1941,7 +1942,7 @@ server <- function(input, output, session) {
               select = as.logical(whichModel == 1))
 
             appendTab(
-              inputId = paste0("mcTabsetTab", c("Mg")[!isFALSE(groupName)]),
+              inputId = paste0("mcTabsetTab", groupAppend),
 
               tabPanel(
                 title = HTML(modelsLong[thisModel]),
@@ -1952,7 +1953,7 @@ server <- function(input, output, session) {
 
             ##### factor score tab ----
             appendTab(
-              inputId = paste0("fsTabsetTab", c("Mg")[!isFALSE(groupName)]),
+              inputId = paste0("fsTabsetTab", groupAppend),
 
               tabPanel(
                 title = HTML(modelsLong[thisModel]),
@@ -1989,7 +1990,7 @@ server <- function(input, output, session) {
                     hr(),
 
                     downloadButton(
-                      paste0(thisModel, "ScoresDownload", c("Mg")[!isFALSE(groupName)]),
+                      paste0(thisModel, "ScoresDownload", groupAppend),
                       "Download Factor Scores") %>%
 
                       div(align = "center"),
@@ -2000,7 +2001,7 @@ server <- function(input, output, session) {
                   mainPanel(
                     h4("Data Overview"),
                     DT::dataTableOutput(
-                      paste0(thisModel, "Scores", c("Mg")[!isFALSE(groupName)])))
+                      paste0(thisModel, "Scores", groupAppend)))
 
                 ) # sidebarLayout
               ), # tabPael
@@ -2148,7 +2149,11 @@ server <- function(input, output, session) {
                     "</td><td>&nbsp;</td><td>",
                     hierTables[[2]],
                     "</td></tr></table>") %>%
-                    HTML())),
+                    HTML(),
+                  actionLink(paste0("showLegendHierTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
+                  conditionalPanel(paste0("input.showLegendHierTable", groupAppend, " % 2 == 1"),
+                                   makeLegend("hierTables", estimatorNameRV(), input$sigLvl,
+                                              goodColor, badColor, neutrColor, textColor)))),
 
               fluidRow(
                 shinydashboard::box(
@@ -2156,7 +2161,12 @@ server <- function(input, output, session) {
                   width = 12,
                   HTML(makeFitsTable(fits, estimatorNameRV(), input$sigLvl,
                                      goodColor, badColor, neutrColor, textColor,
-                                     modelsAbbrev)))),
+                                     modelsAbbrev)),
+                  br(),
+                  actionLink(paste0("showLegendFitIndexTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
+                  conditionalPanel(paste0("input.showLegendFitIndexTable", groupAppend, " % 2 == 1"),
+                                   makeLegend("fitIndexTable", estimatorNameRV(), input$sigLvl,
+                                              goodColor, badColor, neutrColor, textColor)))),
 
               fluidRow(
                 shinydashboard::box(
@@ -2164,7 +2174,12 @@ server <- function(input, output, session) {
                   width = 12,
                   shinyCTT:::makeKable(combCompTable, bold_cols = 1) %>%
                     kableExtra::add_header_above(headerNames, escape = FALSE) %>%
-                    HTML())),
+                    HTML(),
+                  br(),
+                  actionLink(paste0("showLegendCombCompTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
+                  conditionalPanel(paste0("input.showLegendCombCompTable", groupAppend, " % 2 == 1"),
+                                   makeLegend("combCompTable", estimatorNameRV(), input$sigLvl,
+                                              goodColor, badColor, neutrColor, textColor)))),
 
               fluidRow(
                 shinydashboard::box(
@@ -2188,7 +2203,11 @@ server <- function(input, output, session) {
 
                   "</td></tr></table>
                 </td></tr></table>") %>%
-                HTML()))
+                HTML(),
+                actionLink(paste0("showLegendInfCompTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
+                conditionalPanel(paste0("input.showLegendInfCompTable", groupAppend, " % 2 == 1"),
+                                 makeLegend("infCompTable", estimatorNameRV(), input$sigLvl,
+                                            goodColor, badColor, neutrColor, textColor))))
 
             ) # fluidPage
           })

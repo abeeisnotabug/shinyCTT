@@ -276,9 +276,8 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
         "hierTables" = cbind(
           kableExtra::cell_spec("Legend:", bold = TRUE),
           kableExtra::cell_spec(
-            paste(c("&Delta;df",
-                    paste0(estimatorName, "-&Delta;&chi;&sup2;"),
-                    "p:"), collapse = ", "),
+            paste(c("&Delta;df", paste0(estimatorName, "-&Delta;&chi;&sup2;"), "p:"),
+                  collapse = ", "),
             escape = FALSE),
           kableExtra::cell_spec(
             sprintf("p >= %.3f", sigLvl),
@@ -329,9 +328,8 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
           cbind(
             kableExtra::cell_spec("Legend:", bold = TRUE),
             kableExtra::cell_spec(
-              paste(c("&Delta;df",
-                      paste0(estimatorName, "-&Delta;&chi;&sup2;"),
-                      "p:"), collapse = ", "),
+              paste(c("&Delta;df", paste0(estimatorName, "-&Delta;&chi;&sup2;"), "p:"),
+                    collapse = ", "),
               escape = FALSE),
             kableExtra::cell_spec(
               sprintf("p >= %.3f", sigLvl),
@@ -412,6 +410,43 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
               sprintf(">= %.3f", sigLvl),
               color = textColor,
               background = badColor))),
+
+        "combCompTable" = cbind(
+          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(
+            paste0("&Delta;df, ", estimatorName, "-&Delta;&chi;&sup2;:"),
+            escape = FALSE),
+          kableExtra::cell_spec(
+            sprintf("p >= %.3f", sigLvl),
+            color = textColor,
+            background = goodColor),
+          kableExtra::cell_spec(
+            sprintf("p < %.3f", sigLvl),
+            color = textColor,
+            background = badColor),
+          kableExtra::cell_spec(
+            "* / ** / *** if p < 0.05 / 0.01 / 0.001",
+            color = textColor,
+            background = neutrColor)),
+
+        "infCompTable" = cbind(
+          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(
+            "AIC/BIC",
+            escape = FALSE),
+          kableExtra::cell_spec(
+            "< 0",
+            color = textColor,
+            background = goodColor),
+          kableExtra::cell_spec(
+            "> 0",
+            color = textColor,
+            background = badColor),
+          kableExtra::cell_spec(
+            "= 0",
+            color = textColor,
+            background = neutrColor)),
+
         stop(sprintf("No legend available for table %s.", whichLegend))),
 
       position = "left",
