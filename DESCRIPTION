@@ -24,6 +24,7 @@ Depends: R (>= 3.5.1),
     shiny (>= 1.2.0)
 Imports: 
     shinydashboard (>= 0.7.1),
+    dashboardthemes (>= 1.1.6),
     shinyjs (>= 1.0),
     MVN (>= 6.0),
     moments (>= 0.14),
