@@ -152,7 +152,7 @@ server <- function(input, output, session) {
     if (input$source == "CSV") {
       req(input$CSVFile)
 
-      userDataTmp <- read.csv(
+      userDataTmp <- utils::read.csv(
         file = input$CSVFile$datapath,
         header = input$header,
         sep = input$sep,
@@ -284,7 +284,7 @@ server <- function(input, output, session) {
     req(input$groupCol)
 
     if (input$groupCol != "noGroupSelected" && input$groupCol %in% colnames(userDataChosen())) {
-      possibleGroups <- unique(na.omit(userDataChosen()[, input$groupCol]))
+      possibleGroups <- unique(stats::na.omit(userDataChosen()[, input$groupCol]))
 
       if (any(c(table(userDataChosen()[, input$groupCol])) == 1)) {
         groupWarning <- "There are groups with only one observation,
@@ -452,7 +452,7 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab naInfoBox ----
   output$naInfoBox <- shinydashboard::renderValueBox({
-    incompleteCasesRV(!complete.cases(userDataNA()))
+    incompleteCasesRV(!stats::complete.cases(userDataNA()))
     output$incompleteCasesBoolRV <- reactive({any(incompleteCasesRV())})
     outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
 
@@ -465,7 +465,7 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab naTable ----
   output$naTable <- renderUI({
-    HTML(shinyCTT:::makeKable(data.frame(NAs = colSums(is.na(userDataChosen())))))
+    HTML(makeKable(data.frame(NAs = colSums(is.na(userDataChosen())))))
   })
 
   ## subsetSelectionTab obsTable ----
@@ -473,7 +473,7 @@ server <- function(input, output, session) {
     nTotal <- nrow(userDataNA())
     nComplete <- sum(!incompleteCasesRV())
 
-    HTML(shinyCTT:::makeKable(data.frame(Total = nTotal, Complete = nComplete)))
+    HTML(makeKable(data.frame(Total = nTotal, Complete = nComplete)))
   })
 
   ## subsetSelectionTab obsPerGroupTable ----
@@ -481,7 +481,7 @@ server <- function(input, output, session) {
       req(input$groupCol)
 
       if (input$groupCol != "noGroupSelected") {
-        HTML(shinyCTT:::makeKable(t(table(userDataChosen()[, input$groupCol], useNA = "ifany"))))
+        HTML(makeKable(t(table(userDataChosen()[, input$groupCol], useNA = "ifany"))))
       } else {
         helpText("No group column selected.")
       }
@@ -592,7 +592,7 @@ server <- function(input, output, session) {
       MARGIN = 2,
       FUN = function(col) {
         c(Mean = mean(col, na.rm = TRUE),
-          Sd = sd(col, na.rm = TRUE),
+          Sd = stats::sd(col, na.rm = TRUE),
           Skew = moments::skewness(col, na.rm = TRUE),
           Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
       }
@@ -601,7 +601,7 @@ server <- function(input, output, session) {
     nHeader <- c(1, 4)
     names(nHeader) <- c(" ", sprintf("n<sub>all</sub> = %i", nrow(userDataGroup())))
 
-    overallDescrTable <- shinyCTT:::makeKable(table, bold_cols = 1) %>%
+    overallDescrTable <- makeKable(table, bold_cols = 1) %>%
       kableExtra::add_header_above(header = nHeader, escape = FALSE) %>%
       HTML()
 
@@ -618,7 +618,7 @@ server <- function(input, output, session) {
                 userDataGroup()[, input$groupCol] == group),
               MARGIN = 2,
               FUN = function(col) {
-                c(Mean = mean(col, na.rm = TRUE), SD = sd(col, na.rm = TRUE),
+                c(Mean = mean(col, na.rm = TRUE), SD = stats::sd(col, na.rm = TRUE),
                   Skew = moments::skewness(col, na.rm = TRUE),
                   Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
               }
@@ -639,7 +639,7 @@ server <- function(input, output, session) {
 
       for (i in 1:((length(groups) + 1) %/% 2)) {
         mgDescrTableListTagged[i] <-
-          shinyCTT:::makeKable(
+          makeKable(
               do.call(cbind,
                       mgDescrTableList[(2 * i - 1):min(2 * i, length(groups))]),
               bold_cols = 1) %>%
@@ -685,11 +685,11 @@ server <- function(input, output, session) {
     ## histBox output singleHist ----
     output$singleHist <- renderPlot({
       ggplot2::ggplot(
-        data.frame(item = na.omit(userDataGroup()[, input$histItem])),
-        ggplot2::aes(x = item)) +
+        data.frame(item = stats::na.omit(userDataGroup()[, input$histItem])),
+        ggplot2::aes(x = .data$item)) +
 
         ggplot2::geom_histogram(
-          if (input$singleDens) ggplot2::aes(y = ggplot2::after_stat(density)),
+          if (input$singleDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
           color = "white",
           fill = "#438BCA",
           bins = input$singleNoBins) +
@@ -708,12 +708,12 @@ server <- function(input, output, session) {
             userDataGroup(),
             subset = userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
             select = c(input$groupCol, input$histItemGroup)) %>%
-            na.omit() %>%
-            setNames(nm = c("group", "item")),
-          ggplot2::aes(x = item, fill = group)) +
+            stats::na.omit() %>%
+            stats::setNames(nm = c("group", "item")),
+          ggplot2::aes(x = .data$item, fill = .data$group)) +
 
           ggplot2::geom_histogram(
-            if (input$groupDens) ggplot2::aes(y = ggplot2::after_stat(density)),
+            if (input$groupDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
             color = "white",
             bins = input$groupNoBins,
             position = "dodge") +
@@ -832,7 +832,7 @@ server <- function(input, output, session) {
   output$covMatBox <- renderUI({
     req(userDataGroup())
 
-    table <- cov(userDataGroup()[, input$itemCols], use = "pairwise.complete.obs")
+    table <- stats::cov(userDataGroup()[, input$itemCols], use = "pairwise.complete.obs")
     table[upper.tri(table)] <- NA
 
     ## covMatBox if (validGroupsRV()) ----
@@ -842,7 +842,7 @@ server <- function(input, output, session) {
       mgCovMatList <- lapply(
         groups,
         function(group) {
-          cov(
+          stats::cov(
             subset(
               userDataGroup()[, input$itemCols],
               userDataGroup()[, input$groupCol] == group),
@@ -852,7 +852,7 @@ server <- function(input, output, session) {
       for (i in 1:length(mgCovMatList))
         mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
 
-      mgCovMatTable <- shinyCTT:::makeKable(do.call(rbind, mgCovMatList),
+      mgCovMatTable <- makeKable(do.call(rbind, mgCovMatList),
                                             bold_cols = 1)
 
       groupRowHeaders <- sprintf(
@@ -876,7 +876,7 @@ server <- function(input, output, session) {
 
         tabPanel(
           title = "Overall",
-          shinyCTT:::makeKable(table, bold_cols = 1) %>%
+          makeKable(table, bold_cols = 1) %>%
             HTML()),
 
         tabPanel(
@@ -893,7 +893,7 @@ server <- function(input, output, session) {
         width = 12,
         title = "Covariance Matrix:",
 
-        shinyCTT:::makeKable(table, bold_cols = 1) %>%
+        makeKable(table, bold_cols = 1) %>%
           HTML()
 
       ) # box
@@ -923,7 +923,7 @@ server <- function(input, output, session) {
     ## corrInd if (class(corrIndRaw)[1] == "lavaan") ---
     if (class(corrIndRaw)[1] == "lavaan") {
 
-      corrInd <- unlist(shinyCTT:::extractFitIndices(corrIndRaw)[, c(2, 1, 3)])
+      corrInd <- unlist(extractFitIndices(corrIndRaw)[, c(2, 1, 3)])
 
       if (!is.na(input$corrIndSL) && input$corrIndSL < 1 && input$corrIndSL > 0) {
 
@@ -976,8 +976,8 @@ server <- function(input, output, session) {
           data.frame(
               itemX = userDataGroup()[, input$scatterItemX],
               itemY = userDataGroup()[, input$scatterItemY]) %>%
-            na.omit(),
-          ggplot2::aes(x = itemX, y = itemY)) +
+            stats::na.omit(),
+          ggplot2::aes(x = .data$itemX, y = .data$itemY)) +
 
           ggplot2::geom_point(color = "#438BCA") +
           ggplot2::xlab(input$scatterItemX) +
@@ -994,9 +994,9 @@ server <- function(input, output, session) {
             userDataGroup(),
             subset = userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
             select = c(input$groupCol, input$scatterItemXGroup, input$scatterItemYGroup)) %>%
-            na.omit() %>%
-            setNames(nm = c("group", "itemX", "itemY")),
-          ggplot2::aes(x = itemX, y = itemY, color = group)) +
+            stats::na.omit() %>%
+            stats::setNames(nm = c("group", "itemX", "itemY")),
+          ggplot2::aes(x = .data$itemX, y = .data$itemY, color = .data$group)) +
 
           ggplot2::geom_point() +
           ggplot2::xlab(input$scatterItemXGroup) +
@@ -1099,7 +1099,7 @@ server <- function(input, output, session) {
     ## corrTableBox create raw cor table and test for errors ----
     corrTableWithCIsRaw <- list(
       cor = tryCatch(
-        cor(userDataGroup()[, input$itemCols],
+        stats::cor(userDataGroup()[, input$itemCols],
             use = input$corrTabNA),
         warning = function(w) NULL,
         error = function(e) NULL),
@@ -1128,7 +1128,7 @@ server <- function(input, output, session) {
           color = textColor,
           background = neutrColor)) %>%
 
-        shinyCTT:::makeKable(
+        makeKable(
           # bootstrap_options = "bordered",
           position = "left") %>%
         HTML()
@@ -1138,7 +1138,7 @@ server <- function(input, output, session) {
     ## corrTableBox singleCorrTable if no errors: ----
     if (class(corrTableWithCIsRaw$test)[1] == "list") {
 
-      singleCorrTable <- shinyCTT:::makeCorrTableWithCIs(
+      singleCorrTable <- makeCorrTableWithCIs(
         rawTable = corrTableWithCIsRaw,
         goodColor,
         badColor,
@@ -1147,7 +1147,7 @@ server <- function(input, output, session) {
         sigLvl = input$corrTabSL,
         itemCols = input$itemCols) %>%
 
-        shinyCTT:::makeKable(
+        makeKable(
           bootstrap_options = c("condensed", "striped"),
           bold_cols = 1) %>%
         HTML()
@@ -1166,10 +1166,10 @@ server <- function(input, output, session) {
         unique(userDataGroup()[, input$groupCol]),
         function(group) {
 
-          shinyCTT:::makeCorrTableWithCIs(
+          makeCorrTableWithCIs(
 
             rawTable = list(
-              cor = suppressWarnings(cor(
+              cor = suppressWarnings(stats::cor(
                 subset(
                   userDataGroup()[, input$itemCols],
                   userDataGroup()[, input$groupCol] == group),
@@ -1189,7 +1189,7 @@ server <- function(input, output, session) {
       })
 
       # join each group corrTable
-      mgCorrTable <- shinyCTT:::makeKable(
+      mgCorrTable <- makeKable(
         do.call(rbind, mgCorrTableList),
         bootstrap_options = c("condensed", "striped"),
         bold_cols = 1)
@@ -1257,7 +1257,7 @@ server <- function(input, output, session) {
     req(userDataGroup())
 
     mvnTestResult$raw <- tryCatch(
-      MVN::mvn(na.omit(userDataGroup()[, input$itemCols]),
+      MVN::mvn(stats::na.omit(userDataGroup()[, input$itemCols]),
                mvn_test = "mardia"),
       warning = function(w) w,
       error = function(e) e)
@@ -1310,7 +1310,7 @@ server <- function(input, output, session) {
       mvnUV$Signif. <- ifelse(mvnUV$p < input$mvnSL, "*", "")
       mvnUV$p <- ifelse(mvnUV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnUV$p, 3)))
 
-      HTML(shinyCTT:::makeKable(mvnUV, bootstrap_options = "basic"))
+      HTML(makeKable(mvnUV, bootstrap_options = "basic"))
 
     } ## mvnTable if error ----
     else {
@@ -1344,7 +1344,7 @@ server <- function(input, output, session) {
                     or Mardias' Kurtosis statistic matches one of a
                     normal distribution has to be discarded on a significance
                     level of %s. Test result:", input$mvnSL),
-          HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
+          HTML(makeKable(mvnMV, bootstrap_options = "basic")),
           HTML("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator."))
 
       } else {
@@ -1354,7 +1354,7 @@ server <- function(input, output, session) {
                     and Mardias' Kurtosis statistic match those of a
                     normal distribution can be maintained on a significance
                     level of %s. Test result:", input$mvnSL),
-          HTML(shinyCTT:::makeKable(mvnMV, bootstrap_options = "basic")),
+          HTML(makeKable(mvnMV, bootstrap_options = "basic")),
           HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
       }
     } ## mvnComment if error ----
@@ -1370,15 +1370,15 @@ server <- function(input, output, session) {
 
     output$mvnPlot <- renderPlot({
 
-      userDataNAOmit <- na.omit(userDataGroup())
+      userDataNAOmit <- stats::na.omit(userDataGroup())
 
       if (input$mvnPlotType == "qq") {
         MVN::multivariate_diagnostic_plot(
-          na.omit(userDataNAOmit[, input$itemCols]),
+          stats::na.omit(userDataNAOmit[, input$itemCols]),
           type = "qq")
 
       } else if (input$mvnPlotType == "persp") {
-        persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
+        graphics::persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
                               userDataNAOmit[, input$mvnItemY],
                               n = 100),
               theta = 1, phi = 30, border = NA, shade = 0.5, box = T,
@@ -1387,7 +1387,7 @@ server <- function(input, output, session) {
               zlab = "Density")
 
       } else if (input$mvnPlotType == "contour") {
-        contour(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
+        graphics::contour(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
                                 userDataNAOmit[, input$mvnItemY],
                                 n = 100),
                 nlevels = 20,
@@ -1525,7 +1525,7 @@ server <- function(input, output, session) {
         modelTestsContStr <- paste0("modelTestsCont", groupAppend)
 
         ### try fitting and capture warning and error messages ----
-        modelCodes <- shinyCTT:::makeModelCodes(inputData = userDataGroup(),
+        modelCodes <- makeModelCodes(inputData = userDataGroup(),
                                                 itemCols = input$itemCols,
                                                 group = groupName,
                                                 etaIntFree = as.logical(input$etaIntFree))
@@ -1681,7 +1681,7 @@ server <- function(input, output, session) {
         }
 
         ### generate comparative fit table and tab ----
-        fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], shinyCTT:::extractFitIndices))
+        fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], extractFitIndices))
         comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
 
         succTable <- list()
@@ -1890,7 +1890,7 @@ server <- function(input, output, session) {
             #### factor scores ----
             output[[thisModelScoresStr]] <<- DT::renderDataTable(
 
-              shinyCTT:::getPredictedScores(
+              getPredictedScores(
                 fittedModelsWarns[[thisModel]],
                 userDataGroup()[, input$groupCol]),
 
@@ -1900,8 +1900,8 @@ server <- function(input, output, session) {
               filename = function() input[[thisModelScoresDLFileStr]],
               content = function(file) {
 
-                write.table(
-                  shinyCTT:::getPredictedScores(
+                utils::write.table(
+                  getPredictedScores(
                     fittedModelsWarns[[thisModel]],
                     userDataGroup()[, input$groupCol]),
 
@@ -1921,7 +1921,7 @@ server <- function(input, output, session) {
                      length(unique(userDataRaw()[, input$groupCol]))))
 
               cat(
-                shinyCTT:::makeRCode(
+                makeRCode(
                   input = input,
                   modelCode = modelCodes[[thisModel]],
                   estimator = mvnTestResult$estimator,
@@ -2048,29 +2048,30 @@ server <- function(input, output, session) {
 
             ##### ggplot code ----
             ggplot2::ggplot(modelTestDF,
-                            ggplot2::aes(x = x, y = y, label = name)) +
+                            ggplot2::aes(x = .data$x, y = .data$y, label = .data$name)) +
 
               ggplot2::geom_text(parse = TRUE, fontface = "bold", size = 5) +
               ggplot2::geom_segment(
-                ggplot2::aes(x = xstarts, y = ystarts, xend = xends, yend = yends),
+                ggplot2::aes(x = .data$xstarts, y = .data$ystarts,
+                             xend = .data$xends, yend = .data$yends),
                 linewidth = 0.3) +
 
               ggplot2::geom_label(
                 ggplot2::aes(
-                  x = labelxs,
-                  y = labelys,
+                  x = .data$labelxs,
+                  y = .data$labelys,
 
                   label = ifelse(
-                    is.na(chisq),
+                    is.na(.data$chisq),
                     yes = "No~Comparison",
                     no = sprintf(
                       "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
                       estimatorNameRV(), # %s
-                      chisq, # %.3f
-                      df, # %i
-                      ifelse(pvalue < 0.001, "<0.001", sprintf("==%.3f", pvalue)))),
+                      .data$chisq, # %.3f
+                      .data$df, # %i
+                      ifelse(.data$pvalue < 0.001, "<0.001", sprintf("==%.3f", .data$pvalue)))),
 
-                  fill = c("nsig", "sig")[c(pvalue < input$sigLvl) + 1]), # aes
+                  fill = c("nsig", "sig")[c(.data$pvalue < input$sigLvl) + 1]), # aes
 
                 color = textColor,
                 size = 4.5,
@@ -2172,7 +2173,7 @@ server <- function(input, output, session) {
                 shinydashboard::box(
                   title = HTML("&chi;&sup2;-Comparison Table:"),
                   width = 12,
-                  shinyCTT:::makeKable(combCompTable, bold_cols = 1) %>%
+                  makeKable(combCompTable, bold_cols = 1) %>%
                     kableExtra::add_header_above(headerNames, escape = FALSE) %>%
                     HTML(),
                   br(),
@@ -2190,7 +2191,7 @@ server <- function(input, output, session) {
                       <table align = \"center\"> <tr><td>
                         <h5>AIC:</h5>",
 
-                    shinyCTT:::makeKable(infCompTable$aic, bold_cols = 1),
+                    makeKable(infCompTable$aic, bold_cols = 1),
 
                     "</td></tr></table>
                   </td>
@@ -2199,7 +2200,7 @@ server <- function(input, output, session) {
                     <table align = \"center\"> <tr><td>
                       <h5>BIC:</h5>",
 
-                    shinyCTT:::makeKable(infCompTable$bic, bold_cols = 1),
+                    makeKable(infCompTable$bic, bold_cols = 1),
 
                   "</td></tr></table>
                 </td></tr></table>") %>%

@@ -145,7 +145,7 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
 
   rownames(hierTable) <- modelsAbbrev[rownames(hierTable)]
 
-  shinyCTT:::makeKable(hierTable, bold_cols = 1) %>%
+  makeKable(hierTable, bold_cols = 1) %>%
     kableExtra::row_spec(row = 1, background = "lightgrey")
 }
 
@@ -207,7 +207,7 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, goodColor, badColor, neut
 
   rownames(fitsTable) <- modelsAbbrev[rownames(fitsTable)]
 
-  shinyCTT:::makeKable(
+  makeKable(
     fitsTable[, c("df", "chisq", "pvalue",
                   "rmsea", "rmsea.ci", "rmsea.pvalue", "rmsea.notclose.pvalue",
                   "cfi", "srmr")],
@@ -224,8 +224,8 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, goodColor, badColor, neut
 makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, Ngroups) {
   SECIestName <- paste0(c("SE", "CI"), "<sub>", estimatorName, "</sub>")
 
-  shinyCTT:::makeKable(
-    shinyCTT:::extractParameters(
+  makeKable(
+    extractParameters(
       fitObject,
       alpha = sigLvl),
     col.names = c(
@@ -254,7 +254,7 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, Ngro
 
 makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, neutrColor, textColor) {
   HTML(
-    shinyCTT:::makeKable(
+    makeKable(
       switch(
         whichLegend,
 
@@ -450,5 +450,5 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
         stop(sprintf("No legend available for table %s.", whichLegend))),
 
       position = "left",
-      bootstrap_options = "condensed")) # HTML(shinyCTT:::makeKable(
+      bootstrap_options = "condensed")) # HTML(makeKable(
 }
