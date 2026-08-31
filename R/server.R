@@ -1531,50 +1531,45 @@ server <- function(input, output, session) {
                                                 group = groupName,
                                                 etaIntFree = as.logical(input$etaIntFree))
 
-        #### fitting if there are no groups ----
-        if (isFALSE(groupName)) {
-
-          fittedModelsWarns <- lapply(
-            modelCodes[modelsToTest],
-            FUN = fitOneModel,
-            data = userDataGroup(),
-            meanstructure = TRUE,
-            estimator = mvnTestResult$estimator,
-            missing = ifelse(fimlRV(), "fiml", "listwise"),
-            int.ov.free = TRUE,
-            int.lv.free = as.logical(input$etaIntFree),
-            auto.fix.first = TRUE,
-            auto.fix.single = TRUE,
-            auto.var = TRUE,
-            auto.cov.lv.x = TRUE,
-            auto.efa = TRUE,
-            auto.th = TRUE,
-            auto.delta = TRUE,
-            auto.cov.y = TRUE)
-
-        } #### fitting if there are groups ----
-        else {
-
-          fittedModelsWarns <- lapply(
-            modelCodes[modelsToTest],
-            FUN = fitOneModel,
-            data = userDataGroup(),
-            meanstructure = TRUE,
-            group = groupName,
-            group.equal = c("loadings", "intercepts"),
-            estimator = mvnTestResult$estimator,
-            missing = ifelse(fimlRV(), "fiml", "listwise"),
-            int.ov.free = TRUE,
-            int.lv.free = as.logical(input$etaIntFree),
-            auto.fix.first = TRUE,
-            auto.fix.single = TRUE,
-            auto.var = TRUE,
-            auto.cov.lv.x = TRUE,
-            auto.efa = TRUE,
-            auto.th = TRUE,
-            auto.delta = TRUE,
-            auto.cov.y = TRUE)
-        }
+        #### fit each model once, keeping both a warning and the completed fit ----
+        # withCallingHandlers() + invokeRestart("muffleWarning") records the warning without
+        # aborting the call, unlike tryCatch(warning = ...), which would exit at the first
+        # warning and throw away whatever fit lavaan() was about to return. A model that
+        # errors afterwards is still caught by the wrapping tryCatch(); one that only warns
+        # completes normally and its fit is kept, with the warning attached as an attribute.
+        # group/group.equal are NULL (lavaan::lavaan()'s own default - verified identical to
+        # omitting them) whenever there is no group, so the single-group and multigroup cases
+        # need only one call.
+        fittedModelsWarns <- lapply(
+          modelCodes[modelsToTest],
+          FUN = function(model) {
+            warnCond <- NULL
+            fit <- withCallingHandlers(
+              tryCatch(lavaan::lavaan(model = model,
+                                      data = userDataGroup(),
+                                      meanstructure = TRUE,
+                                      group = if (isFALSE(groupName)) NULL else groupName,
+                                      group.equal = if (isFALSE(groupName)) NULL else c("loadings", "intercepts"),
+                                      estimator = mvnTestResult$estimator,
+                                      missing = ifelse(fimlRV(), "fiml", "listwise"),
+                                      int.ov.free = TRUE,
+                                      int.lv.free = as.logical(input$etaIntFree),
+                                      auto.fix.first = TRUE,
+                                      auto.fix.single = TRUE,
+                                      auto.var = TRUE,
+                                      auto.cov.lv.x = TRUE,
+                                      auto.efa = TRUE,
+                                      auto.th = TRUE,
+                                      auto.delta = TRUE,
+                                      auto.cov.y = TRUE),
+                       error = function(e) e),
+              warning = function(w) {
+                warnCond <<- w
+                invokeRestart("muffleWarning")
+              })
+            attr(fit, "shinyCTTwarning") <- warnCond
+            fit
+          })
 
         #### warning and error counting and capturing ----
         errs <- sapply(fittedModelsWarns, inherits, what = "error")
