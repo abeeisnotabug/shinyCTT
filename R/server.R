@@ -871,7 +871,7 @@ server <- function(input, output, session) {
       # output if groups
       shinydashboard::tabBox(
         width = 12,
-        title = "Covariance Matrix:",
+        title = "Covariance matrix:",
         side = "right",
 
         tabPanel(
@@ -891,7 +891,7 @@ server <- function(input, output, session) {
       # output if NO groups
       shinydashboard::box(
         width = 12,
-        title = "Covariance Matrix:",
+        title = "Covariance matrix:",
 
         makeKable(table, bold_cols = 1) %>%
           HTML()
@@ -1068,7 +1068,7 @@ server <- function(input, output, session) {
     else {
 
       shinydashboard::box(
-        title = "Scatter Plot:",
+        title = "Scatter plot:",
         width = NULL,
 
         fluidRow(
@@ -1208,7 +1208,7 @@ server <- function(input, output, session) {
       # assemble in tabBox
       shinydashboard::tabBox(
         width = 12,
-        title = "Correlation Table with Confidence Intervals:",
+        title = "Correlation table with confidence intervals:",
         side = "right",
 
         tabPanel(
@@ -1231,7 +1231,7 @@ server <- function(input, output, session) {
 
       shinydashboard::box(
           width = 12,
-          title = "Correlation Table with Confidence Intervals:",
+          title = "Correlation table with confidence intervals:",
 
           singleCorrTable,
           br(),
@@ -1398,7 +1398,7 @@ server <- function(input, output, session) {
 
     shinydashboard::box(
       width = 12,
-      title = "Multivariate Plot:",
+      title = "Multivariate plot:",
 
       fluidRow(
 
@@ -2177,7 +2177,7 @@ server <- function(input, output, session) {
 
               fluidRow(
                 shinydashboard::box(
-                  title = HTML("&chi;&sup2;-Comparison Table:"),
+                  title = HTML("&chi;&sup2;-comparison table:"),
                   width = 12,
                   makeKable(combCompTable, bold_cols = 1) %>%
                     kableExtra::add_header_above(headerNames, escape = FALSE) %>%
@@ -2190,7 +2190,7 @@ server <- function(input, output, session) {
 
               fluidRow(
                 shinydashboard::box(
-                  title = "AIC/BIC-Comparison Table:",
+                  title = "AIC/BIC-comparison table:",
                   width = 12,
                   paste0(
                     "<table align = \"center\", width = \"100%\"> <tr><td>

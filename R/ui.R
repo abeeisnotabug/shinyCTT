@@ -278,7 +278,7 @@ ui <- function(request) {
 
               shinydashboard::box(
                 width = NULL,
-                title = "Test on Correlative Independence:",
+                title = "Test on correlative independence:",
                 radioButtons(
                   "corrIndEst",
                   "Choose the estimator for this test:",
@@ -296,7 +296,7 @@ ui <- function(request) {
 
               shinydashboard::box(
                 width = NULL,
-                title = "Correlation Table with Confidence Intervals:",
+                title = "Correlation table with confidence intervals:",
                 shinyjs::hidden(
                   radioButtons(
                     "corrTabNA",
@@ -343,12 +343,12 @@ ui <- function(request) {
 
               shinydashboard::box(
                 width = NULL,
-                title = "Test on Multivariate Normality:",
+                title = "Test on multivariate normality:",
                 htmlOutput("mvnComment")),
 
               shinydashboard::box(
                 width = NULL,
-                title = "Tests on Univariate Normality:",
+                title = "Tests on univariate normality:",
                 htmlOutput("mvnTable"))
             ), # column
 
@@ -725,7 +725,7 @@ ui <- function(request) {
           fluidRow(
             shinydashboard::tabBox(
               id = "parTabsetTab",
-              title = "Estimated Paramters",
+              title = "Estimated parameters",
               width = 12))),
 
         ### tabItem parTablesMg ----
@@ -734,7 +734,7 @@ ui <- function(request) {
           fluidRow(
             shinydashboard::tabBox(
               id = "parTabsetTabMg",
-              title = "Estimated Paramters",
+              title = "Estimated parameters",
               width = 12))),
 
         ### tabItem facScores ----
@@ -743,7 +743,7 @@ ui <- function(request) {
           fluidRow(
             shinydashboard::tabBox(
               id = "fsTabsetTab",
-              title = HTML("Predicted Factor Scores (&eta;&#x302;)"),
+              title = HTML("Predicted factor scores (&eta;&#x302;)"),
               width = 12))),
 
         ### tabItem facScoresMg ----
@@ -752,7 +752,7 @@ ui <- function(request) {
           fluidRow(
             shinydashboard::tabBox(
               id = "fsTabsetTabMg",
-              title = HTML("Predicted Factor Scores (&eta;&#x302;)"),
+              title = HTML("Predicted factor scores (&eta;&#x302;)"),
               width = 12))),
 
         ### tabItem modelCode ----
@@ -761,7 +761,7 @@ ui <- function(request) {
           fluidRow(
             shinydashboard::tabBox(
               id = "mcTabsetTab",
-              title = "Model Code",
+              title = "Model code",
               width = 12))),
 
         ### tabItem modelCodeMg ----
@@ -770,7 +770,7 @@ ui <- function(request) {
           fluidRow(
             shinydashboard::tabBox(
               id = "mcTabsetTabMg",
-              title = "Model Code",
+              title = "Model code",
               width = 12)))
 
       ) # tabItems
