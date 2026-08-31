@@ -91,7 +91,7 @@ makeCorrTableWithCIs <- function(
   corrTableComb
 }
 
-makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, badColor, textColor, modelsAbbrev) {
+makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, badColor, neutrColor, textColor, modelsAbbrev) {
   hierTable <- succTable
   hierTable$CFI <- CFIs
 
@@ -119,24 +119,26 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
     color = textColor,
     background = ifelse(hierTable[-1, "RMSEA"] < 0.05, goodColor, badColor))
 
-  hierTable[-1, "CFI"] <- kableExtra::cell_spec(
-    sprintf("%.3f", hierTable[-1, "CFI"]),
+  ## CFI, AIC and BIC rate each model on its own, same as in the fit index table, so unlike
+  ## the columns above they are not restricted to rows -1 and compared against reference
+  ## values / each other instead of against the row above.
+  hierTable$CFI <- kableExtra::cell_spec(
+    sprintf("%.3f", hierTable$CFI),
     color = textColor,
-    background = ifelse(diff(hierTable$CFI) >= 0, goodColor, badColor))
+    background = ifelse(
+      hierTable$CFI >= 0.97,
+      yes = goodColor,
+      no = ifelse(hierTable$CFI >= 0.95, yes = neutrColor, no = badColor)))
 
-  hierTable[-1, "AIC"] <- kableExtra::cell_spec(
-    sprintf("%.3f", hierTable[-1, "AIC"]),
+  hierTable$AIC <- kableExtra::cell_spec(
+    sprintf("%.3f", as.numeric(hierTable$AIC)),
     color = textColor,
-    background = ifelse(diff(hierTable$AIC) <= 0, goodColor, badColor))
+    background = ifelse(hierTable$AIC == min(as.numeric(hierTable$AIC)), goodColor, badColor))
 
-  hierTable[-1, "BIC"] <- kableExtra::cell_spec(
-    sprintf("%.3f", hierTable[-1, "BIC"]),
+  hierTable$BIC <- kableExtra::cell_spec(
+    sprintf("%.3f", as.numeric(hierTable$BIC)),
     color = textColor,
-    background = ifelse(diff(hierTable$BIC) <= 0, goodColor, badColor))
-
-  hierTable$AIC[1] <- sprintf("%.3f", as.numeric(hierTable$AIC[1]))
-  hierTable$BIC[1] <- sprintf("%.3f", as.numeric(hierTable$BIC[1]))
-  hierTable$CFI[1] <- sprintf("%.3f", as.numeric(hierTable$CFI[1]))
+    background = ifelse(hierTable$BIC == min(as.numeric(hierTable$BIC)), goodColor, badColor))
 
   names(hierTable) <- c("&Delta;df", paste0(estimatorName, "-&Delta;&chi;&sup2;"), "p",
                         "RMSEA<sub>D</sub>",
@@ -198,7 +200,10 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, goodColor, badColor, neut
   fitsTable$cfi <- kableExtra::cell_spec(
     sprintf("%.3f", fits$cfi),
     color = textColor,
-    background = ifelse(fits$cfi < 0.95, badColor, goodColor))
+    background = ifelse(
+      fits$cfi >= 0.97,
+      yes = goodColor,
+      no = ifelse(fits$cfi >= 0.95, yes = neutrColor, no = badColor)))
 
   fitsTable$srmr <- kableExtra::cell_spec(
     sprintf("%.3f", fits$srmr),
@@ -302,27 +307,27 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
 
           kableExtra::cell_spec("CFI:"),
           kableExtra::cell_spec(
-            "&nearr;",
+            ">= 0.97",
             color = textColor,
-            background = goodColor,
-            escape = FALSE),
+            background = goodColor),
           kableExtra::cell_spec(
-            "&searr;",
+            ">= 0.95",
             color = textColor,
-            background = badColor,
-            escape = FALSE),
+            background = neutrColor),
+          kableExtra::cell_spec(
+            "< 0.95",
+            color = textColor,
+            background = badColor),
 
           kableExtra::cell_spec("AIC, BIC:"),
           kableExtra::cell_spec(
-            "&searr;",
+            "min.",
             color = textColor,
-            background = goodColor,
-            escape = FALSE),
+            background = goodColor),
           kableExtra::cell_spec(
-            "&nearr;",
+            "else",
             color = textColor,
-            background = badColor,
-            escape = FALSE)),
+            background = badColor)),
 
         "fitIndexTable" = rbind(
           cbind(
@@ -342,11 +347,15 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
             kableExtra::cell_spec(""), kableExtra::cell_spec(""), kableExtra::cell_spec(""), kableExtra::cell_spec(""),
             kableExtra::cell_spec("CFI"),
             kableExtra::cell_spec(
-              "> 0.95",
+              ">= 0.97",
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              "<= 0.95",
+              ">= 0.95",
+              color = textColor,
+              background = neutrColor),
+            kableExtra::cell_spec(
+              "< 0.95",
               color = textColor,
               background = badColor),
 
@@ -409,7 +418,8 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
             kableExtra::cell_spec(
               sprintf(">= %.3f", sigLvl),
               color = textColor,
-              background = badColor))),
+              background = badColor),
+            kableExtra::cell_spec(""))),
 
         "combCompTable" = cbind(
           kableExtra::cell_spec("Legend:", bold = TRUE),

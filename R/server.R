@@ -2105,7 +2105,7 @@ server <- function(input, output, session) {
                 succTableTmp <- as.data.frame(succTable[[model]])
                 makeHierTable(succTableTmp, fits[rownames(succTableTmp), "cfi"],
                               estimatorNameRV(), input$sigLvl,
-                              goodColor, badColor, textColor, modelsAbbrev)
+                              goodColor, badColor, neutrColor, textColor, modelsAbbrev)
               } else {
                 NULL
               }
