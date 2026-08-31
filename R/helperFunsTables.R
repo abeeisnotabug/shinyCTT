@@ -235,14 +235,14 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, Ngro
       alpha = sigLvl),
     col.names = c(
       "Item",
-      "&lambda;&#x302;<sub>i</sub>",
+      "&lambda;<sub>i</sub>",
       "Est.", SECIestName,
       "Std. Est.", SECIestName,
-      "&alpha;&#x302;<sub>i</sub>",
+      "&alpha;<sub>i</sub>",
       "Est.", SECIestName,
-      "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
+      "&sigma;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
       "Est.", SECIestName,
-      "R&#x302;<sub>i</sub>",
+      "R<sub>i</sub>",
       "Est.", SECIestName),
     bold_cols = 1) %>%
 

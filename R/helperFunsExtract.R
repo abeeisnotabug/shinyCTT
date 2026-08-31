@@ -97,18 +97,18 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
     df$label <- gsub("_g(\\d+)", "", df$label)
 
     df$label <- gsub("sigma_epsilon_(\\d+)",
-                     "&sigma;&#x302;&sup2;<sub>&epsilon;<sub>\\1</sub></sub>",
+                     "&sigma;&sup2;<sub>&epsilon;<sub>\\1</sub></sub>",
                      df$label)
     df$label <- gsub("lambda_(\\d+)",
-                     "&lambda;&#x302;<sub>\\1</sub>",
+                     "&lambda;<sub>\\1</sub>",
                      df$label)
     df$label <- gsub("alpha_(\\d+)",
-                     "&alpha;&#x302;<sub>\\1</sub>",
+                     "&alpha;<sub>\\1</sub>",
                      df$label)
-    df$label[grep("rel_", df$label)] <- sprintf("R&#x302;<sub>%i</sub>", 1:length(lavaan::lavNames(fittedModel)))
-    df$label[grep("sumrel", df$label)] <- "R&#x302;<sub>&Sigma;</sub>"
-    df$label[grep("sigma_eta", df$label)] <- "&sigma;&#x302;&sup2;<sub>&eta;</sub>"
-    df$label[grep("mu_eta", df$label)] <- "&mu;&#x302;<sub>&eta;</sub>"
+    df$label[grep("rel_", df$label)] <- sprintf("R<sub>%i</sub>", 1:length(lavaan::lavNames(fittedModel)))
+    df$label[grep("sumrel", df$label)] <- "R<sub>&Sigma;</sub>"
+    df$label[grep("sigma_eta", df$label)] <- "&sigma;&sup2;<sub>&eta;</sub>"
+    df$label[grep("mu_eta", df$label)] <- "&mu;<sub>&eta;</sub>"
 
     # Split by groups and bind -----------------------------------------------------------------------------------------------
     splitDf <- lapply(
@@ -119,7 +119,7 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
                     subDf[grep("std", subDf$label), -c(1, 2)],
                     subDf[grep("alpha", subDf$label), -1],
                     subDf[grep("epsilon", subDf$label), -1],
-                    subDf[grep("R&#x302;", subDf$label)[1:nItems], -1]),
+                    subDf[grep("R", subDf$label)[1:nItems], -1]),
               c(Item = NA,
                 label = NA,
                 est = NA,
@@ -128,9 +128,9 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
                 est = NA,
                 se = NA,
                 CI = NA,
-                if (etaIntFree) subDf[subDf$label == "&mu;&#x302;<sub>&eta;</sub>", -1] else c(label = NA, est = NA, se = NA, CI = NA),
-                subDf[subDf$label == "&sigma;&#x302;&sup2;<sub>&eta;</sub>", -1],
-                subDf[grep("R&#x302;<sub>&Sigma;", subDf$label), -1])
+                if (etaIntFree) subDf[subDf$label == "&mu;<sub>&eta;</sub>", -1] else c(label = NA, est = NA, se = NA, CI = NA),
+                subDf[subDf$label == "&sigma;&sup2;<sub>&eta;</sub>", -1],
+                subDf[grep("R<sub>&Sigma;", subDf$label), -1])
         )
       }
     )
