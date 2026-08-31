@@ -130,3 +130,20 @@ makeRCode <- function(input, modelCode, estimator, missingMethod, isSubset, mode
   fitLine)
 
 }
+
+# withCallingHandlers() + invokeRestart("muffleWarning") records a warning without aborting
+# the call, unlike tryCatch(warning = ...), which would exit at the first warning and throw
+# away whatever fit lavaan() was about to return. A model that errors afterwards is still
+# caught by the wrapping tryCatch(); one that only warns completes normally and its fit is
+# kept, with the warning attached as an attribute for display.
+fitOneModel <- function(model, ...) {
+  warnCond <- NULL
+  fit <- withCallingHandlers(
+    tryCatch(lavaan::lavaan(model = model, ...), error = function(e) e),
+    warning = function(w) {
+      warnCond <<- w
+      invokeRestart("muffleWarning")
+    })
+  attr(fit, "shinyCTTwarning") <- warnCond
+  fit
+}
