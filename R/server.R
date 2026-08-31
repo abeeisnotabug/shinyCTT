@@ -695,7 +695,10 @@ server <- function(input, output, session) {
           bins = input$singleNoBins) +
 
         ggplot2::xlab(input$histItem) +
-        ggplot2::theme_classic()
+        ggplot2::theme_classic() +
+
+        if (input$singleDens)
+          ggplot2::geom_density(color = "black", linewidth = 1)
     })
 
     ## histBox if (validGroupsRV()) ----
@@ -720,7 +723,15 @@ server <- function(input, output, session) {
 
           ggplot2::xlab(input$histItemGroup) +
           ggplot2::scale_fill_discrete(name = input$groupCol) +
-          ggplot2::theme_classic()
+          ggplot2::theme_classic() +
+
+          if (input$groupDens)
+            list(
+              ggplot2::geom_density(
+                ggplot2::aes(color = .data$group),
+                fill = NA,
+                linewidth = 1),
+              ggplot2::scale_color_discrete(name = input$groupCol))
       })
 
       ### histBox tabBox ----
@@ -748,11 +759,10 @@ server <- function(input, output, session) {
                 min = 1, max = 100, value = 30, step = 1)),
             column(
               width = 6,
-              radioButtons(
+              checkboxInput(
                 "singleDens",
-                "Choose the ordinate scaling:",
-                choices = c("Density" = TRUE, "Frequency" = FALSE),
-                selected = FALSE)))),
+                "Overlay a density curve",
+                value = FALSE)))),
 
         #### histBox tabBox group-wise panel ----
         tabPanel(
@@ -785,11 +795,10 @@ server <- function(input, output, session) {
                 min = 1, max = 100, value = 30, step = 1)),
             column(
               width = 6,
-              radioButtons(
+              checkboxInput(
                 "groupDens",
-                "Choose the ordinate scaling:",
-                choices = c("Density" = TRUE, "Frequency" = FALSE),
-                selected = FALSE)))
+                "Overlay a density curve",
+                value = FALSE)))
         ) # tabPanel
       ) # tabBox
 
@@ -814,15 +823,14 @@ server <- function(input, output, session) {
             width = 6,
             sliderInput(
               "singleNoBins",
-              "Number of bins",
+              "Choose the number of bins:",
               min = 1, max = 100, value = 30, step = 1)),
           column(
             width = 6,
-            radioButtons(
+            checkboxInput(
               "singleDens",
-              "Choose ordinate units",
-              choices = c("Density" = TRUE, "Frequency" = FALSE),
-              selected = FALSE)))
+              "Overlay a density curve",
+              value = FALSE)))
 
       ) # box
     }
