@@ -79,8 +79,13 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
   relsLogit <- log(rels / (1 - rels))
   relsLogitSE <- relsSE / (rels * (1 - rels))
 
-  relsCiL <- 1 / (1 + exp(-relsLogit + stats::qnorm(1 - alpha / 2) * relsLogitSE))
-  relsCiU <- 1 / (1 + exp(-relsLogit - stats::qnorm(1 - alpha / 2) * relsLogitSE))
+  # At a Heywood boundary (rel <= 0 or rel >= 1) the logit is +-Inf and its SE blows up too,
+  # so the formula below divides Inf by Inf and returns NaN on one side. Report a zero-width
+  # CI pinned to the boundary there instead, rather than let a valid bound sit next to a NaN.
+  relsCiL <- ifelse(rels <= 0, 0, ifelse(rels >= 1, 1,
+    1 / (1 + exp(-relsLogit + stats::qnorm(1 - alpha / 2) * relsLogitSE))))
+  relsCiU <- ifelse(rels <= 0, 0, ifelse(rels >= 1, 1,
+    1 / (1 + exp(-relsLogit - stats::qnorm(1 - alpha / 2) * relsLogitSE))))
 
   df$ci.lower[grep("rel_", df$label)] <- relsCiL
   df$ci.upper[grep("rel_", df$label)] <- relsCiU
