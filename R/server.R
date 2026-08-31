@@ -1446,6 +1446,7 @@ server <- function(input, output, session) {
     shinyjs::disable("goModels")
     shinyjs::disable("doMg")
     shinyjs::disable("etaIntFree")
+    shinyjs::disable("sigLvl")
     shinyjs::disable("estimator")
 
     estimatorNameRV(paste0(if (fimlRV()) "FI", input$estimator))
@@ -1541,6 +1542,7 @@ server <- function(input, output, session) {
                                       data = userDataGroup(),
                                       meanstructure = TRUE,
                                       estimator = mvnTestResult$estimator,
+                                      missing = ifelse(fimlRV(), "fiml", "listwise"),
                                       int.ov.free = TRUE,
                                       int.lv.free = as.logical(input$etaIntFree),
                                       auto.fix.first = TRUE,
@@ -1564,6 +1566,7 @@ server <- function(input, output, session) {
                                         data = userDataGroup(),
                                         meanstructure = TRUE,
                                         estimator = mvnTestResult$estimator,
+                                        missing = ifelse(fimlRV(), "fiml", "listwise"),
                                         int.ov.free = TRUE,
                                         int.lv.free = as.logical(input$etaIntFree),
                                         auto.fix.first = TRUE,
@@ -1590,6 +1593,7 @@ server <- function(input, output, session) {
                                       group = groupName,
                                       group.equal = c("loadings", "intercepts"),
                                       estimator = mvnTestResult$estimator,
+                                      missing = ifelse(fimlRV(), "fiml", "listwise"),
                                       int.ov.free = TRUE,
                                       int.lv.free = as.logical(input$etaIntFree),
                                       auto.fix.first = TRUE,
@@ -1615,6 +1619,7 @@ server <- function(input, output, session) {
                                         group = groupName,
                                         group.equal = c("loadings", "intercepts"),
                                         estimator = mvnTestResult$estimator,
+                                        missing = ifelse(fimlRV(), "fiml", "listwise"),
                                         int.ov.free = TRUE,
                                         int.lv.free = as.logical(input$etaIntFree),
                                         auto.fix.first = TRUE,
@@ -1925,6 +1930,7 @@ server <- function(input, output, session) {
                   input = input,
                   modelCode = modelCodes[[thisModel]],
                   estimator = mvnTestResult$estimator,
+                  missingMethod = ifelse(fimlRV(), "fiml", "listwise"),
                   isSubset = isSubset,
                   model = thisModel,
                   isMg = !isFALSE(groupName)))

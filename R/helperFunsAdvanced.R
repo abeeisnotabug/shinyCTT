@@ -32,7 +32,7 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
   out
 }
 
-makeRCode <- function(input, modelCode, estimator, isSubset, model, isMg) {
+makeRCode <- function(input, modelCode, estimator, missingMethod, isSubset, model, isMg) {
   head <- "library(lavaan)"
 
   dataInput <- sprintf(
@@ -80,12 +80,14 @@ makeRCode <- function(input, modelCode, estimator, isSubset, model, isMg) {
   meanstructure = TRUE,
   group = \"%s\",
   group.equal = c(\"loadings\", \"intercepts\"),
-  estimator = \"%s\")",
+  estimator = \"%s\",
+  missing = \"%s\")",
 
       model,
       ifelse(isSubset, "subsetData", "rawData"),
       input$groupCol,
-      estimator)
+      estimator,
+      missingMethod)
 
   } else {
 
@@ -94,11 +96,13 @@ makeRCode <- function(input, modelCode, estimator, isSubset, model, isMg) {
   model = modelCode,
   data = %s,
   meanstructure = TRUE,
-  estimator = \"%s\")",
+  estimator = \"%s\",
+  missing = \"%s\")",
 
       model,
       ifelse(isSubset, "subsetData", "rawData"),
-      estimator)
+      estimator,
+      missingMethod)
   }
 
   sprintf(
