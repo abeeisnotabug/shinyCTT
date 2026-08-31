@@ -76,7 +76,11 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
   rels <- df$est[grep("rel_", df$label)]
   relsSE <- df$se[grep("rel_", df$label)]
 
-  relsLogit <- log(rels / (1 - rels))
+  # rels > 1 or < 0 (a Heywood case, see below) makes rels / (1 - rels) negative, and log() of
+  # that is NaN - correctly, since the logit isn't defined out there. The ifelse() clamp below
+  # discards it before it's ever used, so the NaN is harmless; suppress the console warning it
+  # would otherwise print for a value nobody keeps.
+  relsLogit <- suppressWarnings(log(rels / (1 - rels)))
   relsLogitSE <- relsSE / (rels * (1 - rels))
 
   # At a Heywood boundary (rel <= 0 or rel >= 1) the logit is +-Inf and its SE blows up too,
