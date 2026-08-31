@@ -406,8 +406,11 @@ ui <- function(request) {
                     width = 6,
                     radioButtons(
                       "etaIntFree",
-                      "Choose parameterization:",
-                      choices = c("Std. Eta" = FALSE, "Std. Alpha" = TRUE))),
+                      "Choose the mean structure parameterization:",
+                      choiceNames = list(
+                        HTML("Fix the latent mean (&mu;<sub>&eta;</sub> = 0)"),
+                        HTML("Fix the first intercept (&alpha;<sub>1</sub> = 0)")),
+                      choiceValues = c(FALSE, TRUE))),
 
                   ##### testParamTab left col doMg ----
                   column(
