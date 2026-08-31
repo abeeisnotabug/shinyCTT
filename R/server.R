@@ -1777,7 +1777,7 @@ server <- function(input, output, session) {
 
             compTable$chisq[thisModelStr] <-
               kableExtra::cell_spec(
-                sprintf(paste0("%.3f", sigAddon), fits[thisModel, "chisq"]),
+                sprintf(paste0("%.2f", sigAddon), fits[thisModel, "chisq"]),
                 background = sigColor,
                 color = sigTxtColor,
                 italic = TRUE)
@@ -1792,13 +1792,13 @@ server <- function(input, output, session) {
             ##### write to AIC/BIC comp table ----
             infCompTable$aic[thisModelStr] <-
               kableExtra::cell_spec(
-                sprintf("%.3f", fits[thisModel, "aic"]),
+                sprintf("%.1f", fits[thisModel, "aic"]),
                 color = textColor,
                 background = neutrColor)
 
             infCompTable$bic[thisModelStr] <-
               kableExtra::cell_spec(
-                sprintf("%.3f", fits[thisModel, "bic"]),
+                sprintf("%.1f", fits[thisModel, "bic"]),
                 color = textColor,
                 background = neutrColor)
 
@@ -1810,13 +1810,13 @@ server <- function(input, output, session) {
 
               infCompTable$aic[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
                 kableExtra::cell_spec(
-                  sprintf(ifelse(aicDiffs < 0, "%.3f", "+%.3f"), aicDiffs),
+                  sprintf(ifelse(aicDiffs < 0, "%.1f", "+%.1f"), aicDiffs),
                   color = textColor,
                   background = ifelse(aicDiffs < 0, goodColor, badColor))
 
               infCompTable$bic[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
                 kableExtra::cell_spec(
-                  sprintf(ifelse(bicDiffs < 0, "%.3f", "+%.3f"), bicDiffs),
+                  sprintf(ifelse(bicDiffs < 0, "%.1f", "+%.1f"), bicDiffs),
                   color = textColor,
                   background = ifelse(bicDiffs < 0, goodColor, badColor))
             }
@@ -1860,7 +1860,7 @@ server <- function(input, output, session) {
               thisModelCompStr <- paste0(thisModel, thisComp)
 
               compTable$chisq[thisModelCompStr] <- kableExtra::cell_spec(
-                sprintf(paste0("+%.3f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp]),
+                sprintf(paste0("+%.2f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp]),
                 background = sigColor,
                 color = sigTxtColor)
 
