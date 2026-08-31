@@ -1531,119 +1531,76 @@ server <- function(input, output, session) {
                                                 group = groupName,
                                                 etaIntFree = as.logical(input$etaIntFree))
 
-        #### tryCatches if there are no groups ----
+        #### fit each model once, keeping both a warning and the completed fit ----
+        # withCallingHandlers() + invokeRestart("muffleWarning") records the warning without
+        # aborting the call, unlike tryCatch(warning = ...), which would exit at the first
+        # warning and throw away whatever fit lavaan() was about to return. A model that
+        # errors afterwards is still caught by the wrapping tryCatch(); one that only warns
+        # completes normally and its fit is kept, with the warning attached as an attribute.
+        fitOneModel <- function(model, ...) {
+          warnCond <- NULL
+          fit <- withCallingHandlers(
+            tryCatch(lavaan::lavaan(model = model, ...), error = function(e) e),
+            warning = function(w) {
+              warnCond <<- w
+              invokeRestart("muffleWarning")
+            })
+          attr(fit, "shinyCTTwarning") <- warnCond
+          fit
+        }
+
+        #### fitting if there are no groups ----
         if (isFALSE(groupName)) {
 
-          ##### Capture warnings ----
           fittedModelsWarns <- lapply(
             modelCodes[modelsToTest],
-            FUN = function(model) {
-              tryCatch(lavaan::lavaan(model = model,
-                                      data = userDataGroup(),
-                                      meanstructure = TRUE,
-                                      estimator = mvnTestResult$estimator,
-                                      missing = ifelse(fimlRV(), "fiml", "listwise"),
-                                      int.ov.free = TRUE,
-                                      int.lv.free = as.logical(input$etaIntFree),
-                                      auto.fix.first = TRUE,
-                                      auto.fix.single = TRUE,
-                                      auto.var = TRUE,
-                                      auto.cov.lv.x = TRUE,
-                                      auto.efa = TRUE,
-                                      auto.th = TRUE,
-                                      auto.delta = TRUE,
-                                      auto.cov.y = TRUE),
-                       error = function(e) e,
-                       warning = function(w) w)
-          })
+            FUN = fitOneModel,
+            data = userDataGroup(),
+            meanstructure = TRUE,
+            estimator = mvnTestResult$estimator,
+            missing = ifelse(fimlRV(), "fiml", "listwise"),
+            int.ov.free = TRUE,
+            int.lv.free = as.logical(input$etaIntFree),
+            auto.fix.first = TRUE,
+            auto.fix.single = TRUE,
+            auto.var = TRUE,
+            auto.cov.lv.x = TRUE,
+            auto.efa = TRUE,
+            auto.th = TRUE,
+            auto.delta = TRUE,
+            auto.cov.y = TRUE)
 
-          ##### Capture errors ----
-          fittedModelsErrs <- lapply(
-            modelCodes[modelsToTest],
-            FUN = function(model) {
-              suppressWarnings(
-                tryCatch(lavaan::lavaan(model = model,
-                                        data = userDataGroup(),
-                                        meanstructure = TRUE,
-                                        estimator = mvnTestResult$estimator,
-                                        missing = ifelse(fimlRV(), "fiml", "listwise"),
-                                        int.ov.free = TRUE,
-                                        int.lv.free = as.logical(input$etaIntFree),
-                                        auto.fix.first = TRUE,
-                                        auto.fix.single = TRUE,
-                                        auto.var = TRUE,
-                                        auto.cov.lv.x = TRUE,
-                                        auto.efa = TRUE,
-                                        auto.th = TRUE,
-                                        auto.delta = TRUE,
-                                        auto.cov.y = TRUE),
-                         error = function(e) e))
-          })
-
-        } #### tryCatches if there are groups ----
+        } #### fitting if there are groups ----
         else {
 
-          ##### Capture warnings ----
           fittedModelsWarns <- lapply(
             modelCodes[modelsToTest],
-            FUN = function(model) {
-              tryCatch(lavaan::lavaan(model = model,
-                                      data = userDataGroup(),
-                                      meanstructure = TRUE,
-                                      group = groupName,
-                                      group.equal = c("loadings", "intercepts"),
-                                      estimator = mvnTestResult$estimator,
-                                      missing = ifelse(fimlRV(), "fiml", "listwise"),
-                                      int.ov.free = TRUE,
-                                      int.lv.free = as.logical(input$etaIntFree),
-                                      auto.fix.first = TRUE,
-                                      auto.fix.single = TRUE,
-                                      auto.var = TRUE,
-                                      auto.cov.lv.x = TRUE,
-                                      auto.efa = TRUE,
-                                      auto.th = TRUE,
-                                      auto.delta = TRUE,
-                                      auto.cov.y = TRUE),
-                       error = function(e) e,
-                       warning = function(w) w)
-          })
-
-          ##### Capture errors ----
-          fittedModelsErrs <- lapply(
-            modelCodes[modelsToTest],
-            FUN = function(model) {
-              suppressWarnings(
-                tryCatch(lavaan::lavaan(model = model,
-                                        data = userDataGroup(),
-                                        meanstructure = TRUE,
-                                        group = groupName,
-                                        group.equal = c("loadings", "intercepts"),
-                                        estimator = mvnTestResult$estimator,
-                                        missing = ifelse(fimlRV(), "fiml", "listwise"),
-                                        int.ov.free = TRUE,
-                                        int.lv.free = as.logical(input$etaIntFree),
-                                        auto.fix.first = TRUE,
-                                        auto.fix.single = TRUE,
-                                        auto.var = TRUE,
-                                        auto.cov.lv.x = TRUE,
-                                        auto.efa = TRUE,
-                                        auto.th = TRUE,
-                                        auto.delta = TRUE,
-                                        auto.cov.y = TRUE),
-                         error = function(e) e))
-          })
+            FUN = fitOneModel,
+            data = userDataGroup(),
+            meanstructure = TRUE,
+            group = groupName,
+            group.equal = c("loadings", "intercepts"),
+            estimator = mvnTestResult$estimator,
+            missing = ifelse(fimlRV(), "fiml", "listwise"),
+            int.ov.free = TRUE,
+            int.lv.free = as.logical(input$etaIntFree),
+            auto.fix.first = TRUE,
+            auto.fix.single = TRUE,
+            auto.var = TRUE,
+            auto.cov.lv.x = TRUE,
+            auto.efa = TRUE,
+            auto.th = TRUE,
+            auto.delta = TRUE,
+            auto.cov.y = TRUE)
         }
 
         #### warning and error counting and capturing ----
-        warns <- sapply(
-          lapply(fittedModelsWarns, class),
-          function(code) code[1] == "simpleWarning")
+        errs <- sapply(fittedModelsWarns, inherits, what = "error")
+        warns <- sapply(fittedModelsWarns, function(f) !is.null(attr(f, "shinyCTTwarning")))
 
-        errs <- sapply(
-          lapply(fittedModelsErrs, class),
-          function(code) code[1] == "simpleError")
-
-        goodModels <- modelsToTest[!warns & !errs]
+        # A model that only warns is still usable - its fit was kept above - so only a
+        # genuine error excludes it from goodModels. warnModels is purely informational now.
+        goodModels <- modelsToTest[!errs]
         errModels <- modelsToTest[errs]
         warnModels <- modelsToTest[warns]
 
@@ -1655,7 +1612,7 @@ server <- function(input, output, session) {
 
             cbind(paste0(modelsLong[warnModels], ":&emsp;"),
                   sapply(fittedModelsWarns[warnModels],
-                         function(model) model$message)) %>%
+                         function(model) attr(model, "shinyCTTwarning")$message)) %>%
               kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
               kableExtra::column_spec(column = 1, bold = TRUE) %>%
               HTML() %>%
@@ -1673,7 +1630,7 @@ server <- function(input, output, session) {
             h6("The following models produced errors:"),
 
             cbind(paste0(modelsLong[errModels], ":&emsp;"),
-                  sapply(fittedModelsErrs[errModels],
+                  sapply(fittedModelsWarns[errModels],
                          function(model) model$message)) %>%
               kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
               kableExtra::column_spec(column = 1, bold = TRUE) %>%
