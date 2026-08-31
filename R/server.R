@@ -1502,7 +1502,9 @@ server <- function(input, output, session) {
   })
 
   # observeEvent input$goModels ----
-  observeEvent(input$goModels, {
+  observeEvent(input$goModels, tryCatch({
+    output$goModelsError <- renderUI(NULL)
+
     shinyjs::disable("goModels")
     shinyjs::disable("doMg")
     shinyjs::disable("etaIntFree")
@@ -2238,5 +2240,27 @@ server <- function(input, output, session) {
         }
       }
     )
-  }) # observeEvent(input$goModels, {
+  },
+
+  ## observeEvent input$goModels error handler ----
+  # Everything above is one long chain - fit, compare, render - and a failure anywhere
+  # in it used to kill the observer with nothing on screen: no results, no error box,
+  # the message only in the R console. Report it where the user pressed the button, and
+  # put back exactly what this run disabled so they can change the settings and retry.
+  # The model selection stays locked either way, as it does after a run that succeeds.
+  error = function(e) {
+    shinyjs::enable("goModels")
+    shinyjs::enable("etaIntFree")
+    shinyjs::enable("sigLvl")
+    shinyjs::enable("estimator")
+    if (isTRUE(validGroupsRV())) shinyjs::enable("doMg")
+
+    output$goModelsError <- renderUI(
+      tagList(
+        br(),
+        strong("The model tests failed:"),
+        paste("There was an ERROR:", conditionMessage(e)) %>%
+          HTML() %>%
+          div(style = "color:red")))
+  })) # observeEvent(input$goModels, {
 }

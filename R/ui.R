@@ -426,7 +426,8 @@ ui <- function(request) {
               ##### testParamTab left col goModels ----
               shinydashboard::box(
                 width = NULL,
-                actionButton("goModels", "Test the models", width = "100%"))
+                actionButton("goModels", "Test the models", width = "100%"),
+                htmlOutput("goModelsError"))
             ), # column
 
             #### testParamTab right col (model test checkbox table) ----
