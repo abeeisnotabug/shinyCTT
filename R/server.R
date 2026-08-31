@@ -375,7 +375,15 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab observeEvent selectall ----
   observeEvent(input$selectall, {
-    if (input$selectall != 0) {
+    # Both links sit in the same renderUI as the item checkboxes, and their
+    # updateCheckboxGroupInput(choices = ) rebuilds that group from scratch - which
+    # throws away the shinyjs::disable("itemCols") applied when the subset was selected.
+    # A click after that point handed back an editable item selection that the already
+    # rendered statistics, model tests and tables know nothing about. Disabling the links
+    # is only the visible half of the fix: shinyjs marks an actionLink disabled, but an
+    # <a> has no disabled semantics of its own and the click still reaches Shiny - the
+    # counters do go up. This guard is the half that actually holds.
+    if (input$selectall != 0 && input$subsetSelectButton == 0) {
       possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
       itemColsRV(length(possibleItemColumns))
 
@@ -390,7 +398,7 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab observeEvent deselectall ----
   observeEvent(input$deselectall, {
-    if (input$deselectall != 0) {
+    if (input$deselectall != 0 && input$subsetSelectButton == 0) {
       possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
       itemColsRV(length(possibleItemColumns))
 
@@ -541,6 +549,8 @@ server <- function(input, output, session) {
   ## subsetSelectionTab observeEvent subsetSelectButton ----
   observeEvent(input$subsetSelectButton, {
     shinyjs::disable("itemCols")
+    shinyjs::disable("selectall")
+    shinyjs::disable("deselectall")
     shinyjs::disable("groupCol")
     shinyjs::disable("groups")
     shinyjs::disable("subsetSelectButton")
