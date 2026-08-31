@@ -2074,6 +2074,15 @@ server <- function(input, output, session) {
 
             fluidPage(
 
+              if (sum(warns) > 0 || sum(errs) > 0)
+                fluidRow(
+                  wellPanel(
+                    h5(sprintf("Lavaan status: %i warnings, %i errors.",
+                               sum(warns),
+                               sum(errs))),
+                    lavErrsMsg,
+                    lavWarnsMsg)),
+
               fluidRow(
                 shinydashboard::box(
                   title = "Hierarchical model comparison plot:",
