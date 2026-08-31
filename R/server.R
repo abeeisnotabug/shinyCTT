@@ -69,6 +69,26 @@ server <- function(input, output, session) {
     raw = NULL,
     estimator = "ML")
 
+  ## Group colours ----
+  # ggplot2's default discrete palette, but pinned to the group *by name*: a discrete
+  # scale hands out its palette to whichever levels are still in the data, so
+  # de-selecting a group in a plot tab used to recolour the ones that remain. The light
+  # variants - the same colours mixed 40% toward white - are for the density curves,
+  # which are drawn on top of bars in the solid colour.
+  groupColors <- reactive({
+    groupLevels <- sort(unique(userDataGroup()[, input$groupCol]))
+    solid <- grDevices::hcl(
+      h = seq(15, 375, length.out = length(groupLevels) + 1)[seq_along(groupLevels)],
+      c = 100,
+      l = 65)
+
+    list(
+      solid = stats::setNames(solid, groupLevels),
+      light = stats::setNames(
+        grDevices::rgb(t(0.6 * grDevices::col2rgb(solid) + 0.4 * 255), maxColorValue = 255),
+        groupLevels))
+  })
+
   ## Notifications ----
   output$infoMenu <- shinydashboard::renderMenu({
     if (any(sapply(notifications$notList, grepl, pattern = "danger"))) {
@@ -698,7 +718,8 @@ server <- function(input, output, session) {
         ggplot2::theme_classic() +
 
         if (input$singleDens)
-          ggplot2::geom_density(color = "black", linewidth = 1)
+          # the bars' "#438BCA" mixed 40% toward white
+          ggplot2::geom_density(color = "#8EB9DF", linewidth = 1)
     })
 
     ## histBox if (validGroupsRV()) ----
@@ -722,7 +743,7 @@ server <- function(input, output, session) {
             position = "dodge") +
 
           ggplot2::xlab(input$histItemGroup) +
-          ggplot2::scale_fill_discrete(name = input$groupCol) +
+          ggplot2::scale_fill_manual(values = groupColors()$solid, name = input$groupCol) +
           ggplot2::theme_classic() +
 
           if (input$groupDens)
@@ -731,7 +752,7 @@ server <- function(input, output, session) {
                 ggplot2::aes(color = .data$group),
                 fill = NA,
                 linewidth = 1),
-              ggplot2::scale_color_discrete(name = input$groupCol))
+              ggplot2::scale_color_manual(values = groupColors()$light, name = input$groupCol))
       })
 
       ### histBox tabBox ----
@@ -1009,7 +1030,7 @@ server <- function(input, output, session) {
           ggplot2::geom_point() +
           ggplot2::xlab(input$scatterItemXGroup) +
           ggplot2::ylab(input$scatterItemYGroup) +
-          ggplot2::scale_color_discrete(name = input$groupCol) +
+          ggplot2::scale_color_manual(values = groupColors()$solid, name = input$groupCol) +
           ggplot2::theme_classic()
       })
 
