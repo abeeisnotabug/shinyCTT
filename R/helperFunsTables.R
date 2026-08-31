@@ -235,7 +235,7 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, goodColor, badColor, neut
                   "rmsea", "rmsea.ci", "rmsea.pvalue", "rmsea.notclose.pvalue",
                   "cfi", "srmr")],
     col.names = c("df", paste0(estimatorName, "-&chi;&sup2;"), "p",
-                  "RMSEA", "95%-CI", "p<sub>H0:RMSEA<=.05</sub>", "p<sub>H0:RMSEA>=.08</sub>",
+                  "RMSEA", "90%-CI", "p<sub>H0:RMSEA<=.05</sub>", "p<sub>H0:RMSEA>=.08</sub>",
                   "CFI", "SRMR"),
     bold_cols = 1) %>%
 
@@ -403,7 +403,7 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
               color = textColor,
               background = badColor),
 
-            kableExtra::cell_spec("95%-CI"),
+            kableExtra::cell_spec("90%-CI"),
             kableExtra::cell_spec(
               "< .05",
               color = textColor,
