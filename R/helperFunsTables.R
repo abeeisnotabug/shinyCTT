@@ -128,7 +128,7 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
 
   rmseaD <- hierTable[-1, "RMSEA"]
   hierTable[-1, "RMSEA"] <- kableExtra::cell_spec(
-    ifelse(is.na(rmseaD), "", formatBounded(rmseaD)),
+    ifelse(is.na(rmseaD), "NA", formatBounded(rmseaD)),
     color = textColor,
     background = ifelse(is.na(rmseaD), neutrColor, ifelse(rmseaD < 0.05, goodColor, badColor)))
 
@@ -322,6 +322,10 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
             ">= .05",
             color = textColor,
             background = badColor),
+          kableExtra::cell_spec(
+            "NA (FIML, lavaan >= 0.6-21)",
+            color = textColor,
+            background = neutrColor),
 
           kableExtra::cell_spec("CFI:"),
           kableExtra::cell_spec(
