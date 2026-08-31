@@ -101,6 +101,12 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
   hierTable <- succTable
   hierTable$CFI <- CFIs
 
+  ## lavTestLRT() omits the RMSEA-of-the-difference column entirely whenever any compared
+  ## model was fitted with missing = "fiml" - regardless of whether the data actually has
+  ## missing values. Fill it with NA so the column selection below doesn't error out; it then
+  ## renders as a blank, uncoloured cell (see the is.na() guard a few lines down).
+  if (!"RMSEA" %in% names(hierTable)) hierTable$RMSEA <- NA_real_
+
   bgColIfSignif <- ifelse(hierTable[-1, "Pr(>Chisq)"] < sigLvl, yes = badColor, no = goodColor)
 
   hierTable <- hierTable[, c("Df diff", "Chisq diff", "Pr(>Chisq)", "RMSEA", "CFI", "AIC", "BIC")]
@@ -120,10 +126,11 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
     color = textColor,
     background = bgColIfSignif)
 
+  rmseaD <- hierTable[-1, "RMSEA"]
   hierTable[-1, "RMSEA"] <- kableExtra::cell_spec(
-    formatBounded(hierTable[-1, "RMSEA"]),
+    ifelse(is.na(rmseaD), "", formatBounded(rmseaD)),
     color = textColor,
-    background = ifelse(hierTable[-1, "RMSEA"] < 0.05, goodColor, badColor))
+    background = ifelse(is.na(rmseaD), neutrColor, ifelse(rmseaD < 0.05, goodColor, badColor)))
 
   ## CFI, AIC and BIC rate each model on its own, same as in the fit index table, so unlike
   ## the columns above they are not restricted to rows -1 and compared against reference
