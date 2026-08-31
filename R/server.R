@@ -37,6 +37,14 @@ server <- function(input, output, session) {
 
   possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
 
+  # Fewest items at which each model still has a positive df, i.e. at which it can be
+  # tested at all. The same thresholds are already stated twice elsewhere: once per
+  # conditionalPanel in ui.R's comparison grid ("Too few items." at itemCols.length <= 3
+  # for tko, <= 2 for ete, < 2 for the rest), and in prose in the item-count
+  # notifications further down. Named here so the R side reads them from one place
+  # instead of open-coding a third set; all three have to be kept in step by hand.
+  minItems <- c(tko = 4, ete = 3, teq = 2, etp = 2, tpa = 2)
+
   modelTestDF <- data.frame(name = modelsExpr,
                             x = c(0, 0, -2, 2, 0),
                             y = c(6, 4, 2, 2, 0),
@@ -409,6 +417,29 @@ server <- function(input, output, session) {
         shinyjs::disable("subsetSelectButton") # subset of items
       } else {
         shinyjs::enable("subsetSelectButton")
+      }
+
+      ### keep the model selection in step with the item count ----
+      # A conditionalPanel only hides its contents, so a model whose cell in the
+      # comparison grid reads "Too few items." kept its checkbox at TRUE - and
+      # modelsToTest reads those checkboxes, not the grid. Two items therefore submitted
+      # an unidentified tau-congeneric model and killed the goModels observer outright.
+      # Unticking here rather than filtering modelsToTest later also makes the grid
+      # honest, since every condition in it keys off these same inputs; a comparison
+      # goes with whichever of its two models is unavailable. itemCols is disabled once
+      # the subset is selected, and the model checkboxes are unreachable until then, so
+      # this can never overwrite a deliberate choice.
+      enoughItems <- minItems <= length(input$itemCols)
+
+      for (thisModel in models) {
+        updateCheckboxInput(session, thisModel, value = unname(enoughItems[thisModel]))
+      }
+
+      for (thisComp in possComps) {
+        updateCheckboxInput(
+          session,
+          thisComp,
+          value = enoughItems[substr(thisComp, 1, 3)] && enoughItems[substr(thisComp, 4, 6)])
       }
 
       notifications$notList$numItems <- switch(
