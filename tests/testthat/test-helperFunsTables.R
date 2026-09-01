@@ -33,7 +33,7 @@ test_that("it leaves an unbounded value's leading digit alone", {
 
 test_that("it renders one row per model and keeps the model names", {
   fits <- fitsFor(c("tko", "ete", "teq"))
-  html <- makeFitsTable(fits, "ML", 0.05, colors$good, colors$bad, colors$neutr,
+  html <- makeFitsTable(fits, "ML", 0.05, 0.90, colors$good, colors$bad, colors$neutr,
                         colors$text, abbrev)
 
   expect_type(html, "character")
@@ -48,7 +48,7 @@ test_that("CFI is rated on the absolute three-tier scale, not by successive diff
   rate <- function(cfi) {
     fits <- fitsFor("tko")
     fits$cfi <- cfi
-    html <- makeFitsTable(fits, "ML", 0.05, colors$good, colors$bad, colors$neutr,
+    html <- makeFitsTable(fits, "ML", 0.05, 0.90, colors$good, colors$bad, colors$neutr,
                           colors$text, abbrev)
     html
   }
@@ -57,13 +57,37 @@ test_that("CFI is rated on the absolute three-tier scale, not by successive diff
   expect_match(rate(0.90), colors$bad,   fixed = TRUE)
 })
 
-test_that("the RMSEA interval is labelled 90%, which is lavaan's fixed default", {
+test_that("the RMSEA interval is labelled with the confidence level it was built at", {
   fits <- fitsFor("tko")
-  html <- makeFitsTable(fits, "ML", 0.05, colors$good, colors$bad, colors$neutr,
-                        colors$text, abbrev)
 
-  expect_match(html, "90%", fixed = TRUE)
-  expect_no_match(html, "95%-CI", fixed = TRUE)
+  html90 <- makeFitsTable(fits, "ML", 0.05, 0.90, colors$good, colors$bad, colors$neutr,
+                          colors$text, abbrev)
+
+  expect_match(html90, "90%-CI", fixed = TRUE)
+  expect_no_match(html90, "95%-CI", fixed = TRUE)
+
+  html95 <- makeFitsTable(fits, "ML", 0.05, 0.95, colors$good, colors$bad, colors$neutr,
+                          colors$text, abbrev)
+
+  expect_match(html95, "95%-CI", fixed = TRUE)
+  expect_no_match(html95, "90%-CI", fixed = TRUE)
+})
+
+test_that("the fit index legend labels the RMSEA interval the same way", {
+  legend <- makeLegend("fitIndexTable", "ML", 0.05, colors$good, colors$bad, colors$neutr,
+                       colors$text, rmseaCiLvl = 0.99)
+
+  expect_match(as.character(legend), "99%-CI", fixed = TRUE)
+})
+
+test_that("a wider confidence level gives a wider RMSEA interval", {
+  fit <- fitCTT(rtdata, "tko")
+
+  narrow <- extractFitIndices(fit, rmseaCiLevel = 0.90)
+  wide <- extractFitIndices(fit, rmseaCiLevel = 0.99)
+
+  expect_gt(wide$rmsea.ci.upper, narrow$rmsea.ci.upper)
+  expect_equal(wide$rmsea, narrow$rmsea)
 })
 
 ## makeHierTable() ---------------------------------------------------------------------

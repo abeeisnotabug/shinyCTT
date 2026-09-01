@@ -169,7 +169,7 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
     kableExtra::row_spec(row = 1, background = "lightgrey")
 }
 
-makeFitsTable <- function(fits, estimatorName, sigLvl, goodColor, badColor, neutrColor, textColor, modelsAbbrev) {
+makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, goodColor, badColor, neutrColor, textColor, modelsAbbrev) {
   fitsTable <- fits
 
   bgColIfSignif <- ifelse(fits$pvalue < sigLvl, badColor, goodColor)
@@ -235,7 +235,8 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, goodColor, badColor, neut
                   "rmsea", "rmsea.ci", "rmsea.pvalue", "rmsea.notclose.pvalue",
                   "cfi", "srmr")],
     col.names = c("df", paste0(estimatorName, "-&chi;&sup2;"), "p",
-                  "RMSEA", "90%-CI", "p<sub>H0:RMSEA<=.05</sub>", "p<sub>H0:RMSEA>=.08</sub>",
+                  "RMSEA", sprintf("%g%%-CI", 100 * rmseaCiLvl),
+                  "p<sub>H0:RMSEA<=.05</sub>", "p<sub>H0:RMSEA>=.08</sub>",
                   "CFI", "SRMR"),
     bold_cols = 1) %>%
 
@@ -275,7 +276,12 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, Ngro
                 "Reliabilities" = 4))
 }
 
-makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, neutrColor, textColor) {
+## Builds the legend under one of the tables.
+##
+##   rmseaCiLvl : the confidence level of the RMSEA interval. Only the fit index legend
+##                shows that interval, so only that call passes it.
+makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, neutrColor, textColor,
+                       rmseaCiLvl = 0.90) {
   HTML(
     makeKable(
       switch(
@@ -403,7 +409,7 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
               color = textColor,
               background = badColor),
 
-            kableExtra::cell_spec("90%-CI"),
+            kableExtra::cell_spec(sprintf("%g%%-CI", 100 * rmseaCiLvl)),
             kableExtra::cell_spec(
               "< .05",
               color = textColor,

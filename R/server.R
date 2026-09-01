@@ -26,6 +26,11 @@ server <- function(input, output, session) {
   # Model labels plus the coordinates the hierarchical plot draws them at.
   modelTestDF <- family$plot
 
+  # The results half of the app is built twice from the same code: once for the whole
+  # sample and once for the group-wise fit. The second pass puts "Mg" on the end of every
+  # output id, so "modelTests" and "modelTestsMg" are the same page from different fits.
+  passSuffixes <- c(single = "", multigroup = "Mg")
+
   ## Reactive values ----
   notifications <- reactiveValues(notList = list())
 
@@ -39,7 +44,18 @@ server <- function(input, output, session) {
   validGroupsRV <- reactiveVal()
 
   fimlRV <- reactiveVal(FALSE)
-  estimatorNameRV <- reactiveVal()
+
+  # "ML" or "MLR", with "FI" in front when the fits use full information maximum
+  # likelihood. Shown in table headers and legends.
+  estimatorName <- reactive(paste0(if (fimlRV()) "FI", input$estimator))
+
+  # The fitted models, written by "Test the models" and read by everything on the results
+  # tabs. NULL until the button has been pressed.
+  modelFitsRV <- reactiveVal(NULL)
+
+  # TRUE once the estimator has been changed after a run -> the results on screen came
+  # from the other estimator, so the user is told and the button is marked.
+  refitPendingRV <- reactiveVal(FALSE)
 
   mvnTestResult <- reactiveValues(
     raw = NULL,
@@ -60,7 +76,7 @@ server <- function(input, output, session) {
                    "dataSelectButton"),
     subset     = c("itemCols", "selectall", "deselectall", "groupCol", "groups",
                    "subsetSelectButton", "useFIML"),
-    statistics = c("goModels", "doMg", "etaIntFree", "sigLvl", "estimator"))
+    statistics = c("doMg", "etaIntFree"))
 
   observeEvent(appStage(), {
 
@@ -1254,13 +1270,13 @@ server <- function(input, output, session) {
             "Overall",
             singleCorrTable,
             br(),
-            HTML(makeLegend("corrTable", estimatorNameRV(), input$sigLvl,
+            HTML(makeLegend("corrTable", estimatorName(), input$sigLvl,
                             goodColor, badColor, neutrColor, textColor))),
         tabPanel(
             "Group-wise",
             HTML(mgCorrTable),
             br(),
-            HTML(makeLegend("corrTable", estimatorNameRV(), input$sigLvl,
+            HTML(makeLegend("corrTable", estimatorName(), input$sigLvl,
                             goodColor, badColor, neutrColor, textColor)))
 
       ) # tabBox
@@ -1281,6 +1297,29 @@ server <- function(input, output, session) {
   # observeEvent input$estimator ----
   observeEvent(input$estimator, {
     mvnTestResult$estimator <- input$estimator
+
+    # The models on screen were fitted with whichever estimator was chosen at the time, so
+    # a change after a run means they no longer match the setting -> a refit is pending.
+    if (!is.null(modelFitsRV())) refitPendingRV(TRUE)
+  })
+
+  # The pending refit: a note and a mark on the button ----
+  observeEvent(refitPendingRV(), {
+    updateActionButton(
+      session,
+      "goModels",
+      label = paste0("Test the models", if (refitPendingRV()) " *"))
+  })
+
+  output$refitPendingNote <- renderUI({
+    if (!refitPendingRV()) return(NULL)
+
+    tagList(
+      br(),
+      HTML("The estimator has changed. The results still come from the estimator that
+            was chosen when the models were last fitted. Press <b>Test the models *</b>
+            to fit them again.") %>%
+        div(style = "color:orange"))
   })
 
   # mvnTab ----
@@ -1452,693 +1491,199 @@ server <- function(input, output, session) {
       updateNumericInput(session, "sigLvl", value = 0.05)
   })
 
+  # observeEvent input$rmseaCiLvl ----
+  observeEvent(input$rmseaCiLvl, {
+    if ((input$rmseaCiLvl < 0.5 | input$rmseaCiLvl > 0.999) && !is.na(input$rmseaCiLvl))
+      updateNumericInput(session, "rmseaCiLvl", value = 0.9)
+  })
+
+  # The two display settings ----
+  # Both are read all over the results tabs, and both can be changed after a run without
+  # refitting anything. Emptying either box sends NA, which would turn every table into an
+  # error message -> hold the tables back until there is a number again.
+  sigLvl <- reactive({
+    req(!is.na(input$sigLvl))
+    input$sigLvl
+  })
+
+  rmseaCiLvl <- reactive({
+    req(!is.na(input$rmseaCiLvl))
+    input$rmseaCiLvl
+  })
+
   # observeEvent input$goModels ----
-  # Pressing "Test the models" runs everything down to the error handler at the bottom:
-  # fit -> compare -> build the tables and plots. Any step failing -> that error handler.
+  # Pressing "Test the models" fits the models and stores them, and does nothing else.
+  # Everything drawn from them is built under "Results" below and redraws on its own.
   observeEvent(input$goModels, tryCatch({
     output$goModelsError <- renderUI(NULL)
 
-    estimatorNameRV(paste0(if (fimlRV()) "FI", input$estimator))
+    # Whatever is on screen was fitted with the settings as they were before this press.
+    modelFitsRV(NULL)
 
     # Freeze the multigroup choice, then reveal the results entries in the sidebar.
     doMgRV(isTRUE(input$doMg))
     appStage("results")
 
-    ## test the models! ----
     modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
+    comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
 
-    lapply(
-      append(list(FALSE), if (isTRUE(input$doMg)) input$groupCol),
-      function(groupName) {
-        groupAppend <- c("Mg")[!isFALSE(groupName)]
-        hierPlotStr <- paste0("hierPlot", groupName)
-        modelTestsContStr <- paste0("modelTestsCont", groupAppend)
+    # Where the data came from, so makeRCode() can write the matching
+    # read.csv() / read_spss() / workspace line into the exported script.
+    dataSource <- switch(
+      input$source,
+      "Workspace" = list(type = "Workspace", object = input$objectFromWorkspace),
+      "CSV" = list(type = "CSV",
+                   name = input$CSVFile$name,
+                   header = input$header,
+                   sep = input$sep,
+                   quote = input$quote),
+      "SPSS" = list(type = "SPSS", name = input$SPSSFile$name))
 
-        ### try fitting and capture warning and error messages ----
-        modelCodes <- makeModelCodes(inputData = userDataGroup(),
-                                                itemCols = input$itemCols,
-                                                group = groupName,
-                                                etaIntFree = as.logical(input$etaIntFree))
+    # The name of the data set, used as the first part of the factor score filename.
+    dataName <- switch(
+      input$source,
+      "Workspace" = input$objectFromWorkspace,
+      "CSV" = gsub("\\.csv", "", input$CSVFile$name),
+      "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name))
 
-        #### fit each model once, keeping both a warning and the completed fit ----
-        # Fit each chosen model:
-        #   warning -> note it, carry on, keep the fit
-        #   error   -> keep the error message instead of a fit
-        # group and group.equal are NULL without a grouping column, so one call does both.
-        fittedModelsWarns <- lapply(
-          modelCodes[modelsToTest],
-          FUN = function(model) {
-            warnCond <- NULL
-            fit <- withCallingHandlers(
-              tryCatch(lavaan::lavaan(model = model,
-                                      data = userDataGroup(),
-                                      meanstructure = TRUE,
-                                      group = if (isFALSE(groupName)) NULL else groupName,
-                                      group.equal = if (isFALSE(groupName)) NULL else c("loadings", "intercepts"),
-                                      estimator = mvnTestResult$estimator,
-                                      missing = ifelse(fimlRV(), "fiml", "listwise"),
-                                      int.ov.free = TRUE,
-                                      int.lv.free = as.logical(input$etaIntFree),
-                                      auto.fix.first = TRUE,
-                                      auto.fix.single = TRUE,
-                                      auto.var = TRUE,
-                                      auto.cov.lv.x = TRUE,
-                                      auto.efa = TRUE,
-                                      auto.th = TRUE,
-                                      auto.delta = TRUE,
-                                      auto.cov.y = TRUE),
-                       error = function(e) e),
-              warning = function(w) {
-                warnCond <<- w
-                invokeRestart("muffleWarning")
-              })
-            attr(fit, "shinyCTTwarning") <- warnCond
-            fit
-          })
+    # TRUE when the user left some of the groups out, so the exported script has to
+    # subset the data before fitting.
+    isSubset <- (
+      validGroupsRV() &&
+        (length(unique(userDataGroup()[, input$groupCol])) <
+           length(unique(userDataRaw()[, input$groupCol]))))
 
-        #### warning and error counting and capturing ----
-        errs <- sapply(fittedModelsWarns, inherits, what = "error")
-        warns <- sapply(fittedModelsWarns, function(f) !is.null(attr(f, "shinyCTTwarning")))
+    # Which group each row belongs to, for the predicted factor scores. FALSE when the
+    # user chose no group column, because then the data has no such column to read.
+    groupValues <- if (input$groupCol == "noGroupSelected") {
+      FALSE
+    } else {
+      userDataGroup()[, input$groupCol]
+    }
 
-        # A model that only warns is still usable - its fit was kept above - so only a
-        # genuine error excludes it from goodModels. warnModels is purely informational now.
-        goodModels <- modelsToTest[!errs]
-        errModels <- modelsToTest[errs]
-        warnModels <- modelsToTest[warns]
+    ## test the models! ----
+    # One pass over the whole sample, plus one fitting the groups separately if the user
+    # asked for that.
+    passes <- list(single = FALSE)
+    if (isTRUE(input$doMg)) passes$multigroup <- input$groupCol
 
-        #### message if warnings ----
-        if (sum(warns) > 0) {
+    modelFitsRV(lapply(passes, function(groupName) {
 
-          lavWarnsMsg <- tagList(
-            h6("The following models produced warnings:"),
+      ### try fitting and capture warning and error messages ----
+      modelCodes <- makeModelCodes(inputData = userDataGroup(),
+                                              itemCols = input$itemCols,
+                                              group = groupName,
+                                              etaIntFree = as.logical(input$etaIntFree))
 
-            cbind(paste0(modelsLong[warnModels], ":&emsp;"),
-                  sapply(fittedModelsWarns[warnModels],
-                         function(model) attr(model, "shinyCTTwarning")$message)) %>%
-              kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
-              kableExtra::column_spec(column = 1, bold = TRUE) %>%
-              HTML() %>%
-              div(style = "color:orange")
-          ) # tagList
-
-        } else {
-          lavWarnsMsg <- NULL
-        }
-
-        #### message if errors ----
-        if (sum(errs) > 0) {
-
-          lavErrsMsg <- tagList(
-            h6("The following models produced errors:"),
-
-            cbind(paste0(modelsLong[errModels], ":&emsp;"),
-                  sapply(fittedModelsWarns[errModels],
-                         function(model) model$message)) %>%
-              kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
-              kableExtra::column_spec(column = 1, bold = TRUE) %>%
-              HTML() %>%
-              div(style = "color:red")
-            ) # tagList
-
-        } else {
-          lavErrsMsg <- NULL
-        }
-
-        ### generate comparative fit table and tab ----
-        fits <- do.call(rbind, lapply(fittedModelsWarns[goodModels], extractFitIndices))
-        comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
-
-        succTable <- list()
-
-        if (length(goodModels) > 1 && !identical(goodModels, c(teq = "teq", etp = "etp"))) {
-
-          if ("teq" %in% goodModels) {
-
-            succTable$teq <- do.call(
-              lavaan::lavTestLRT,
-              args = c(object = fittedModelsWarns[[goodModels[1]]],
-                       ... = fittedModelsWarns[goodModels[-c(1, which(goodModels == "etp"))]]))
-
-            rownames(succTable$teq) <- goodModels[which(goodModels != "etp")]
-          }
-
-          if ("etp" %in% goodModels) {
-            succTable$etp <- do.call(
-              lavaan::lavTestLRT,
-              args = c(object = fittedModelsWarns[[goodModels[1 + (goodModels[1] == "teq")]]],
-                       ... = fittedModelsWarns[goodModels[-c(1 + (goodModels[1] == "teq"),
-                                                             which(goodModels == "teq"))]]))
-
-            rownames(succTable$etp) <- goodModels[which(goodModels != "teq")]
-          }
-
-          if (!any(c("teq", "etp") %in% goodModels)) {
-            succTable$teq <- do.call(
-              lavaan::lavTestLRT,
-              args = c(object = fittedModelsWarns[[goodModels[1]]],
-                       ... = fittedModelsWarns[goodModels[-1]]))
-
-            rownames(succTable$teq) <- goodModels
-          }
-        }
-
-        compTable <- reactiveValues(
-          df = matrix(ncol = 5, nrow = 5),
-          chisq = matrix(ncol = 5, nrow = 5))
-
-        infCompTable <- reactiveValues(
-          aic = matrix(ncol = 5, nrow = 5),
-          bic = matrix(ncol = 5, nrow = 5))
-
-        names(compTable$df) <-
-          names(compTable$chisq) <-
-          names(infCompTable$aic) <-
-          names(infCompTable$bic) <- outer(models, models, paste0)
-
-        compTable$chisq[lower.tri(diag(5), diag = TRUE)] <-
-          infCompTable$aic[lower.tri(diag(5), diag = TRUE)] <-
-          infCompTable$bic[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
-
-        ### generate parameter tables, fits and fit tables ----
-        for (model in goodModels) {
-          local({
-            thisModel <- model
-
-            whichModel <- which(goodModels == thisModel)
-
-            thisModelStr <- paste0(thisModel, thisModel)
-            thisModelsNgroups <- fittedModelsWarns[[thisModel]]@Data@ngroups
-
-            thisModelScoresStr <- paste0(thisModel, "Scores", groupAppend)
-            thisModelScoresDLStr <- paste0(thisModel, "ScoresDownload", groupAppend)
-            thisModelScoresDLFileStr <- paste0(thisModel, "Filename", groupAppend)
-            thisModelSepStr <- paste0(thisModel, "Sep", groupAppend)
-            thisModelDecStr <- paste0(thisModel, "Dec", groupAppend)
-
-            thisModelCodeStr <- paste0(thisModel, "Code", groupAppend)
-
-            #### write to diag(chisq comp table) ----
-            if (fits[thisModel, "pvalue"] < input$sigLvl) {
-              sigAddon <- "*"
-              sigColor <- badColor
-              sigTxtColor <- textColor
-
-              if (fits[thisModel, "pvalue"] < 0.01)
-                sigAddon <- paste0(sigAddon, "*")
-
-              if (fits[thisModel, "pvalue"] < 0.001)
-                sigAddon <- paste0(sigAddon, "*")
-
-            } else {
-
-              sigAddon <- ""
-              sigColor <- goodColor
-              sigTxtColor <- textColor
-            }
-
-            compTable$chisq[thisModelStr] <-
-              kableExtra::cell_spec(
-                sprintf(paste0("%.2f", sigAddon), fits[thisModel, "chisq"]),
-                background = sigColor,
-                color = sigTxtColor,
-                italic = TRUE)
-
-            compTable$df[thisModelStr] <-
-              kableExtra::cell_spec(
-                sprintf("%i", fits[thisModel, "df"]),
-                background = sigColor,
-                color = sigTxtColor,
-                italic = TRUE)
-
-            ##### write to AIC/BIC comp table ----
-            infCompTable$aic[thisModelStr] <-
-              kableExtra::cell_spec(
-                sprintf("%.1f", fits[thisModel, "aic"]),
-                color = textColor,
-                background = neutrColor)
-
-            infCompTable$bic[thisModelStr] <-
-              kableExtra::cell_spec(
-                sprintf("%.1f", fits[thisModel, "bic"]),
-                color = textColor,
-                background = neutrColor)
-
-            ###### if there is more than one good model ----
-            if (whichModel > 1) {
-
-              aicDiffs <- fits[thisModel, "aic"] - fits[1:(whichModel - 1), "aic"]
-              bicDiffs <- fits[thisModel, "bic"] - fits[1:(whichModel - 1), "bic"]
-
-              infCompTable$aic[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
-                kableExtra::cell_spec(
-                  sprintf(ifelse(aicDiffs < 0, "%.1f", "+%.1f"), aicDiffs),
-                  color = textColor,
-                  background = ifelse(aicDiffs < 0, goodColor, badColor))
-
-              infCompTable$bic[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
-                kableExtra::cell_spec(
-                  sprintf(ifelse(bicDiffs < 0, "%.1f", "+%.1f"), bicDiffs),
-                  color = textColor,
-                  background = ifelse(bicDiffs < 0, goodColor, badColor))
-            }
-
-            #### write to lower.tri(chisq comp table) ----
-            compsWithThisModel <- substring(
-              text = comps[grep(thisModel, substr(comps, 1, 3))],
-              first = 4,
-              last = 6)
-
-            compsWithThisModel <- compsWithThisModel[compsWithThisModel %in% goodModels]
-            names(compsWithThisModel) <- compsWithThisModel
-
-            fitCompsWithThisModel <- sapply(
-              compsWithThisModel,
-              function(thisComp) {
-                tmpTbl <- lavaan::lavTestLRT(fittedModelsWarns[[thisModel]], fittedModelsWarns[[thisComp]])
-                unlist(tmpTbl[2, c("Chisq diff", "Df diff", "Pr(>Chisq)")])
+      #### fit each model once, keeping both a warning and the completed fit ----
+      # Fit each chosen model:
+      #   warning -> note it, carry on, keep the fit
+      #   error   -> keep the error message instead of a fit
+      # group and group.equal are NULL without a grouping column, so one call does both.
+      fittedModelsWarns <- lapply(
+        modelCodes[modelsToTest],
+        FUN = function(model) {
+          warnCond <- NULL
+          fit <- withCallingHandlers(
+            tryCatch(lavaan::lavaan(model = model,
+                                    data = userDataGroup(),
+                                    meanstructure = TRUE,
+                                    group = if (isFALSE(groupName)) NULL else groupName,
+                                    group.equal = if (isFALSE(groupName)) NULL else c("loadings", "intercepts"),
+                                    estimator = mvnTestResult$estimator,
+                                    missing = ifelse(fimlRV(), "fiml", "listwise"),
+                                    int.ov.free = TRUE,
+                                    int.lv.free = as.logical(input$etaIntFree),
+                                    auto.fix.first = TRUE,
+                                    auto.fix.single = TRUE,
+                                    auto.var = TRUE,
+                                    auto.cov.lv.x = TRUE,
+                                    auto.efa = TRUE,
+                                    auto.th = TRUE,
+                                    auto.delta = TRUE,
+                                    auto.cov.y = TRUE),
+                     error = function(e) e),
+            warning = function(w) {
+              warnCond <<- w
+              invokeRestart("muffleWarning")
             })
+          attr(fit, "shinyCTTwarning") <- warnCond
+          fit
+        })
 
-            for (thisComp in compsWithThisModel) {
+      #### warning and error counting and capturing ----
+      errs <- sapply(fittedModelsWarns, inherits, what = "error")
+      warns <- sapply(fittedModelsWarns, function(f) !is.null(attr(f, "shinyCTTwarning")))
 
-              if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < input$sigLvl) {
-                sigAddon <- "*"
-                sigColor <- badColor
-                sigTxtColor <- textColor
+      # A model that only warns is still usable - its fit was kept above - so only a
+      # genuine error excludes it from goodModels. warnModels is purely informational now.
+      goodModels <- modelsToTest[!errs]
+      errModels <- modelsToTest[errs]
+      warnModels <- modelsToTest[warns]
 
-                if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.01)
-                  sigAddon <- paste0(sigAddon, "*")
+      #### the successive comparisons along the hierarchy ----
+      succTable <- list()
 
-                if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.001)
-                  sigAddon <- paste0(sigAddon, "*")
+      if (length(goodModels) > 1 && !identical(goodModels, c(teq = "teq", etp = "etp"))) {
 
-              } else {
+        if ("teq" %in% goodModels) {
 
-                sigAddon <- ""
-                sigColor <- goodColor
-                sigTxtColor <- textColor
-              }
+          succTable$teq <- do.call(
+            lavaan::lavTestLRT,
+            args = c(object = fittedModelsWarns[[goodModels[1]]],
+                     ... = fittedModelsWarns[goodModels[-c(1, which(goodModels == "etp"))]]))
 
-              thisModelCompStr <- paste0(thisModel, thisComp)
-
-              compTable$chisq[thisModelCompStr] <- kableExtra::cell_spec(
-                sprintf(paste0("+%.2f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp]),
-                background = sigColor,
-                color = sigTxtColor)
-
-              compTable$df[thisModelCompStr] <- kableExtra::cell_spec(
-                sprintf("+%i", fitCompsWithThisModel["Df diff", thisComp]),
-                background = sigColor,
-                color = sigTxtColor)
-            }
-
-            #### parameter tables ----
-            parTableWithCIs <- makeParTableWithCIs(fittedModelsWarns[[thisModel]], estimatorNameRV(),
-                                                   input$sigLvl, input$itemCols,
-                                                   thisModelsNgroups)
-
-            ##### modify parameter tables if there are groups ----
-            if (!isFALSE(groupName)) {
-              for (i in 1:thisModelsNgroups) {
-
-                groupRowHeaders <- sprintf(
-                  "Group: %s",
-                  fittedModelsWarns[[thisModel]]@Data@group.label)
-
-                parTableWithCIs <- kableExtra::group_rows(
-                  parTableWithCIs,
-                  group_label = groupRowHeaders[i],
-                  start_row = (i - 1) * (length(input$itemCols) + 1) + 1,
-                  end_row = i * (length(input$itemCols) + 1),
-                  label_row_css = "background-color: #666; color: #fff;")
-              }
-            }
-
-            #### factor scores ----
-            output[[thisModelScoresStr]] <<- DT::renderDataTable(
-
-              getPredictedScores(
-                fittedModelsWarns[[thisModel]],
-                userDataGroup()[, input$groupCol]),
-
-              options = list(pageLength = 10))
-
-            output[[thisModelScoresDLStr]] <<- downloadHandler(
-              filename = function() input[[thisModelScoresDLFileStr]],
-              content = function(file) {
-
-                utils::write.table(
-                  getPredictedScores(
-                    fittedModelsWarns[[thisModel]],
-                    userDataGroup()[, input$groupCol]),
-
-                  file = file,
-                  sep = input[[thisModelSepStr]],
-                  dec = input[[thisModelDecStr]],
-                  row.names = FALSE)
-              },
-              contentType = "text/csv")
-
-            #### model code ----
-            output[[thisModelCodeStr]] <<- renderPrint({
-
-              isSubset <- (
-                validGroupsRV() &&
-                  (length(unique(userDataGroup()[, input$groupCol])) <
-                     length(unique(userDataRaw()[, input$groupCol]))))
-
-              # Where the data came from, so makeRCode() can write the matching
-              # read.csv() / read_spss() / workspace line into the exported script.
-              dataSource <- switch(
-                input$source,
-                "Workspace" = list(type = "Workspace", object = input$objectFromWorkspace),
-                "CSV" = list(type = "CSV",
-                             name = input$CSVFile$name,
-                             header = input$header,
-                             sep = input$sep,
-                             quote = input$quote),
-                "SPSS" = list(type = "SPSS", name = input$SPSSFile$name))
-
-              cat(
-                makeRCode(
-                  dataSource = dataSource,
-                  groupCol = input$groupCol,
-                  groups = input$groups,
-                  modelCode = modelCodes[[thisModel]],
-                  estimator = mvnTestResult$estimator,
-                  missingMethod = ifelse(fimlRV(), "fiml", "listwise"),
-                  isSubset = isSubset,
-                  model = thisModel,
-                  isMg = !isFALSE(groupName)))
-
-            })
-
-            #### make tabs for each model ----
-            appendTab(
-              inputId = paste0("parTabsetTab", groupAppend),
-
-              tabPanel(
-                title = HTML(modelsLong[thisModel]),
-                HTML(parTableWithCIs)),
-
-              select = as.logical(whichModel == 1))
-
-            appendTab(
-              inputId = paste0("mcTabsetTab", groupAppend),
-
-              tabPanel(
-                title = HTML(modelsLong[thisModel]),
-                h5("The following R code can be used to fit this model with lavaan:"),
-                verbatimTextOutput(thisModelCodeStr)),
-
-              select = as.logical(whichModel == 1))
-
-            ##### factor score tab ----
-            appendTab(
-              inputId = paste0("fsTabsetTab", groupAppend),
-
-              tabPanel(
-                title = HTML(modelsLong[thisModel]),
-                sidebarLayout(
-
-                  sidebarPanel(
-                    h4("Download Predicted Factor Scores as CSV"),
-
-                    textInput(
-                      thisModelScoresDLFileStr,
-                      "Filename:",
-                      sprintf(
-                        "%s_%s_factorscores.csv",
-                        switch(input$source,
-                               "Workspace" = input$objectFromWorkspace,
-                               "CSV" = gsub("\\.csv", "", input$CSVFile$name),
-                               "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name)),
-                        thisModel)),
-
-                    hr(),
-
-                    radioButtons(
-                      thisModelSepStr,
-                      "Separator",
-                      choices = c(Comma = ",", Semicolon = ";", Tab = "\t"),
-                      selected = ","),
-
-                    radioButtons(
-                      thisModelDecStr,
-                      "Decimal Separator",
-                      choices = c(Comma = ",", Dot = "."),
-                      selected = "."),
-
-                    hr(),
-
-                    downloadButton(
-                      thisModelScoresDLStr,
-                      "Download Factor Scores") %>%
-
-                      div(align = "center"),
-
-                    width = 3
-                  ), # sidebarPanel
-
-                  mainPanel(
-                    h4("Data Overview"),
-                    DT::dataTableOutput(
-                      paste0(thisModel, "Scores", groupAppend)))
-
-                ) # sidebarLayout
-              ), # tabPael
-
-              select = as.logical(whichModel == 1)
-            ) # appendTab
-          })
+          rownames(succTable$teq) <- goodModels[which(goodModels != "etp")]
         }
 
-        ### if there are good models ----
-        if (length(goodModels) > 0) {
-          #### hierarchical model comparison plot ----
-          output[[hierPlotStr]] <<- renderPlot({
+        if ("etp" %in% goodModels) {
+          succTable$etp <- do.call(
+            lavaan::lavTestLRT,
+            args = c(object = fittedModelsWarns[[goodModels[1 + (goodModels[1] == "teq")]]],
+                     ... = fittedModelsWarns[goodModels[-c(1 + (goodModels[1] == "teq"),
+                                                           which(goodModels == "teq"))]]))
 
-            modelNumbs <- which(models %in% goodModels)
+          rownames(succTable$etp) <- goodModels[which(goodModels != "teq")]
+        }
 
-            chisqs <- dfs <- pvalues <- rep(NA, 5)
+        if (!any(c("teq", "etp") %in% goodModels)) {
+          succTable$teq <- do.call(
+            lavaan::lavTestLRT,
+            args = c(object = fittedModelsWarns[[goodModels[1]]],
+                     ... = fittedModelsWarns[goodModels[-1]]))
 
-            names(chisqs) <-
-              names(dfs) <-
-              names(pvalues) <- c("tkoete", "eteteq", "eteetp", "teqtpa", "etptpa")
-
-            if (!is.null(succTable$teq)) {
-              teqNames <- paste0(rownames(succTable$teq)[1:(nrow(succTable$teq) - 1)],
-                                 rownames(succTable$teq)[2:nrow(succTable$teq)])
-
-              chisqs[teqNames] <- succTable$teq[-1, "Chisq diff"]
-              dfs[teqNames] <- succTable$teq[-1, "Df diff"]
-              pvalues[teqNames] <- succTable$teq[-1, "Pr(>Chisq)"]
-            }
-
-            if (!is.null(succTable$etp)) {
-              etpNames <- paste0(rownames(succTable$etp)[1:(nrow(succTable$etp) - 1)],
-                                 rownames(succTable$etp)[2:nrow(succTable$etp)])
-
-              chisqs[etpNames] <- succTable$etp[-1, "Chisq diff"]
-              dfs[etpNames] <- succTable$etp[-1, "Df diff"]
-              pvalues[etpNames] <- succTable$etp[-1, "Pr(>Chisq)"]
-            }
-
-            modelTestDF$chisq <- chisqs
-            modelTestDF$df <- dfs
-            modelTestDF$pvalue <- pvalues
-
-            ##### ggplot code ----
-            ggplot2::ggplot(modelTestDF,
-                            ggplot2::aes(x = .data$x, y = .data$y, label = .data$name)) +
-
-              ggplot2::geom_text(parse = TRUE, fontface = "bold", size = 5) +
-              ggplot2::geom_segment(
-                ggplot2::aes(x = .data$xstarts, y = .data$ystarts,
-                             xend = .data$xends, yend = .data$yends),
-                linewidth = 0.3) +
-
-              ggplot2::geom_label(
-                ggplot2::aes(
-                  x = .data$labelxs,
-                  y = .data$labelys,
-
-                  label = ifelse(
-                    is.na(.data$chisq),
-                    yes = "No~Comparison",
-                    no = sprintf(
-                      "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
-                      estimatorNameRV(), # %s
-                      .data$chisq, # %.3f
-                      .data$df, # %i
-                      ifelse(.data$pvalue < 0.001, "<0.001", sprintf("==%.3f", .data$pvalue)))),
-
-                  fill = c("nsig", "sig")[c(.data$pvalue < input$sigLvl) + 1]), # aes
-
-                color = textColor,
-                size = 4.5,
-                parse = TRUE) + # geom_label
-
-              ggplot2::scale_fill_manual(
-                values = c("nsig" = goodColor, "sig" = badColor),
-                na.value = neutrColor) +
-
-              ggplot2::guides(fill = "none") +
-              ggplot2::xlim(c(-4, 4)) +
-              ggplot2::coord_fixed() +
-              ggplot2::theme_void()
-
-          }) # renderPlot
-
-          #### Hierarchical model comparison table ----
-          hierTables <- lapply(
-
-            c("teq", "etp"),
-
-            function(model) {
-              if (!is.null(succTable[[model]])) {
-
-                succTableTmp <- as.data.frame(succTable[[model]])
-                makeHierTable(succTableTmp, fits[rownames(succTableTmp), "cfi"],
-                              estimatorNameRV(), input$sigLvl,
-                              goodColor, badColor, neutrColor, textColor, modelsAbbrev)
-              } else {
-                NULL
-              }
-            } # function(model)
-          ) # lapply
-
-          #### Chisq comparison table ----
-          combCompTable <- matrix(NA, nrow = 5, ncol = 10)
-
-          combCompTable[, seq(1, 10, 2)] <- matrix(compTable$df, ncol = 5, nrow = 5)
-          combCompTable[, seq(2, 10, 2)] <- matrix(compTable$chisq, ncol = 5, nrow = 5)
-
-          colnames(combCompTable) <- rep(
-            c("&Delta;df", paste0(estimatorNameRV(), "-&Delta;&chi;&sup2;")),
-            times = 5)
-
-          headerNames <- c(1, rep(2, 5))
-          names(headerNames) <- c(" ", modelsAbbrev)
-
-          #### AIC comparison table ----
-          dim(infCompTable$aic) <- dim(infCompTable$bic) <- c(5, 5)
-
-          rownames(combCompTable) <-
-            rownames(infCompTable$aic) <-
-            rownames(infCompTable$bic) <-
-            colnames(infCompTable$aic) <-
-            colnames(infCompTable$bic) <-
-              modelsAbbrev
-
-          #### put them in a tab ----
-          output[[modelTestsContStr]] <<- renderUI({
-
-            fluidPage(
-
-              if (sum(warns) > 0 || sum(errs) > 0)
-                fluidRow(
-                  wellPanel(
-                    h5(sprintf("Lavaan status: %i warnings, %i errors.",
-                               sum(warns),
-                               sum(errs))),
-                    lavErrsMsg,
-                    lavWarnsMsg)),
-
-              fluidRow(
-                shinydashboard::box(
-                  title = "Hierarchical model comparison plot:",
-                  width = 12,
-                  plotOutput(paste0("hierPlot", groupName)))),
-
-              fluidRow(
-                shinydashboard::box(
-                  title = "Hierarchical model comparison table:",
-                  width = 12,
-                  paste0(
-                    "<table align = \"center\", width = \"100%\"><tr><td>",
-                    hierTables[[1]],
-                    "</td><td>&nbsp;</td><td>",
-                    hierTables[[2]],
-                    "</td></tr></table>") %>%
-                    HTML(),
-                  actionLink(paste0("showLegendHierTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
-                  conditionalPanel(paste0("input.showLegendHierTable", groupAppend, " % 2 == 1"),
-                                   makeLegend("hierTables", estimatorNameRV(), input$sigLvl,
-                                              goodColor, badColor, neutrColor, textColor)))),
-
-              fluidRow(
-                shinydashboard::box(
-                  title = "Fit index table",
-                  width = 12,
-                  HTML(makeFitsTable(fits, estimatorNameRV(), input$sigLvl,
-                                     goodColor, badColor, neutrColor, textColor,
-                                     modelsAbbrev)),
-                  br(),
-                  actionLink(paste0("showLegendFitIndexTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
-                  conditionalPanel(paste0("input.showLegendFitIndexTable", groupAppend, " % 2 == 1"),
-                                   makeLegend("fitIndexTable", estimatorNameRV(), input$sigLvl,
-                                              goodColor, badColor, neutrColor, textColor)))),
-
-              fluidRow(
-                shinydashboard::box(
-                  title = HTML("&chi;&sup2;-comparison table:"),
-                  width = 12,
-                  makeKable(combCompTable, bold_cols = 1) %>%
-                    kableExtra::add_header_above(headerNames, escape = FALSE) %>%
-                    HTML(),
-                  br(),
-                  actionLink(paste0("showLegendCombCompTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
-                  conditionalPanel(paste0("input.showLegendCombCompTable", groupAppend, " % 2 == 1"),
-                                   makeLegend("combCompTable", estimatorNameRV(), input$sigLvl,
-                                              goodColor, badColor, neutrColor, textColor)))),
-
-              fluidRow(
-                shinydashboard::box(
-                  title = "AIC/BIC-comparison table:",
-                  width = 12,
-                  paste0(
-                    "<table align = \"center\", width = \"100%\"> <tr><td>
-                      <table align = \"center\"> <tr><td>
-                        <h5>AIC:</h5>",
-
-                    makeKable(infCompTable$aic, bold_cols = 1),
-
-                    "</td></tr></table>
-                  </td>
-                  <td>&nbsp;</td>
-                  <td>
-                    <table align = \"center\"> <tr><td>
-                      <h5>BIC:</h5>",
-
-                    makeKable(infCompTable$bic, bold_cols = 1),
-
-                  "</td></tr></table>
-                </td></tr></table>") %>%
-                HTML(),
-                actionLink(paste0("showLegendInfCompTable", groupAppend), "Show/hide legend"), # , style = "margin-left: 15px"),
-                conditionalPanel(paste0("input.showLegendInfCompTable", groupAppend, " % 2 == 1"),
-                                 makeLegend("infCompTable", estimatorNameRV(), input$sigLvl,
-                                            goodColor, badColor, neutrColor, textColor))))
-
-            ) # fluidPage
-          })
-
-        } ### if there are no good models ----
-        else {
-
-          output[[modelTestsContStr]] <- renderUI({
-
-            tagList(
-              wellPanel(
-                h5(sprintf("Lavaan status: %i warnings, %i errors.",
-                           sum(warns),
-                           sum(errs))),
-                lavErrsMsg,
-                lavWarnsMsg))
-          })
+          rownames(succTable$teq) <- goodModels
         }
       }
-    )
+
+      #### everything the results tabs need from this pass ----
+      # The settings are kept alongside the fits. The estimator can be changed after a
+      # run, and the tables must go on reporting the one that actually produced them.
+      list(
+        groupName     = groupName,
+        modelCodes    = modelCodes,
+        fittedModels  = fittedModelsWarns,
+        errs          = errs,
+        warns         = warns,
+        goodModels    = goodModels,
+        errModels     = errModels,
+        warnModels    = warnModels,
+        comps         = comps,
+        succTable     = succTable,
+        estimator     = mvnTestResult$estimator,
+        estimatorName = estimatorName(),
+        missingMethod = ifelse(fimlRV(), "fiml", "listwise"),
+        itemCols      = input$itemCols,
+        groupCol      = input$groupCol,
+        groups        = input$groups,
+        groupValues   = groupValues,
+        dataSource    = dataSource,
+        dataName      = dataName,
+        isSubset      = isSubset)
+    }))
+
+    # The fits now match the estimator that is selected.
+    refitPendingRV(FALSE)
   },
 
   ## observeEvent input$goModels error handler ----
@@ -2150,10 +1695,7 @@ server <- function(input, output, session) {
 
     # The lockout only ever disables, so switch these back on by hand. The multigroup box
     # only if there is a usable group column.
-    shinyjs::enable("goModels")
     shinyjs::enable("etaIntFree")
-    shinyjs::enable("sigLvl")
-    shinyjs::enable("estimator")
     if (isTRUE(validGroupsRV())) shinyjs::enable("doMg")
 
     output$goModelsError <- renderUI(
@@ -2164,4 +1706,676 @@ server <- function(input, output, session) {
           HTML() %>%
           div(style = "color:red")))
   })) # observeEvent(input$goModels, {
+
+  # Results ----
+  # Everything below is built once, when the app starts, and draws itself from whatever
+  # modelFitsRV() holds. Nothing here fits anything, so changing the significance level or
+  # the confidence level of the RMSEA interval only redraws the tables.
+  #
+  # The same code runs twice, once per pass: the whole sample writes to "modelTests",
+  # "parTables" and so on, the group-wise fit to the same ids with "Mg" on the end.
+  lapply(names(passSuffixes), function(thisPass) {
+
+    groupAppend <- passSuffixes[[thisPass]]
+
+    modelTestsContStr <- paste0("modelTestsCont", groupAppend)
+    hierPlotStr <- paste0("hierPlot", groupAppend)
+    hierTableStr <- paste0("hierTable", groupAppend)
+    fitsTableStr <- paste0("fitsTable", groupAppend)
+    combCompTableStr <- paste0("combCompTable", groupAppend)
+    infCompTableStr <- paste0("infCompTable", groupAppend)
+
+    hierTableLegendStr <- paste0("hierTableLegend", groupAppend)
+    fitsTableLegendStr <- paste0("fitsTableLegend", groupAppend)
+    combCompTableLegendStr <- paste0("combCompTableLegend", groupAppend)
+    infCompTableLegendStr <- paste0("infCompTableLegend", groupAppend)
+
+    parTabsetStr <- paste0("parTabset", groupAppend)
+    fsTabsetStr <- paste0("fsTabset", groupAppend)
+    mcTabsetStr <- paste0("mcTabset", groupAppend)
+
+    ## This pass's fits ----
+    # req() holds every output below back until the button has been pressed - and, for the
+    # group-wise pass, until the user has asked for one.
+    passFit <- reactive(req(modelFitsRV()[[thisPass]]))
+
+    ## The fit indices of every model that fitted ----
+    # The confidence level of the RMSEA interval is a display choice, so these are worked
+    # out again whenever the user changes it. No model is refitted.
+    passFits <- reactive(
+      do.call(rbind, lapply(passFit()$fittedModels[passFit()$goodModels],
+                            extractFitIndices,
+                            rmseaCiLevel = rmseaCiLvl())))
+
+    ## The three comparison matrices ----
+    # One cell per pair of models: the model's own chi-square on the diagonal, the
+    # difference against an earlier model to the left of it, and the same layout again for
+    # AIC and BIC. The chi-square cells are coloured by significance, so all of this is
+    # redrawn when the significance level changes.
+    compMatrices <- reactive({
+      fits <- passFits()
+      fittedModels <- passFit()$fittedModels
+      goodModels <- passFit()$goodModels
+      comps <- passFit()$comps
+
+      # Cells are addressed by pair, "etetko" being the ess. tau-equivalent model against
+      # the tau-congeneric one. Anything still empty at the end prints as a blank cell.
+      cellNames <- outer(models, models, paste0)
+
+      chisqCells <- dfCells <- aicCells <- bicCells <-
+        stats::setNames(rep(NA_character_, 25), cellNames)
+
+      # Comparing A with B is the same test as comparing B with A, so only the diagonal
+      # and the cells left of it are used. Those start as a grey X and are overwritten
+      # below wherever there is something to write.
+      chisqCells[lower.tri(diag(5), diag = TRUE)] <-
+        aicCells[lower.tri(diag(5), diag = TRUE)] <-
+        bicCells[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
+
+      for (thisModel in goodModels) {
+
+        whichModel <- which(goodModels == thisModel)
+        thisModelStr <- paste0(thisModel, thisModel)
+
+        ### write to diag(chisq comp table) ----
+        if (fits[thisModel, "pvalue"] < sigLvl()) {
+          sigAddon <- "*"
+          sigColor <- badColor
+
+          if (fits[thisModel, "pvalue"] < 0.01)
+            sigAddon <- paste0(sigAddon, "*")
+
+          if (fits[thisModel, "pvalue"] < 0.001)
+            sigAddon <- paste0(sigAddon, "*")
+
+        } else {
+
+          sigAddon <- ""
+          sigColor <- goodColor
+        }
+
+        chisqCells[thisModelStr] <-
+          kableExtra::cell_spec(
+            sprintf(paste0("%.2f", sigAddon), fits[thisModel, "chisq"]),
+            background = sigColor,
+            color = textColor,
+            italic = TRUE)
+
+        dfCells[thisModelStr] <-
+          kableExtra::cell_spec(
+            sprintf("%i", fits[thisModel, "df"]),
+            background = sigColor,
+            color = textColor,
+            italic = TRUE)
+
+        ### write to AIC/BIC comp table ----
+        aicCells[thisModelStr] <-
+          kableExtra::cell_spec(
+            sprintf("%.1f", fits[thisModel, "aic"]),
+            color = textColor,
+            background = neutrColor)
+
+        bicCells[thisModelStr] <-
+          kableExtra::cell_spec(
+            sprintf("%.1f", fits[thisModel, "bic"]),
+            color = textColor,
+            background = neutrColor)
+
+        #### if there is more than one good model ----
+        if (whichModel > 1) {
+
+          aicDiffs <- fits[thisModel, "aic"] - fits[1:(whichModel - 1), "aic"]
+          bicDiffs <- fits[thisModel, "bic"] - fits[1:(whichModel - 1), "bic"]
+
+          aicCells[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
+            kableExtra::cell_spec(
+              sprintf(ifelse(aicDiffs < 0, "%.1f", "+%.1f"), aicDiffs),
+              color = textColor,
+              background = ifelse(aicDiffs < 0, goodColor, badColor))
+
+          bicCells[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
+            kableExtra::cell_spec(
+              sprintf(ifelse(bicDiffs < 0, "%.1f", "+%.1f"), bicDiffs),
+              color = textColor,
+              background = ifelse(bicDiffs < 0, goodColor, badColor))
+        }
+
+        ### write to lower.tri(chisq comp table) ----
+        compsWithThisModel <- substring(
+          text = comps[grep(thisModel, substr(comps, 1, 3))],
+          first = 4,
+          last = 6)
+
+        compsWithThisModel <- compsWithThisModel[compsWithThisModel %in% goodModels]
+        names(compsWithThisModel) <- compsWithThisModel
+
+        fitCompsWithThisModel <- sapply(
+          compsWithThisModel,
+          function(thisComp) {
+            tmpTbl <- lavaan::lavTestLRT(fittedModels[[thisModel]], fittedModels[[thisComp]])
+            unlist(tmpTbl[2, c("Chisq diff", "Df diff", "Pr(>Chisq)")])
+        })
+
+        for (thisComp in compsWithThisModel) {
+
+          if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < sigLvl()) {
+            sigAddon <- "*"
+            sigColor <- badColor
+
+            if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.01)
+              sigAddon <- paste0(sigAddon, "*")
+
+            if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.001)
+              sigAddon <- paste0(sigAddon, "*")
+
+          } else {
+
+            sigAddon <- ""
+            sigColor <- goodColor
+          }
+
+          thisModelCompStr <- paste0(thisModel, thisComp)
+
+          chisqCells[thisModelCompStr] <- kableExtra::cell_spec(
+            sprintf(paste0("+%.2f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp]),
+            background = sigColor,
+            color = textColor)
+
+          dfCells[thisModelCompStr] <- kableExtra::cell_spec(
+            sprintf("+%i", fitCompsWithThisModel["Df diff", thisComp]),
+            background = sigColor,
+            color = textColor)
+        }
+      }
+
+      ### the df and the chi-square of one pair go in two columns side by side ----
+      combCompTable <- matrix(NA, nrow = 5, ncol = 10)
+      combCompTable[, seq(1, 10, 2)] <- matrix(dfCells, nrow = 5, ncol = 5)
+      combCompTable[, seq(2, 10, 2)] <- matrix(chisqCells, nrow = 5, ncol = 5)
+
+      rownames(combCompTable) <- modelsAbbrev
+      colnames(combCompTable) <- rep(
+        c("&Delta;df", paste0(passFit()$estimatorName, "-&Delta;&chi;&sup2;")),
+        times = 5)
+
+      list(
+        chisq = combCompTable,
+        aic = matrix(aicCells, nrow = 5, ncol = 5,
+                     dimnames = list(modelsAbbrev, modelsAbbrev)),
+        bic = matrix(bicCells, nrow = 5, ncol = 5,
+                     dimnames = list(modelsAbbrev, modelsAbbrev)))
+    })
+
+    ## the page holding the comparison of all models ----
+    # Only the boxes and their headings. Each table is an output of its own below, so
+    # changing the significance level redraws the table without rebuilding the page - which
+    # would close any legend the user has open.
+    output[[modelTestsContStr]] <<- renderUI({
+
+      fit <- passFit()
+
+      #### message if warnings ----
+      if (sum(fit$warns) > 0) {
+
+        lavWarnsMsg <- tagList(
+          h6("The following models produced warnings:"),
+
+          cbind(paste0(modelsLong[fit$warnModels], ":&emsp;"),
+                sapply(fit$fittedModels[fit$warnModels],
+                       function(model) attr(model, "shinyCTTwarning")$message)) %>%
+            kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
+            kableExtra::column_spec(column = 1, bold = TRUE) %>%
+            HTML() %>%
+            div(style = "color:orange")
+        ) # tagList
+
+      } else {
+        lavWarnsMsg <- NULL
+      }
+
+      #### message if errors ----
+      if (sum(fit$errs) > 0) {
+
+        lavErrsMsg <- tagList(
+          h6("The following models produced errors:"),
+
+          cbind(paste0(modelsLong[fit$errModels], ":&emsp;"),
+                sapply(fit$fittedModels[fit$errModels],
+                       function(model) model$message)) %>%
+            kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
+            kableExtra::column_spec(column = 1, bold = TRUE) %>%
+            HTML() %>%
+            div(style = "color:red")
+          ) # tagList
+
+      } else {
+        lavErrsMsg <- NULL
+      }
+
+      lavStatus <- if (sum(fit$warns) > 0 || sum(fit$errs) > 0) {
+        wellPanel(
+          h5(sprintf("Lavaan status: %i warnings, %i errors.",
+                     sum(fit$warns),
+                     sum(fit$errs))),
+          lavErrsMsg,
+          lavWarnsMsg)
+      }
+
+      #### if there are no good models, the status is the whole page ----
+      if (length(fit$goodModels) == 0) return(tagList(lavStatus))
+
+      #### otherwise, one box per comparison ----
+      fluidPage(
+
+        if (!is.null(lavStatus)) fluidRow(lavStatus),
+
+        fluidRow(
+          shinydashboard::box(
+            title = "Hierarchical model comparison plot:",
+            width = 12,
+            plotOutput(hierPlotStr))),
+
+        fluidRow(
+          shinydashboard::box(
+            title = "Hierarchical model comparison table:",
+            width = 12,
+            htmlOutput(hierTableStr),
+            actionLink(paste0("showLegendHierTable", groupAppend), "Show/hide legend"),
+            conditionalPanel(paste0("input.showLegendHierTable", groupAppend, " % 2 == 1"),
+                             htmlOutput(hierTableLegendStr)))),
+
+        fluidRow(
+          shinydashboard::box(
+            title = "Fit index table",
+            width = 12,
+            htmlOutput(fitsTableStr),
+            br(),
+            actionLink(paste0("showLegendFitIndexTable", groupAppend), "Show/hide legend"),
+            conditionalPanel(paste0("input.showLegendFitIndexTable", groupAppend, " % 2 == 1"),
+                             htmlOutput(fitsTableLegendStr)))),
+
+        fluidRow(
+          shinydashboard::box(
+            title = HTML("&chi;&sup2;-comparison table:"),
+            width = 12,
+            htmlOutput(combCompTableStr),
+            br(),
+            actionLink(paste0("showLegendCombCompTable", groupAppend), "Show/hide legend"),
+            conditionalPanel(paste0("input.showLegendCombCompTable", groupAppend, " % 2 == 1"),
+                             htmlOutput(combCompTableLegendStr)))),
+
+        fluidRow(
+          shinydashboard::box(
+            title = "AIC/BIC-comparison table:",
+            width = 12,
+            htmlOutput(infCompTableStr),
+            actionLink(paste0("showLegendInfCompTable", groupAppend), "Show/hide legend"),
+            conditionalPanel(paste0("input.showLegendInfCompTable", groupAppend, " % 2 == 1"),
+                             htmlOutput(infCompTableLegendStr))))
+
+      ) # fluidPage
+    })
+
+    ## hierarchical model comparison plot ----
+    output[[hierPlotStr]] <<- renderPlot({
+
+      succTable <- passFit()$succTable
+      goodModels <- passFit()$goodModels
+
+      req(length(goodModels) > 0)
+
+      modelNumbs <- which(models %in% goodModels)
+
+      chisqs <- dfs <- pvalues <- rep(NA, 5)
+
+      names(chisqs) <-
+        names(dfs) <-
+        names(pvalues) <- c("tkoete", "eteteq", "eteetp", "teqtpa", "etptpa")
+
+      if (!is.null(succTable$teq)) {
+        teqNames <- paste0(rownames(succTable$teq)[1:(nrow(succTable$teq) - 1)],
+                           rownames(succTable$teq)[2:nrow(succTable$teq)])
+
+        chisqs[teqNames] <- succTable$teq[-1, "Chisq diff"]
+        dfs[teqNames] <- succTable$teq[-1, "Df diff"]
+        pvalues[teqNames] <- succTable$teq[-1, "Pr(>Chisq)"]
+      }
+
+      if (!is.null(succTable$etp)) {
+        etpNames <- paste0(rownames(succTable$etp)[1:(nrow(succTable$etp) - 1)],
+                           rownames(succTable$etp)[2:nrow(succTable$etp)])
+
+        chisqs[etpNames] <- succTable$etp[-1, "Chisq diff"]
+        dfs[etpNames] <- succTable$etp[-1, "Df diff"]
+        pvalues[etpNames] <- succTable$etp[-1, "Pr(>Chisq)"]
+      }
+
+      modelTestDF$chisq <- chisqs
+      modelTestDF$df <- dfs
+      modelTestDF$pvalue <- pvalues
+
+      ### ggplot code ----
+      ggplot2::ggplot(modelTestDF,
+                      ggplot2::aes(x = .data$x, y = .data$y, label = .data$name)) +
+
+        ggplot2::geom_text(parse = TRUE, fontface = "bold", size = 5) +
+        ggplot2::geom_segment(
+          ggplot2::aes(x = .data$xstarts, y = .data$ystarts,
+                       xend = .data$xends, yend = .data$yends),
+          linewidth = 0.3) +
+
+        ggplot2::geom_label(
+          ggplot2::aes(
+            x = .data$labelxs,
+            y = .data$labelys,
+
+            label = ifelse(
+              is.na(.data$chisq),
+              yes = "No~Comparison",
+              no = sprintf(
+                "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
+                passFit()$estimatorName, # %s
+                .data$chisq, # %.3f
+                .data$df, # %i
+                ifelse(.data$pvalue < 0.001, "<0.001", sprintf("==%.3f", .data$pvalue)))),
+
+            fill = c("nsig", "sig")[c(.data$pvalue < sigLvl()) + 1]), # aes
+
+          color = textColor,
+          size = 4.5,
+          parse = TRUE) + # geom_label
+
+        ggplot2::scale_fill_manual(
+          values = c("nsig" = goodColor, "sig" = badColor),
+          na.value = neutrColor) +
+
+        ggplot2::guides(fill = "none") +
+        ggplot2::xlim(c(-4, 4)) +
+        ggplot2::coord_fixed() +
+        ggplot2::theme_void()
+
+    }) # renderPlot
+
+    ## hierarchical model comparison table ----
+    # Two tables side by side: one down each branch of the hierarchy.
+    output[[hierTableStr]] <<- renderUI({
+
+      fit <- passFit()
+      req(length(fit$goodModels) > 0)
+
+      hierTables <- lapply(
+
+        c("teq", "etp"),
+
+        function(model) {
+          if (!is.null(fit$succTable[[model]])) {
+
+            succTableTmp <- as.data.frame(fit$succTable[[model]])
+            makeHierTable(succTableTmp, passFits()[rownames(succTableTmp), "cfi"],
+                          fit$estimatorName, sigLvl(),
+                          goodColor, badColor, neutrColor, textColor, modelsAbbrev)
+          } else {
+            NULL
+          }
+        } # function(model)
+      ) # lapply
+
+      paste0(
+        "<table align = \"center\", width = \"100%\"><tr><td>",
+        hierTables[[1]],
+        "</td><td>&nbsp;</td><td>",
+        hierTables[[2]],
+        "</td></tr></table>") %>%
+        HTML()
+    })
+
+    ## fit index table ----
+    output[[fitsTableStr]] <<- renderUI({
+      req(length(passFit()$goodModels) > 0)
+
+      HTML(makeFitsTable(passFits(), passFit()$estimatorName, sigLvl(), rmseaCiLvl(),
+                         goodColor, badColor, neutrColor, textColor,
+                         modelsAbbrev))
+    })
+
+    ## chi-square comparison table ----
+    output[[combCompTableStr]] <<- renderUI({
+      req(length(passFit()$goodModels) > 0)
+
+      # One header spanning the two columns of each model.
+      headerNames <- c(1, rep(2, 5))
+      names(headerNames) <- c(" ", modelsAbbrev)
+
+      makeKable(compMatrices()$chisq, bold_cols = 1) %>%
+        kableExtra::add_header_above(headerNames, escape = FALSE) %>%
+        HTML()
+    })
+
+    ## AIC/BIC comparison table ----
+    output[[infCompTableStr]] <<- renderUI({
+      req(length(passFit()$goodModels) > 0)
+
+      paste0(
+        "<table align = \"center\", width = \"100%\"> <tr><td>
+          <table align = \"center\"> <tr><td>
+            <h5>AIC:</h5>",
+
+        makeKable(compMatrices()$aic, bold_cols = 1),
+
+        "</td></tr></table>
+      </td>
+      <td>&nbsp;</td>
+      <td>
+        <table align = \"center\"> <tr><td>
+          <h5>BIC:</h5>",
+
+        makeKable(compMatrices()$bic, bold_cols = 1),
+
+      "</td></tr></table>
+    </td></tr></table>") %>%
+      HTML()
+    })
+
+    ## the four legends ----
+    # Each names the significance level it is describing, so each follows it.
+    output[[hierTableLegendStr]] <<- renderUI(
+      makeLegend("hierTables", passFit()$estimatorName, sigLvl(),
+                 goodColor, badColor, neutrColor, textColor))
+
+    output[[fitsTableLegendStr]] <<- renderUI(
+      makeLegend("fitIndexTable", passFit()$estimatorName, sigLvl(),
+                 goodColor, badColor, neutrColor, textColor,
+                 rmseaCiLvl = rmseaCiLvl()))
+
+    output[[combCompTableLegendStr]] <<- renderUI(
+      makeLegend("combCompTable", passFit()$estimatorName, sigLvl(),
+                 goodColor, badColor, neutrColor, textColor))
+
+    output[[infCompTableLegendStr]] <<- renderUI(
+      makeLegend("infCompTable", passFit()$estimatorName, sigLvl(),
+                 goodColor, badColor, neutrColor, textColor))
+
+    ## the three tab strips ----
+    # Built whole from the models that fitted, rather than a tab being added per model:
+    # the models can be fitted again, and adding to the strip would give two tabs per
+    # model the second time round. tabBox() takes its panels one by one, so do.call()
+    # hands it the list.
+    output[[parTabsetStr]] <<- renderUI({
+      panels <- lapply(
+        passFit()$goodModels,
+        function(thisModel) tabPanel(
+          title = HTML(modelsLong[thisModel]),
+          htmlOutput(paste0(thisModel, "ParTable", groupAppend))))
+
+      do.call(
+        shinydashboard::tabBox,
+        c(list(id = paste0("parTabsetTab", groupAppend),
+               title = "Estimated parameters",
+               width = 12),
+          unname(panels)))
+    })
+
+    output[[fsTabsetStr]] <<- renderUI({
+      panels <- lapply(
+        passFit()$goodModels,
+        function(thisModel) tabPanel(
+          title = HTML(modelsLong[thisModel]),
+          sidebarLayout(
+
+            sidebarPanel(
+              h4("Download Predicted Factor Scores as CSV"),
+
+              textInput(
+                paste0(thisModel, "Filename", groupAppend),
+                "Filename:",
+                sprintf("%s_%s_factorscores.csv", passFit()$dataName, thisModel)),
+
+              hr(),
+
+              radioButtons(
+                paste0(thisModel, "Sep", groupAppend),
+                "Separator",
+                choices = c(Comma = ",", Semicolon = ";", Tab = "\t"),
+                selected = ","),
+
+              radioButtons(
+                paste0(thisModel, "Dec", groupAppend),
+                "Decimal Separator",
+                choices = c(Comma = ",", Dot = "."),
+                selected = "."),
+
+              hr(),
+
+              downloadButton(
+                paste0(thisModel, "ScoresDownload", groupAppend),
+                "Download Factor Scores") %>%
+
+                div(align = "center"),
+
+              width = 3
+            ), # sidebarPanel
+
+            mainPanel(
+              h4("Data Overview"),
+              DT::dataTableOutput(paste0(thisModel, "Scores", groupAppend)))
+
+          ) # sidebarLayout
+        )) # tabPanel, lapply
+
+      do.call(
+        shinydashboard::tabBox,
+        c(list(id = paste0("fsTabsetTab", groupAppend),
+               title = HTML("Predicted factor scores (&eta;&#x302;)"),
+               width = 12),
+          unname(panels)))
+    })
+
+    output[[mcTabsetStr]] <<- renderUI({
+      panels <- lapply(
+        passFit()$goodModels,
+        function(thisModel) tabPanel(
+          title = HTML(modelsLong[thisModel]),
+          h5("The following R code can be used to fit this model with lavaan:"),
+          verbatimTextOutput(paste0(thisModel, "Code", groupAppend))))
+
+      do.call(
+        shinydashboard::tabBox,
+        c(list(id = paste0("mcTabsetTab", groupAppend),
+               title = "Model code",
+               width = 12),
+          unname(panels)))
+    })
+
+    ## one set of outputs per model ----
+    # All five models get theirs, whether or not they were chosen. The req() at the top of
+    # each holds back the ones that were not fitted; the tab strips above only show tabs
+    # for the ones that were.
+    lapply(models, function(thisModel) {
+
+      parTableStr <- paste0(thisModel, "ParTable", groupAppend)
+      scoresStr <- paste0(thisModel, "Scores", groupAppend)
+      scoresDLStr <- paste0(thisModel, "ScoresDownload", groupAppend)
+      scoresDLFileStr <- paste0(thisModel, "Filename", groupAppend)
+      sepStr <- paste0(thisModel, "Sep", groupAppend)
+      decStr <- paste0(thisModel, "Dec", groupAppend)
+      codeStr <- paste0(thisModel, "Code", groupAppend)
+
+      ### parameter table ----
+      output[[parTableStr]] <<- renderUI({
+
+        fit <- passFit()
+        req(thisModel %in% fit$goodModels)
+
+        fittedModel <- fit$fittedModels[[thisModel]]
+        thisModelsNgroups <- fittedModel@Data@ngroups
+
+        parTableWithCIs <- makeParTableWithCIs(fittedModel, fit$estimatorName,
+                                               sigLvl(), fit$itemCols,
+                                               thisModelsNgroups)
+
+        #### modify parameter tables if there are groups ----
+        if (!isFALSE(fit$groupName)) {
+          for (i in 1:thisModelsNgroups) {
+
+            groupRowHeaders <- sprintf("Group: %s", fittedModel@Data@group.label)
+
+            parTableWithCIs <- kableExtra::group_rows(
+              parTableWithCIs,
+              group_label = groupRowHeaders[i],
+              start_row = (i - 1) * (length(fit$itemCols) + 1) + 1,
+              end_row = i * (length(fit$itemCols) + 1),
+              label_row_css = "background-color: #666; color: #fff;")
+          }
+        }
+
+        HTML(parTableWithCIs)
+      })
+
+      ### factor scores ----
+      output[[scoresStr]] <<- DT::renderDataTable({
+
+        req(thisModel %in% passFit()$goodModels)
+
+        getPredictedScores(
+          passFit()$fittedModels[[thisModel]],
+          passFit()$groupValues)
+
+      }, options = list(pageLength = 10))
+
+      output[[scoresDLStr]] <<- downloadHandler(
+        filename = function() input[[scoresDLFileStr]],
+        content = function(file) {
+
+          utils::write.table(
+            getPredictedScores(
+              passFit()$fittedModels[[thisModel]],
+              passFit()$groupValues),
+
+            file = file,
+            sep = input[[sepStr]],
+            dec = input[[decStr]],
+            row.names = FALSE)
+        },
+        contentType = "text/csv")
+
+      ### model code ----
+      output[[codeStr]] <<- renderPrint({
+
+        fit <- passFit()
+        req(thisModel %in% fit$goodModels)
+
+        cat(
+          makeRCode(
+            dataSource = fit$dataSource,
+            groupCol = fit$groupCol,
+            groups = fit$groups,
+            modelCode = fit$modelCodes[[thisModel]],
+            estimator = fit$estimator,
+            missingMethod = fit$missingMethod,
+            isSubset = fit$isSubset,
+            model = thisModel,
+            isMg = !isFALSE(fit$groupName)))
+      })
+    })
+  })
 }

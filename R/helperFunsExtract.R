@@ -1,6 +1,15 @@
-extractFitIndices <- function(fittedModel) {
+## Pulls the fit indices out of a fitted model.
+##
+##   rmseaCiLevel : the confidence level of the RMSEA interval. lavaan's own default is
+##                  0.90, which is why it is the default here too.
+extractFitIndices <- function(fittedModel, rmseaCiLevel = 0.90) {
   scaledAddon <- switch(length(fittedModel@test), "", ".scaled")
-  rawParams <- lavaan::lavInspect(fittedModel, what = "fit")
+
+  # fitMeasures() rather than lavInspect(fittedModel, "fit"): same numbers under both ML
+  # and MLR, but it takes the confidence level for the RMSEA interval.
+  rawParams <- lavaan::fitMeasures(
+    fittedModel,
+    fm.args = list(rmsea.ci.level = rmseaCiLevel))
 
   paramsDfLeft <- as.data.frame(t(
     rawParams[c(

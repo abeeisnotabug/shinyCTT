@@ -62,12 +62,15 @@ records whether FIML is in play (`fimlRV()`).
 
 ### "Test the models" (`goModels`)
 
-The big one, around 700 lines. It:
+It:
 
 1. freezes the multigroup choice into `doMgRV()` and calls `appStage("results")`;
 2. builds the five lavaan model syntax strings with `makeModelCodes()`;
 3. fits each chosen model, keeping the fit even if lavaan only *warns*;
-4. compares them, builds every table and plot, and appends one tab per model.
+4. puts the fits, and the settings they were fitted with, into `modelFitsRV()`.
+
+**It draws nothing.** Every table, plot and tab on the results pages is an output of its own,
+written once when the app starts, that reads `modelFitsRV()` — see section 4b.
 
 The whole body is wrapped in `tryCatch()`. If anything in that chain fails, the handler puts
 the message in a red box under the button and steps `appStage()` back to `"statistics"` so
@@ -101,7 +104,7 @@ blocks[[length(blocks) + 1]] <- reloadBlock       # always last
 stageControls <- list(
   data       = c("source", "CSVFile", ... , "dataSelectButton"),
   subset     = c("itemCols", "groupCol", ... , "useFIML"),
-  statistics = c("goModels", "doMg", "etaIntFree", "sigLvl", "estimator"))
+  statistics = c("doMg", "etaIntFree"))
 ```
 
 and one observer disables everything belonging to a stage the app has already left:
@@ -121,6 +124,46 @@ handler — re-enables its four controls by name.
 
 > **If you add a control**, put its id in the right `stageControls` entry. That is the whole
 > job; you do not need to write a `disable()` call.
+
+Four controls on the Testing Parameters tab are deliberately in no entry at all, so they stay
+usable after a run: the significance level, the confidence level of the RMSEA interval, the
+estimator, and the "Test the models" button itself.
+
+---
+
+## 4b. Fitting and drawing are separate
+
+The button fits. Everything on the results pages draws itself from the fits, and redraws when
+a display setting changes. Nothing is refitted for a display setting.
+
+```
+"Test the models"  ->  modelFitsRV()  ->  the tables, plots and tabs
+                                     ^
+                       the significance level and the RMSEA confidence level
+                       feed in here, not into the fitting
+```
+
+So:
+
+- **Changing the significance level** recolours every table, re-stars every comparison and
+  recomputes the parameter confidence intervals, with no refit. It is instant.
+- **Changing the confidence level of the RMSEA interval** widens or narrows that interval in
+  the fit index table, and relabels its header. Also no refit — the interval is worked out
+  from the fitted model by `fitMeasures(fm.args = list(rmsea.ci.level = ...))`.
+- **Changing the estimator** *does* need a refit, because it changes how the models are
+  fitted. The app does not do it silently: an orange note appears under the button and the
+  button's label gains a `*`, until the user presses it.
+
+`modelFitsRV()` holds the settings each pass was fitted with — the estimator, whether FIML
+was used, the item and group columns, where the data came from — alongside the fits. The
+tables read those, not the live controls, so after an estimator change the results go on
+saying which estimator actually produced them, and the exported R script goes on reproducing
+them.
+
+**The three tab strips are rebuilt whole**, from `renderUI()`, rather than a tab being added
+per model. A tab that is *added* would be added again on the next run, giving two
+"τ-kongeneric" tabs, then three. Each strip depends only on the fits, so changing a display
+setting redraws the table *inside* the open tab and leaves the user where they were.
 
 ---
 
@@ -231,6 +274,12 @@ devtools::install()
 window.shinyjs        # should be an object, not undefined
 ```
 
+**An output that only ever draws must not fit anything.** The split in section 4b is what
+lets the significance level be changed after a run. If you add something to the results pages,
+work out which side of the line it is on: does it need a new fit, or only the fits that are
+already there? Put anything that needs a fit in the `goModels` observer, and anything that
+does not in an output of its own.
+
 **Every `output$x <- render*()` sits at the top level.** None is nested inside another. A
 nested one is torn down and rebuilt every time the outer one changes, which makes it very hard
 to work out what depends on what. The five plots are defined next to the `renderUI` that draws
@@ -242,7 +291,7 @@ controls do not exist until that `renderUI` has run once.
 ## 8. Checking you have not broken anything
 
 ```r
-devtools::test()     # 44 tests over the calculation helpers - fast, run it constantly
+devtools::test()     # 46 tests over the calculation helpers - fast, run it constantly
 devtools::check()    # full R CMD check; the package is kept at 0 errors/warnings/notes
 ```
 

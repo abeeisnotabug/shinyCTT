@@ -164,6 +164,31 @@ The single-group and multigroup passes are the same code run twice, distinguishe
 All five ids now derive from `groupAppend`-suffixed variables. Real Shiny modules would remove
 the suffixing entirely.
 
+### A tab that is appended is appended again next time
+
+The results tabs used to be added one per model with `appendTab()`. That only looked right
+because the button disabled itself after one run: a second run would have given two
+"τ-kongeneric" tabs, then three. The three strips are now built whole in a `renderUI()` from
+the models that fitted, so a rerun replaces them. Never go back to `appendTab()` here.
+
+`shinydashboard::tabBox()` takes its panels one at a time and does *not* accept a list of
+them — `tabsetPanel(listOfPanels)` errors with "Navigation containers expect a collection of
+...". Hence the `do.call()` at those three call sites, on an unnamed list. (An unnamed one:
+see the `do.call()` gotcha above.)
+
+### Anything the results tabs read must be frozen at fit time
+
+The estimator can now be changed after a run without refitting, so `input$estimator` and the
+fitted models can disagree. Every setting the results pages need — the estimator, the FIML
+choice, the item and group columns, where the data came from — is stored in `modelFitsRV()`
+next to the fits, and the tables read it from there.
+
+Read a live input instead and the failure is silent: the fit index table would head its
+column `MLR-χ²` over numbers that came out of ML, and the exported R script on the Model Code
+tab would not reproduce the results next to it. Two things are deliberately live and only
+two: the significance level and the confidence level of the RMSEA interval, because neither
+changes how anything was fitted.
+
 ### The comparison set is derived, not listed
 
 `cttModelFamily()$comparable` used to be
@@ -183,7 +208,11 @@ enables anything. Some controls start disabled for their own reasons — the dat
 until the chosen data validates, the multigroup checkbox until the group column yields usable
 groups — so a blanket "enable everything for the current stage" would switch those on wrongly.
 
-The one backwards move, the failed-run handler, re-enables its four controls by name.
+The one backwards move, the failed-run handler, re-enables its two controls by name.
+
+The significance level, the confidence level of the RMSEA interval, the estimator and the
+"Test the models" button are in no stage entry at all, so nothing ever disables them — they
+are meant to stay usable after a run.
 
 ### Group colours are pinned by name
 

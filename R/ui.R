@@ -390,14 +390,27 @@ ui <- function(request) {
 
                   ##### testParamTab left col sigLvl ----
                   column(
-                    width = 6,
+                    width = 3,
                     numericInput(
                       "sigLvl",
                       "Enter the significance level:",
                       value = 0.05,
                       min = 0,
                       max = 1,
-                      step = 0.001))),
+                      step = 0.001)),
+
+                  ##### testParamTab left col rmseaCiLvl ----
+                  # A confidence level, not a significance level, and set on its own.
+                  # 0.90 is the interval lavaan reports by default.
+                  column(
+                    width = 3,
+                    numericInput(
+                      "rmseaCiLvl",
+                      "Enter the confidence level of the RMSEA interval:",
+                      value = 0.90,
+                      min = 0.5,
+                      max = 0.999,
+                      step = 0.01))),
 
                 fluidRow(
 
@@ -427,7 +440,8 @@ ui <- function(request) {
               shinydashboard::box(
                 width = NULL,
                 actionButton("goModels", "Test the models", width = "100%"),
-                htmlOutput("goModelsError"))
+                htmlOutput("goModelsError"),
+                htmlOutput("refitPendingNote"))
             ), # column
 
             #### testParamTab right col (model test checkbox table) ----
@@ -457,55 +471,37 @@ ui <- function(request) {
         shinydashboard::tabItem(
           tabName = "parTables",
           fluidRow(
-            shinydashboard::tabBox(
-              id = "parTabsetTab",
-              title = "Estimated parameters",
-              width = 12))),
+            uiOutput("parTabset"))),
 
         ### tabItem parTablesMg ----
         shinydashboard::tabItem(
           tabName = "parTablesMg",
           fluidRow(
-            shinydashboard::tabBox(
-              id = "parTabsetTabMg",
-              title = "Estimated parameters",
-              width = 12))),
+            uiOutput("parTabsetMg"))),
 
         ### tabItem facScores ----
         shinydashboard::tabItem(
           tabName = "facScores",
           fluidRow(
-            shinydashboard::tabBox(
-              id = "fsTabsetTab",
-              title = HTML("Predicted factor scores (&eta;&#x302;)"),
-              width = 12))),
+            uiOutput("fsTabset"))),
 
         ### tabItem facScoresMg ----
         shinydashboard::tabItem(
           tabName = "facScoresMg",
           fluidRow(
-            shinydashboard::tabBox(
-              id = "fsTabsetTabMg",
-              title = HTML("Predicted factor scores (&eta;&#x302;)"),
-              width = 12))),
+            uiOutput("fsTabsetMg"))),
 
         ### tabItem modelCode ----
         shinydashboard::tabItem(
           tabName = "modelCode",
           fluidRow(
-            shinydashboard::tabBox(
-              id = "mcTabsetTab",
-              title = "Model code",
-              width = 12))),
+            uiOutput("mcTabset"))),
 
         ### tabItem modelCodeMg ----
         shinydashboard::tabItem(
           tabName = "modelCodeMg",
           fluidRow(
-            shinydashboard::tabBox(
-              id = "mcTabsetTabMg",
-              title = "Model code",
-              width = 12)))
+            uiOutput("mcTabsetMg")))
 
       ) # tabItems
     ) # dashboardBody
