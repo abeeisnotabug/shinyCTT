@@ -32,15 +32,22 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
   out
 }
 
-makeRCode <- function(input, modelCode, estimator, missingMethod, isSubset, model, isMg) {
+## Writes out the user's analysis as a standalone R script, shown on the Model code tab.
+##
+##   dataSource : where the data came from, as one of
+##                list(type = "Workspace", object = )
+##                list(type = "CSV", name = , header = , sep = , quote = )
+##                list(type = "SPSS", name = )
+makeRCode <- function(dataSource, groupCol, groups, modelCode, estimator, missingMethod,
+                      isSubset, model, isMg) {
   head <- "library(lavaan)"
 
   dataInput <- sprintf(
     "rawData <- %s",
     switch(
-      input$source,
+      dataSource$type,
 
-      "Workspace" = input$objectFromWorkspace,
+      "Workspace" = dataSource$object,
 
       "CSV" = sprintf(
 "read.csv(
@@ -49,22 +56,22 @@ makeRCode <- function(input, modelCode, estimator, missingMethod, isSubset, mode
   sep = \"%s\",
   quote = \"%s\",
   stringsAsFactors = FALSE)",
-        input$CSVFile$name, # file =
-        input$header, # header =
-        input$sep, # sep =
-        ifelse(input$quote == "\"", "\\\"", input$quote)), # quote =
+        dataSource$name, # file =
+        dataSource$header, # header =
+        dataSource$sep, # sep =
+        ifelse(dataSource$quote == "\"", "\\\"", dataSource$quote)), # quote =
 
       "SPSS" = sprintf(
-        "haven::read_spss(file = %s)",
-        input$SPSSFile$name)
+        "haven::read_spss(file = \"%s\")",
+        dataSource$name)
     ) # switch(
   ) # sprintf(
 
   if (isSubset)
     subsetData <- sprintf(
       "subsetData <- subset(rawData, rawData[, \"%s\"] %%in%% c(%s))",
-      input$groupCol,
-      paste0("\"", paste(input$groups, collapse = "\", \""), "\""))
+      groupCol,
+      paste0("\"", paste(groups, collapse = "\", \""), "\""))
 
   modelCodeLine <- sprintf(
 "modelCode <- \"
@@ -85,7 +92,7 @@ makeRCode <- function(input, modelCode, estimator, missingMethod, isSubset, mode
 
       model,
       ifelse(isSubset, "subsetData", "rawData"),
-      input$groupCol,
+      groupCol,
       estimator,
       missingMethod)
 
@@ -106,7 +113,7 @@ makeRCode <- function(input, modelCode, estimator, missingMethod, isSubset, mode
   }
 
   sprintf(
-"# Load necesary package: lavaan
+"# Load the necessary package: lavaan
 %s
 
 # Load the data from the selected source:

@@ -13,52 +13,21 @@ server <- function(input, output, session) {
     neutrColor <- "white"
   }
 
-  modelsLong <- c("&tau;-kongeneric",
-                  "essentially &tau;-equivalent",
-                  "&tau;-equivalent",
-                  "essentially &tau;-parallel",
-                  "&tau;-parallel")
-  modelsExpr <- c("bold(\u03C4*'-kongeneric')",
-                  "bold(essentially~\u03C4*'-equivalent')",
-                  "bold(\u03C4*'-equivalent')",
-                  "bold(essentially~\u03C4*'-parallel')",
-                  "bold(\u03C4*'-parallel')")
-  modelsAbbrev <- c("&#964;-kong.",
-                    "ess. &#964;-equiv.",
-                    "&#964;-equiv.",
-                    "ess. &#964;-paral.",
-                    "&#964;-paral.")
-  models <- c("tko", "ete", "teq", "etp", "tpa")
+  # Everything about the five models comes from one place: cttModelFamily(), defined in
+  # R/modelFamily.R. Read that file to see what each of these contains.
+  family <- cttModelFamily()
 
-  names(models) <-
-    names(modelsLong) <-
-    names(modelsExpr) <-
-    names(modelsAbbrev) <- models
+  models       <- family$names     # c(tko = "tko", ete = "ete", ...)
+  modelsLong   <- family$long      # "&tau;-kongeneric", ... - for tab titles
+  modelsAbbrev <- family$abbrev    # "&#964;-kong.", ...     - for table headers
+  minItems     <- family$minItems  # c(tko = 4, ete = 3, ...) - fewest testable items
+  possComps    <- family$comparable # "etetko", "teqtko", ... - the 9 valid comparisons
 
-  possComps <- outer(models, models, paste0)[lower.tri(diag(5))][-8]
-
-  # Fewest items at which each model still has a positive df, i.e. at which it can be
-  # tested at all. The same thresholds are already stated twice elsewhere: once per
-  # conditionalPanel in ui.R's comparison grid ("Too few items." at itemCols.length <= 3
-  # for tko, <= 2 for ete, < 2 for the rest), and in prose in the item-count
-  # notifications further down. Named here so the R side reads them from one place
-  # instead of open-coding a third set; all three have to be kept in step by hand.
-  minItems <- c(tko = 4, ete = 3, teq = 2, etp = 2, tpa = 2)
-
-  modelTestDF <- data.frame(name = modelsExpr,
-                            x = c(0, 0, -2, 2, 0),
-                            y = c(6, 4, 2, 2, 0),
-                            xstarts = c(0, 0, 0, -2, 2),
-                            xends = c(0, -2, 2, 0, 0),
-                            ystarts = c(5.8, 3.8, 3.8, 1.8, 1.8),
-                            yends = c(4.2, 2.2, 2.2, 0.2, 0.2),
-                            labelxs = c(0, -2, 2, -2, 2),
-                            labelys = c(5, 3, 3, 1, 1))
+  # Model labels plus the coordinates the hierarchical plot draws them at.
+  modelTestDF <- family$plot
 
   ## Reactive values ----
   notifications <- reactiveValues(notList = list())
-
-  dataMenuList <- reactiveValues()
 
   userDataRaw <- reactiveVal()
   userDataChosen <- reactiveVal()
@@ -69,13 +38,42 @@ server <- function(input, output, session) {
   groupColRV <- reactiveVal()
   validGroupsRV <- reactiveVal()
 
-  incompleteCasesRV <- reactiveVal()
   fimlRV <- reactiveVal(FALSE)
   estimatorNameRV <- reactiveVal()
 
   mvnTestResult <- reactiveValues(
     raw = NULL,
     estimator = "ML")
+
+  ## Workflow stage ----
+
+  appStage <- reactiveVal("data")
+
+  # Frozen at the transition to "results" so the sidebar re-renders only on stage changes.
+  doMgRV <- reactiveVal(FALSE)
+
+
+  # Which controls belong to which stage: live while that stage is current, frozen once
+  # the user moves past it.
+  stageControls <- list(
+    data       = c("source", "CSVFile", "header", "sep", "quote", "objectFromWorkspace",
+                   "dataSelectButton"),
+    subset     = c("itemCols", "selectall", "deselectall", "groupCol", "groups",
+                   "subsetSelectButton", "useFIML"),
+    statistics = c("goModels", "doMg", "etaIntFree", "sigLvl", "estimator"))
+
+  observeEvent(appStage(), {
+
+    # Every stage before the current one. seq_len(... - 1) stops one short, so the stage the
+    # user is actually on keeps its own controls live.
+    stagesAlreadyPassed <- stages[seq_len(match(appStage(), stages) - 1)]
+
+    # stageControls[stagesAlreadyPassed] is a list of character vectors, one per stage;
+    # unlist() runs them together into a single vector of input ids to freeze.
+    controlsToFreeze <- unlist(stageControls[stagesAlreadyPassed], use.names = FALSE)
+
+    for (controlId in controlsToFreeze) shinyjs::disable(controlId)
+  })
 
   ## Group colours ----
   # ggplot2's default discrete palette, but pinned to the group *by name*: a discrete
@@ -111,23 +109,10 @@ server <- function(input, output, session) {
       badgeStatus = status)
   })
 
-  ## Sidebar ----
-  dataMenuList$menuList <- list(
-    shinydashboard::menuItem(
-      "1. Data selection",
-      tabName = "dataSelectionTab",
-      icon = icon("database")),
-    hr(),
-    shinydashboard::menuItem(
-      "Reload",
-      tabName = "reloadTab",
-      icon = icon("sync"),
-      selected = FALSE))
-
   output$dataMenuOut <- shinydashboard::renderMenu({
     shinydashboard::sidebarMenu(
       id = "dataMenu",
-      .list = dataMenuList$menuList)})
+      .list = sidebarGroups(appStage(), doMgRV()))})
 
   ## observeEvent reload button ----
   observeEvent(input$dataMenu, {
@@ -167,6 +152,8 @@ server <- function(input, output, session) {
          input$header,
          input$sep,
          input$quote), {
+    req(identical(appStage(), "data"))
+
     userDataRaw(NULL)
 
     shinyjs::disable("dataSelectButton")
@@ -250,28 +237,7 @@ server <- function(input, output, session) {
 
   ## dataSelectionTab observeEvent dataSelectButton ----
   observeEvent(input$dataSelectButton, {
-    shinyjs::disable("source")
-    shinyjs::disable("CSVFile")
-    shinyjs::disable("header")
-    shinyjs::disable("sep")
-    shinyjs::disable("quote")
-    shinyjs::disable("header")
-    shinyjs::disable("objectFromWorkspace")
-    shinyjs::disable("dataSelectButton")
-
-    dataMenuList$menuList[[2]] <- shinydashboard::menuItem(
-      "2. Subset selection",
-      tabName = "subsetSelectionTab",
-      icon = icon("table"),
-      selected = TRUE)
-
-    dataMenuList$menuList[[3]] <- hr()
-
-    dataMenuList$menuList[[4]] <- shinydashboard::menuItem(
-      "Reload",
-      tabName = "reloadTab",
-      icon = icon("sync"),
-      selected = FALSE)
+    appStage("subset")
 
     userDataChosen(isolate(userDataRaw()))
     userDataNA(isolate(userDataRaw()))
@@ -353,7 +319,7 @@ server <- function(input, output, session) {
          input$groups,
          input$itemCols), {
 
-    if (input$dataSelectButton > 0) {
+    if (atLeastStage(appStage(), "subset")) {
 
       if (input$groupCol != "noGroupSelected") {
 
@@ -375,15 +341,8 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab observeEvent selectall ----
   observeEvent(input$selectall, {
-    # Both links sit in the same renderUI as the item checkboxes, and their
-    # updateCheckboxGroupInput(choices = ) rebuilds that group from scratch - which
-    # throws away the shinyjs::disable("itemCols") applied when the subset was selected.
-    # A click after that point handed back an editable item selection that the already
-    # rendered statistics, model tests and tables know nothing about. Disabling the links
-    # is only the visible half of the fix: shinyjs marks an actionLink disabled, but an
-    # <a> has no disabled semantics of its own and the click still reaches Shiny - the
-    # counters do go up. This guard is the half that actually holds.
-    if (input$selectall != 0 && input$subsetSelectButton == 0) {
+    # Only act while the user is still choosing items (see GOTCHAS.md).
+    if (input$selectall != 0 && identical(appStage(), "subset")) {
       possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
       itemColsRV(length(possibleItemColumns))
 
@@ -398,7 +357,7 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab observeEvent deselectall ----
   observeEvent(input$deselectall, {
-    if (input$deselectall != 0 && input$subsetSelectButton == 0) {
+    if (input$deselectall != 0 && identical(appStage(), "subset")) {
       possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
       itemColsRV(length(possibleItemColumns))
 
@@ -417,7 +376,9 @@ server <- function(input, output, session) {
          input$itemCols), {
     #req(input$itemCols)
 
-    if (input$dataSelectButton > 0) {
+    # Only while the subset stage is current: once the app has moved on, the item and
+    # group selections are frozen and this must not hand the button back.
+    if (identical(appStage(), "subset")) {
 
       if (length(input$itemCols) <= 1 ||
           (input$groupCol != "noGroupSelected" && length(input$groups) == 0)) {
@@ -428,15 +389,7 @@ server <- function(input, output, session) {
       }
 
       ### keep the model selection in step with the item count ----
-      # A conditionalPanel only hides its contents, so a model whose cell in the
-      # comparison grid reads "Too few items." kept its checkbox at TRUE - and
-      # modelsToTest reads those checkboxes, not the grid. Two items therefore submitted
-      # an unidentified tau-congeneric model and killed the goModels observer outright.
-      # Unticking here rather than filtering modelsToTest later also makes the grid
-      # honest, since every condition in it keys off these same inputs; a comparison
-      # goes with whichever of its two models is unavailable. itemCols is disabled once
-      # the subset is selected, and the model checkboxes are unreachable until then, so
-      # this can never overwrite a deliberate choice.
+      # TRUE for each model the current item count is enough to test.
       enoughItems <- minItems <= length(input$itemCols)
 
       for (thisModel in models) {
@@ -509,15 +462,22 @@ server <- function(input, output, session) {
       icon = icon("users"))
   })
 
+  ## subsetSelectionTab incomplete cases ----
+  # TRUE for every row of the chosen subset that has a missing value somewhere.
+  # Used by: the yellow NA box, the observations table, and the FIML checkbox.
+  incompleteCases <- reactive({
+    req(userDataNA())
+    !stats::complete.cases(userDataNA())
+  })
+
+  output$incompleteCasesBoolRV <- reactive(any(incompleteCases()))
+  outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
+
   ## subsetSelectionTab naInfoBox ----
   output$naInfoBox <- shinydashboard::renderValueBox({
-    incompleteCasesRV(!stats::complete.cases(userDataNA()))
-    output$incompleteCasesBoolRV <- reactive({any(incompleteCasesRV())})
-    outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
-
     shinydashboard::valueBox(
-      value = sum(incompleteCasesRV()),
-      color = if (any(incompleteCasesRV())) "yellow" else "green",
+      value = sum(incompleteCases()),
+      color = if (any(incompleteCases())) "yellow" else "green",
       subtitle = "rows with missing values in this subset",
       icon = icon("exclamation-triangle"))
   })
@@ -530,7 +490,7 @@ server <- function(input, output, session) {
   ## subsetSelectionTab obsTable ----
   output$obsTable <- renderUI({
     nTotal <- nrow(userDataNA())
-    nComplete <- sum(!incompleteCasesRV())
+    nComplete <- sum(!incompleteCases())
 
     HTML(makeKable(data.frame(Total = nTotal, Complete = nComplete)))
   })
@@ -548,41 +508,9 @@ server <- function(input, output, session) {
 
   ## subsetSelectionTab observeEvent subsetSelectButton ----
   observeEvent(input$subsetSelectButton, {
-    shinyjs::disable("itemCols")
-    shinyjs::disable("selectall")
-    shinyjs::disable("deselectall")
-    shinyjs::disable("groupCol")
-    shinyjs::disable("groups")
-    shinyjs::disable("subsetSelectButton")
-    shinyjs::disable("useFIML")
+    appStage("statistics")
 
-    fimlRV(any(incompleteCasesRV()) & input$useFIML)
-
-    dataMenuList$menuList[[8]] <- dataMenuList$menuList[[4]]
-
-    dataMenuList$menuList[[4]] <- shinydashboard::menuItem(
-      "3. Statistics",
-      shinydashboard::menuSubItem(
-          "Descriptive Statistics",
-          tabName = "statisticsTab",
-          selected = TRUE),
-      shinydashboard::menuSubItem(
-          "Correlational Analysis",
-          tabName = "corrTab"),
-      shinydashboard::menuSubItem(
-          "Test on Multivariate Normality",
-          tabName = "mvnTab"),
-      icon = icon("chart-bar"),
-      startExpanded = TRUE)
-
-    dataMenuList$menuList[[5]] <- hr()
-
-    dataMenuList$menuList[[6]] <- shinydashboard::menuItem(
-        "4. Testing Parameters",
-        tabName = "testParamTab",
-        icon = icon("cog"))
-
-    dataMenuList$menuList[[7]] <- hr()
+    fimlRV(any(incompleteCases()) && isTRUE(input$useFIML))
 
     if (input$groupCol != "noGroupSelected") {
 
@@ -627,7 +555,7 @@ server <- function(input, output, session) {
                     "Robust (Full Information) Maximum Likelihood" = "MLR"))
     }
 
-    if (any(incompleteCasesRV())) {
+    if (any(incompleteCases())) {
       notifications$notList$NAhand <- shinydashboard::notificationItem(
         text = HTML("For all plots and the multivariate normality analyses<br/>
                       rows with missing values have been removed."),
@@ -740,61 +668,66 @@ server <- function(input, output, session) {
     }
   })
 
+  ## statisticsTab histogram plots ----
+  # output$histBox further down draws the box and leaves empty plot slots -> these fill them.
+  output$singleHist <- renderPlot({
+    # histBox builds the dropdown and the slider, so they do not exist on the first run.
+    req(userDataGroup(), input$histItem, input$singleNoBins)
+
+    ggplot2::ggplot(
+      data.frame(item = stats::na.omit(userDataGroup()[, input$histItem])),
+      ggplot2::aes(x = .data$item)) +
+
+      ggplot2::geom_histogram(
+        if (input$singleDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
+        color = "white",
+        fill = "#438BCA",
+        bins = input$singleNoBins) +
+
+      ggplot2::xlab(input$histItem) +
+      ggplot2::theme_classic() +
+
+      if (input$singleDens)
+        # the bars' "#438BCA" mixed 40% toward white
+        ggplot2::geom_density(color = "#8EB9DF", linewidth = 1)
+  })
+
+  output$groupHist <- renderPlot({
+    req(userDataGroup(), input$histItemGroup, input$groupNoBins, input$histGroupGroups)
+
+    ggplot2::ggplot(
+      subset(
+        userDataGroup(),
+        subset = userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
+        select = c(input$groupCol, input$histItemGroup)) %>%
+        stats::na.omit() %>%
+        stats::setNames(nm = c("group", "item")),
+      ggplot2::aes(x = .data$item, fill = .data$group)) +
+
+      ggplot2::geom_histogram(
+        if (input$groupDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
+        color = "white",
+        bins = input$groupNoBins,
+        position = "dodge") +
+
+      ggplot2::xlab(input$histItemGroup) +
+      ggplot2::scale_fill_manual(values = groupColors()$solid, name = input$groupCol) +
+      ggplot2::theme_classic() +
+
+      if (input$groupDens)
+        list(
+          ggplot2::geom_density(
+            ggplot2::aes(color = .data$group),
+            fill = NA,
+            linewidth = 1),
+          ggplot2::scale_color_manual(values = groupColors()$light, name = input$groupCol))
+  })
+
   ## statisticsTab histBox ----
   output$histBox <- renderUI({
 
-    ## histBox output singleHist ----
-    output$singleHist <- renderPlot({
-      ggplot2::ggplot(
-        data.frame(item = stats::na.omit(userDataGroup()[, input$histItem])),
-        ggplot2::aes(x = .data$item)) +
-
-        ggplot2::geom_histogram(
-          if (input$singleDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
-          color = "white",
-          fill = "#438BCA",
-          bins = input$singleNoBins) +
-
-        ggplot2::xlab(input$histItem) +
-        ggplot2::theme_classic() +
-
-        if (input$singleDens)
-          # the bars' "#438BCA" mixed 40% toward white
-          ggplot2::geom_density(color = "#8EB9DF", linewidth = 1)
-    })
-
     ## histBox if (validGroupsRV()) ----
     if (validGroupsRV()) {
-
-      ### histBox output groupHist ----
-      output$groupHist <- renderPlot({
-        ggplot2::ggplot(
-          subset(
-            userDataGroup(),
-            subset = userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
-            select = c(input$groupCol, input$histItemGroup)) %>%
-            stats::na.omit() %>%
-            stats::setNames(nm = c("group", "item")),
-          ggplot2::aes(x = .data$item, fill = .data$group)) +
-
-          ggplot2::geom_histogram(
-            if (input$groupDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
-            color = "white",
-            bins = input$groupNoBins,
-            position = "dodge") +
-
-          ggplot2::xlab(input$histItemGroup) +
-          ggplot2::scale_fill_manual(values = groupColors()$solid, name = input$groupCol) +
-          ggplot2::theme_classic() +
-
-          if (input$groupDens)
-            list(
-              ggplot2::geom_density(
-                ggplot2::aes(color = .data$group),
-                fill = NA,
-                linewidth = 1),
-              ggplot2::scale_color_manual(values = groupColors()$light, name = input$groupCol))
-      })
 
       ### histBox tabBox ----
       shinydashboard::tabBox(
@@ -1035,45 +968,81 @@ server <- function(input, output, session) {
     }
   })
 
+  ## corrTab scatter plots ----
+  output$singleScatter <- renderPlot({
+    req(userDataGroup(), input$scatterItemX, input$scatterItemY)
+
+    ggplot2::ggplot(
+        data.frame(
+            itemX = userDataGroup()[, input$scatterItemX],
+            itemY = userDataGroup()[, input$scatterItemY]) %>%
+          stats::na.omit(),
+        ggplot2::aes(x = .data$itemX, y = .data$itemY)) +
+
+        ggplot2::geom_point(color = "#438BCA") +
+        ggplot2::xlab(input$scatterItemX) +
+        ggplot2::ylab(input$scatterItemY) +
+        ggplot2::theme_classic()
+  })
+
+  output$groupScatter <- renderPlot({
+    req(userDataGroup(), input$scatterItemXGroup, input$scatterItemYGroup,
+        input$scatterGroupGroups)
+
+    ggplot2::ggplot(
+      subset(
+        userDataGroup(),
+        subset = userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
+        select = c(input$groupCol, input$scatterItemXGroup, input$scatterItemYGroup)) %>%
+        stats::na.omit() %>%
+        stats::setNames(nm = c("group", "itemX", "itemY")),
+      ggplot2::aes(x = .data$itemX, y = .data$itemY, color = .data$group)) +
+
+      ggplot2::geom_point() +
+      ggplot2::xlab(input$scatterItemXGroup) +
+      ggplot2::ylab(input$scatterItemYGroup) +
+      ggplot2::scale_color_manual(values = groupColors()$solid, name = input$groupCol) +
+      ggplot2::theme_classic()
+  })
+
+  ## mvnTab multivariate plot ----
+  output$mvnPlot <- renderPlot({
+    req(userDataGroup(), input$mvnPlotType)
+    if (input$mvnPlotType != "qq") req(input$mvnItemX, input$mvnItemY)
+
+    userDataNAOmit <- stats::na.omit(userDataGroup())
+
+    if (input$mvnPlotType == "qq") {
+      MVN::multivariate_diagnostic_plot(
+        stats::na.omit(userDataNAOmit[, input$itemCols]),
+        type = "qq")
+
+    } else if (input$mvnPlotType == "persp") {
+      graphics::persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
+                            userDataNAOmit[, input$mvnItemY],
+                            n = 100),
+            theta = 1, phi = 30, border = NA, shade = 0.5, box = T,
+            xlab = input$mvnItemX,
+            ylab = input$mvnItemY,
+            zlab = "Density")
+
+    } else if (input$mvnPlotType == "contour") {
+      graphics::contour(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
+                              userDataNAOmit[, input$mvnItemY],
+                              n = 100),
+              nlevels = 20,
+              xlab = input$mvnItemX,
+              ylab = input$mvnItemY)
+    }
+  })
+
   ## corrTab scatterBox ----
   output$scatterBox <- renderUI({
 
     req(userDataGroup())
 
-    ## scatterBox output singleScatter ----
-    output$singleScatter <- renderPlot({
-      ggplot2::ggplot(
-          data.frame(
-              itemX = userDataGroup()[, input$scatterItemX],
-              itemY = userDataGroup()[, input$scatterItemY]) %>%
-            stats::na.omit(),
-          ggplot2::aes(x = .data$itemX, y = .data$itemY)) +
-
-          ggplot2::geom_point(color = "#438BCA") +
-          ggplot2::xlab(input$scatterItemX) +
-          ggplot2::ylab(input$scatterItemY) +
-          ggplot2::theme_classic()
-    })
-
     ## scatterBox if (validGroupsRV()) ----
     if (validGroupsRV()) {
-
-      output$groupScatter <- renderPlot({
-        ggplot2::ggplot(
-          subset(
-            userDataGroup(),
-            subset = userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
-            select = c(input$groupCol, input$scatterItemXGroup, input$scatterItemYGroup)) %>%
-            stats::na.omit() %>%
-            stats::setNames(nm = c("group", "itemX", "itemY")),
-          ggplot2::aes(x = .data$itemX, y = .data$itemY, color = .data$group)) +
-
-          ggplot2::geom_point() +
-          ggplot2::xlab(input$scatterItemXGroup) +
-          ggplot2::ylab(input$scatterItemYGroup) +
-          ggplot2::scale_color_manual(values = groupColors()$solid, name = input$groupCol) +
-          ggplot2::theme_classic()
-      })
 
       ### scatterBox tabBox ----
       shinydashboard::tabBox(
@@ -1438,34 +1407,6 @@ server <- function(input, output, session) {
   ## mvnTab output mvnPlotBox ----
   output$mvnPlotBox <- renderUI({
 
-    output$mvnPlot <- renderPlot({
-
-      userDataNAOmit <- stats::na.omit(userDataGroup())
-
-      if (input$mvnPlotType == "qq") {
-        MVN::multivariate_diagnostic_plot(
-          stats::na.omit(userDataNAOmit[, input$itemCols]),
-          type = "qq")
-
-      } else if (input$mvnPlotType == "persp") {
-        graphics::persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
-                              userDataNAOmit[, input$mvnItemY],
-                              n = 100),
-              theta = 1, phi = 30, border = NA, shade = 0.5, box = T,
-              xlab = input$mvnItemX,
-              ylab = input$mvnItemY,
-              zlab = "Density")
-
-      } else if (input$mvnPlotType == "contour") {
-        graphics::contour(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
-                                userDataNAOmit[, input$mvnItemY],
-                                n = 100),
-                nlevels = 20,
-                xlab = input$mvnItemX,
-                ylab = input$mvnItemY)
-      }
-    })
-
     shinydashboard::box(
       width = 12,
       title = "Multivariate plot:",
@@ -1512,82 +1453,18 @@ server <- function(input, output, session) {
   })
 
   # observeEvent input$goModels ----
+  # Pressing "Test the models" runs everything down to the error handler at the bottom:
+  # fit -> compare -> build the tables and plots. Any step failing -> that error handler.
   observeEvent(input$goModels, tryCatch({
     output$goModelsError <- renderUI(NULL)
 
-    shinyjs::disable("goModels")
-    shinyjs::disable("doMg")
-    shinyjs::disable("etaIntFree")
-    shinyjs::disable("sigLvl")
-    shinyjs::disable("estimator")
-
     estimatorNameRV(paste0(if (fimlRV()) "FI", input$estimator))
 
-    dataMenuList$menuList[[13]] <- dataMenuList$menuList[[8]]
-
-    ## observeEvent input$goModels if doMg true ----
-    if (input$doMg) {
-
-      dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
-        "5. Model Comparison Tests",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "modelTests", selected = TRUE),
-        shinydashboard::menuSubItem("Multigroup", tabName = "modelTestsMg"),
-        icon = icon("chart-bar"),
-        startExpanded = TRUE)
-
-      dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
-        "6. Parameter Tables",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "parTables"),
-        shinydashboard::menuSubItem("Multigroup", tabName = "parTablesMg"),
-        icon = icon("chart-bar"))
-
-      dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
-        "7. Factor Scores",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "facScores"),
-        shinydashboard::menuSubItem("Multigroup", tabName = "facScoresMg"),
-        icon = icon("chart-bar"))
-
-      dataMenuList$menuList[[11]] <- shinydashboard::menuItem(
-        "8. Model Code",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "modelCode"),
-        shinydashboard::menuSubItem("Multigroup", tabName = "modelCodeMg"),
-        icon = icon("chart-bar"))
-
-    } ## observeEvent input$goModels if doMg false ----
-    else {
-      dataMenuList$menuList[[8]] <- shinydashboard::menuItem(
-        "5. Model Comparison Tests",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "modelTests", selected = TRUE),
-        icon = icon("chart-bar"),
-        startExpanded = TRUE)
-
-      dataMenuList$menuList[[9]] <- shinydashboard::menuItem(
-        "6. Parameter Tables",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "parTables"),
-        icon = icon("chart-bar"))
-
-      dataMenuList$menuList[[10]] <- shinydashboard::menuItem(
-        "7. Factor Scores",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "facScores"),
-        icon = icon("chart-bar"))
-
-      dataMenuList$menuList[[11]] <- shinydashboard::menuItem(
-        "8. Model Code",
-
-        shinydashboard::menuSubItem("Single Group", tabName = "modelCode"),
-        icon = icon("chart-bar"))
-    }
+    # Freeze the multigroup choice, then reveal the results entries in the sidebar.
+    doMgRV(isTRUE(input$doMg))
+    appStage("results")
 
     ## test the models! ----
-    dataMenuList$menuList[[12]] <- hr()
-
     modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
 
     lapply(
@@ -1604,14 +1481,10 @@ server <- function(input, output, session) {
                                                 etaIntFree = as.logical(input$etaIntFree))
 
         #### fit each model once, keeping both a warning and the completed fit ----
-        # withCallingHandlers() + invokeRestart("muffleWarning") records the warning without
-        # aborting the call, unlike tryCatch(warning = ...), which would exit at the first
-        # warning and throw away whatever fit lavaan() was about to return. A model that
-        # errors afterwards is still caught by the wrapping tryCatch(); one that only warns
-        # completes normally and its fit is kept, with the warning attached as an attribute.
-        # group/group.equal are NULL (lavaan::lavaan()'s own default - verified identical to
-        # omitting them) whenever there is no group, so the single-group and multigroup cases
-        # need only one call.
+        # Fit each chosen model:
+        #   warning -> note it, carry on, keep the fit
+        #   error   -> keep the error message instead of a fit
+        # group and group.equal are NULL without a grouping column, so one call does both.
         fittedModelsWarns <- lapply(
           modelCodes[modelsToTest],
           FUN = function(model) {
@@ -1759,6 +1632,8 @@ server <- function(input, output, session) {
             thisModelScoresStr <- paste0(thisModel, "Scores", groupAppend)
             thisModelScoresDLStr <- paste0(thisModel, "ScoresDownload", groupAppend)
             thisModelScoresDLFileStr <- paste0(thisModel, "Filename", groupAppend)
+            thisModelSepStr <- paste0(thisModel, "Sep", groupAppend)
+            thisModelDecStr <- paste0(thisModel, "Dec", groupAppend)
 
             thisModelCodeStr <- paste0(thisModel, "Code", groupAppend)
 
@@ -1917,8 +1792,8 @@ server <- function(input, output, session) {
                     userDataGroup()[, input$groupCol]),
 
                   file = file,
-                  sep = input[[paste0(thisModel, "Sep")]],
-                  dec = input[[paste0(thisModel, "Dec")]],
+                  sep = input[[thisModelSepStr]],
+                  dec = input[[thisModelDecStr]],
                   row.names = FALSE)
               },
               contentType = "text/csv")
@@ -1931,9 +1806,23 @@ server <- function(input, output, session) {
                   (length(unique(userDataGroup()[, input$groupCol])) <
                      length(unique(userDataRaw()[, input$groupCol]))))
 
+              # Where the data came from, so makeRCode() can write the matching
+              # read.csv() / read_spss() / workspace line into the exported script.
+              dataSource <- switch(
+                input$source,
+                "Workspace" = list(type = "Workspace", object = input$objectFromWorkspace),
+                "CSV" = list(type = "CSV",
+                             name = input$CSVFile$name,
+                             header = input$header,
+                             sep = input$sep,
+                             quote = input$quote),
+                "SPSS" = list(type = "SPSS", name = input$SPSSFile$name))
+
               cat(
                 makeRCode(
-                  input = input,
+                  dataSource = dataSource,
+                  groupCol = input$groupCol,
+                  groups = input$groups,
                   modelCode = modelCodes[[thisModel]],
                   estimator = mvnTestResult$estimator,
                   missingMethod = ifelse(fimlRV(), "fiml", "listwise"),
@@ -1975,7 +1864,7 @@ server <- function(input, output, session) {
                     h4("Download Predicted Factor Scores as CSV"),
 
                     textInput(
-                      paste0(thisModel, "Filename"),
+                      thisModelScoresDLFileStr,
                       "Filename:",
                       sprintf(
                         "%s_%s_factorscores.csv",
@@ -1988,13 +1877,13 @@ server <- function(input, output, session) {
                     hr(),
 
                     radioButtons(
-                      paste0(thisModel, "Sep"),
+                      thisModelSepStr,
                       "Separator",
                       choices = c(Comma = ",", Semicolon = ";", Tab = "\t"),
                       selected = ","),
 
                     radioButtons(
-                      paste0(thisModel, "Dec"),
+                      thisModelDecStr,
                       "Decimal Separator",
                       choices = c(Comma = ",", Dot = "."),
                       selected = "."),
@@ -2002,7 +1891,7 @@ server <- function(input, output, session) {
                     hr(),
 
                     downloadButton(
-                      paste0(thisModel, "ScoresDownload", groupAppend),
+                      thisModelScoresDLStr,
                       "Download Factor Scores") %>%
 
                       div(align = "center"),
@@ -2253,12 +2142,14 @@ server <- function(input, output, session) {
   },
 
   ## observeEvent input$goModels error handler ----
-  # Everything above is one long chain - fit, compare, render - and a failure anywhere
-  # in it used to kill the observer with nothing on screen: no results, no error box,
-  # the message only in the R console. Report it where the user pressed the button, and
-  # put back exactly what this run disabled so they can change the settings and retry.
-  # The model selection stays locked either way, as it does after a run that succeeds.
+  # Anything goes wrong above -> show the message under the button, go back one stage.
   error = function(e) {
+    # Back to "statistics", so the results entries disappear from the sidebar again.
+    appStage("statistics")
+    doMgRV(FALSE)
+
+    # The lockout only ever disables, so switch these back on by hand. The multigroup box
+    # only if there is a usable group column.
     shinyjs::enable("goModels")
     shinyjs::enable("etaIntFree")
     shinyjs::enable("sigLvl")
