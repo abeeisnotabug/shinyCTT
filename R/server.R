@@ -29,20 +29,12 @@ server <- function(input, output, session) {
   ## Reactive values ----
   notifications <- reactiveValues(notList = list())
 
-  userDataRaw <- reactiveVal()
-  userDataChosen <- reactiveVal()
-  userDataNA <- reactiveVal()
-  userDataGroup <- reactiveVal()
 
-  itemColsRV <- reactiveVal()
-  groupColRV <- reactiveVal()
-  validGroupsRV <- reactiveVal()
 
-  fimlRV <- reactiveVal(FALSE)
 
   # "ML" or "MLR", with "FI" in front when the fits use full information maximum
   # likelihood. Shown in table headers and legends.
-  estimatorName <- reactive(paste0(if (fimlRV()) "FI", input$estimator))
+  estimatorName <- reactive(paste0(if (subset$useFIML()) "FI", input$estimator))
 
   # The fitted models, written by "Test the models" and read by everything on the results
   # tabs. NULL until the button has been pressed.
@@ -99,12 +91,7 @@ server <- function(input, output, session) {
 
   # Which controls belong to which stage: live while that stage is current, frozen once
   # the user moves past it.
-  stageControls <- list(
-    data       = c("source", "CSVFile", "header", "sep", "quote", "objectFromWorkspace",
-                   "dataSelectButton"),
-    subset     = c("itemCols", "selectall", "deselectall", "groupCol", "groups",
-                   "subsetSelectButton", "useFIML"),
-    statistics = c("doMg", "etaIntFree"))
+  stageControls <- list(statistics = c("doMg", "etaIntFree"))
 
   observeEvent(appStage(), {
 
@@ -126,7 +113,7 @@ server <- function(input, output, session) {
   # variants - the same colours mixed 40% toward white - are for the density curves,
   # which are drawn on top of bars in the solid colour.
   groupColors <- reactive({
-    groupLevels <- sort(unique(userDataGroup()[, input$groupCol]))
+    groupLevels <- sort(unique(subset$data()[, subset$groupCol()]))
     solid <- grDevices::hcl(
       h = seq(15, 375, length.out = length(groupLevels) + 1)[seq_along(groupLevels)],
       c = 100,
@@ -167,417 +154,34 @@ server <- function(input, output, session) {
   ## Display NAs correctly in datatable ----
   options(htmlwidgets.TOJSON_ARGS = list(na = "string"))
 
-  observeEvent(userDataRaw(), {
-    output$dataOverview <- userDataRaw() %>%
-      DT::datatable() %>%
-      DT::formatRound(
-        columns = seq_along(userDataRaw())[sapply(userDataRaw(), is.numeric)],
-        digits = 3) %>%
-      DT::renderDataTable()
-  })
-
   # dataSelectionTab ----
-  ## dataSelectionTab objectsInWorkspace ----
-  output$objectsInWorkspace <- renderUI({
-    selectInput(
-      "objectFromWorkspace",
-      "1b. Choose data object from Workspace",
-      Filter(
-        function(object) !is.null(dim(get(object))) && typeof(get(object)) != "character",
-        ls(envir = globalenv())))
-  })
+  # Step 1 lives in R/mod-data-source.R. It hands back the data it loaded and the copy taken
+  # when Select was pressed.
+  dataSource <- dataSourceServer(
+    "dataSource",
+    notifications = notifications,
+    frozen = reactive(atLeastStage(appStage(), "subset")))
 
-  ## dataSelectionTab observeEvent data properties ----
-  observeEvent(
-    list(input$source,
-         input$objectFromWorkspace,
-         input$CSVFile,
-         input$SPSSFile,
-         input$header,
-         input$sep,
-         input$quote), {
-    req(identical(appStage(), "data"))
-
-    userDataRaw(NULL)
-
-    shinyjs::disable("dataSelectButton")
-
-    notifications$notList$noData <- shinydashboard::notificationItem(
-      text = "No data selected",
-      icon = icon("times"),
-      status = "danger")
-
-    ### choose data source ----
-    if (input$source == "CSV") {
-      req(input$CSVFile)
-
-      userDataTmp <- utils::read.csv(
-        file = input$CSVFile$datapath,
-        header = input$header,
-        sep = input$sep,
-        quote = input$quote,
-        stringsAsFactors = FALSE)
-    } else if (input$source == "SPSS") {
-      req(input$SPSSFile)
-
-      userDataTmp <- haven::read_spss(file = input$SPSSFile$datapath)
-    } else if (input$source == "Workspace") {
-      req(input$objectFromWorkspace)
-
-      userDataTmp <- get(input$objectFromWorkspace)
-    }
-
-    if (any(sapply(userDataTmp, is.factor))) {
-      userDataTmp[sapply(userDataTmp, is.factor)] <- lapply(
-        userDataTmp[sapply(userDataTmp, is.factor)],
-        as.character)
-    }
-
-    userDataRaw(data.frame(userDataTmp, stringsAsFactors = FALSE))
-
-    notifications$notList$noData <- NULL
-
-    ### Test the data for problems ----
-    if (!any(sapply(userDataRaw(), is.numeric))) {
-      notifications$notList$noNumeric <- shinydashboard::notificationItem(
-        text = "No numeric columns found",
-        icon = icon("times"),
-        status = "danger")
-      showNotification(
-        "No numeric columns found",
-        duration = 5,
-        id = "noNumericNot",
-        type = "error")
-
-    } else {
-      notifications$notList$noNumeric <- NULL
-      removeNotification("noNumericNot")
-    }
-
-    if (length(userDataRaw()) <= 1) {
-      notifications$notList$oneCol <- shinydashboard::notificationItem(
-        text = "Only one column found",
-        icon = icon("times"),
-        status = "danger")
-      showNotification(
-        "Only one column found",
-        duration = 5,
-        id = "oneColNot",
-        type = "error")
-
-    } else {
-      notifications$notList$oneCol <- NULL
-      removeNotification("oneColNot")
-    }
-
-    #### If all is good, enable the select button ----
-    if (all(
-      is.null(notifications$notList$noNumeric),
-      is.null(notifications$notList$oneCol))) {
-
-      shinyjs::enable("dataSelectButton")
-    }
-  })
-
-  ## dataSelectionTab observeEvent dataSelectButton ----
-  observeEvent(input$dataSelectButton, {
-    appStage("subset")
-
-    userDataChosen(isolate(userDataRaw()))
-    userDataNA(isolate(userDataRaw()))
-  })
+  # Pressing Select is the only thing that fills dataSource$chosen(), so this is where
+  # step 1 ends and step 2 begins.
+  observeEvent(dataSource$chosen(), appStage("subset"))
 
   # subsetSelectionTab ----
-  ## subsetSelectionTab itemColsChooser ----
-  output$itemColsChooser <- renderUI({
-    possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
-    itemColsRV(length(possibleItemColumns))
+  # Step 2 lives in R/mod-data-subset.R. It hands back the six answers the rest of the app
+  # works from.
+  subset <- dataSubsetServer(
+    "subset",
+    chosenData = dataSource$chosen,
+    notifications = notifications,
+    frozen = reactive(atLeastStage(appStage(), "statistics")))
 
-    tagList(
-      checkboxGroupInput(
-        "itemCols",
-        "2a. Select the item columns:",
-        choices = possibleItemColumns,
-        selected = possibleItemColumns,
-        inline = TRUE),
-      fluidRow(actionLink("selectall", "Select all", style = "margin-left: 15px"),
-               actionLink("deselectall", "Unselect all", style = "margin-left: 15px")))
-  })
-
-  ## subsetSelectionTab groupColChooser ----
-  output$groupColChooser <- renderUI({
-    possibleGroupCols <- colnames(userDataChosen())[!(colnames(userDataChosen()) %in% input$itemCols)]
-    groupColRV(length(possibleGroupCols))
-
-    selectInput(
-        "groupCol",
-        "2b. Select the group column:",
-        choices = c(
-          "No group column selected" = "noGroupSelected",
-          possibleGroupCols))
-  })
-
-  ## subsetSelectionTab groupChooser ----
-  output$groupChooser <- renderUI({
-    req(input$groupCol)
-
-    if (input$groupCol != "noGroupSelected" && input$groupCol %in% colnames(userDataChosen())) {
-      possibleGroups <- unique(stats::na.omit(userDataChosen()[, input$groupCol]))
-
-      if (any(c(table(userDataChosen()[, input$groupCol])) == 1)) {
-        groupWarning <- "There are groups with only one observation,
-                         you might have selected an item as group column."
-        possibleGroups <- NULL
-
-        notifications$notList$invalGroups <- shinydashboard::notificationItem(
-          text = "Invalid groups found.",
-          icon = icon("times"),
-          status = "danger")
-        showNotification(
-          "Invalid groups found.",
-          duration = 5,
-          id = "invalGroups",
-          type = "error")
-
-      } else {
-        groupWarning <- ""
-
-        notifications$notList$invalGroups <- NULL
-        removeNotification("invalGroups")
-      }
-
-      tagList(
-        checkboxGroupInput(
-          "groups",
-          "2c. Select which groups to include",
-          choices = possibleGroups,
-          selected = possibleGroups,
-          inline = TRUE),
-        helpText(groupWarning))
-    }
-  })
-
-  ## subsetSelectionTab observeEvent for userDataNA ----
-  observeEvent(
-    list(input$groupCol,
-         input$groups,
-         input$itemCols), {
-
-    if (atLeastStage(appStage(), "subset")) {
-
-      if (input$groupCol != "noGroupSelected") {
-
-        subset <- userDataChosen()[, input$groupCol] %in% input$groups
-        select <- c(input$groupCol, input$itemCols)
-      } else {
-
-        subset <- rep(TRUE, nrow(userDataChosen()))
-        select <- input$itemCols
-      }
-
-      userDataNA(
-        subset(
-          userDataChosen(),
-          subset = subset,
-          select = select))
-    }
-  })
-
-  ## subsetSelectionTab observeEvent selectall ----
-  observeEvent(input$selectall, {
-    # Only act while the user is still choosing items (see GOTCHAS.md).
-    if (input$selectall != 0 && identical(appStage(), "subset")) {
-      possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
-      itemColsRV(length(possibleItemColumns))
-
-      updateCheckboxGroupInput(
-        session,
-        "itemCols",
-        inline = TRUE,
-        choices = possibleItemColumns,
-        selected = possibleItemColumns)
-    }
-  })
-
-  ## subsetSelectionTab observeEvent deselectall ----
-  observeEvent(input$deselectall, {
-    if (input$deselectall != 0 && identical(appStage(), "subset")) {
-      possibleItemColumns <- colnames(userDataChosen())[sapply(userDataChosen(), is.numeric)]
-      itemColsRV(length(possibleItemColumns))
-
-      updateCheckboxGroupInput(
-        session,
-        "itemCols",
-        inline = TRUE,
-        choices = possibleItemColumns)
-    }
-  })
-
-  ## subsetSelectionTab observeEvent valid subset and notifications ----
-  observeEvent(
-    list(input$groupCol,
-         input$groups,
-         input$itemCols), {
-    #req(input$itemCols)
-
-    # Only while the subset stage is current: once the app has moved on, the item and
-    # group selections are frozen and this must not hand the button back.
-    if (identical(appStage(), "subset")) {
-
-      if (length(input$itemCols) <= 1 ||
-          (input$groupCol != "noGroupSelected" && length(input$groups) == 0)) {
-
-        shinyjs::disable("subsetSelectButton") # subset of items
-      } else {
-        shinyjs::enable("subsetSelectButton")
-      }
-
-      ### keep the model selection in step with the item count ----
-      # TRUE for each model the current item count is enough to test.
-      enoughItems <- minItems <= length(input$itemCols)
-
-      for (thisModel in models) {
-        updateCheckboxInput(session, thisModel, value = unname(enoughItems[thisModel]))
-      }
-
-      for (thisComp in possComps) {
-        updateCheckboxInput(
-          session,
-          thisComp,
-          value = enoughItems[substr(thisComp, 1, 3)] && enoughItems[substr(thisComp, 4, 6)])
-      }
-
-      notifications$notList$numItems <- switch(
-        as.character(length(input$itemCols)),
-        "0" = shinydashboard::notificationItem(
-          text = "No item selected. No analysis possible.",
-          icon = icon("times"),
-          status = "danger"),
-        "1" = shinydashboard::notificationItem(
-          text = "Only one item selected. No analysis possible.",
-          icon = icon("times"),
-          status = "danger"),
-        "2" = shinydashboard::notificationItem(
-          text = HTML("Only two items selected. Unable to test the &tau;-kongeneric and
-                      the ess. &tau;-equivalent model."),
-          icon = icon("exclamation-triangle"),
-          status = "warning"),
-        "3" = shinydashboard::notificationItem(
-          text = HTML("Only three items selected. Unable to test the &tau;-kongeneric model."),
-          icon = icon("exclamation-triangle"),
-          status = "warning"),
-        NULL)
-
-      if (!is.null(notifications$notList$numItems)) {
-        showNotification(
-          ui = notifications$notList$numItems$children[[1]]$children[[2]],
-          duration = 5,
-          id = "numItemsNot",
-          type = ifelse(notifications$notList$numItems$children[[1]]$children[[1]]$attribs[[4]] == "text-danger",
-                        yes = "error",
-                        no = "warning"))
-      } else {
-        removeNotification("numItemsNot")
-      }
-    }
-  })
-
-  ## subsetSelectionTab itemInfoBox ----
-  output$itemInfoBox <- shinydashboard::renderValueBox({
-    shinydashboard::valueBox(
-      value = itemColsRV(),
-      color = switch(
-          as.character(itemColsRV()),
-          "0" = "red",
-          "1" = "red",
-          "2" = "orange",
-          "3" = "orange",
-          "green"),
-      subtitle = "possible item column(s) found",
-      icon = icon("list"))
-  })
-
-  ## subsetSelectionTab groupInfoBox ----
-  output$groupInfoBox <- shinydashboard::renderValueBox({
-    shinydashboard::valueBox(
-      value = groupColRV(),
-      color = "blue",
-      subtitle = "possible group column(s) found",
-      icon = icon("users"))
-  })
-
-  ## subsetSelectionTab incomplete cases ----
-  # TRUE for every row of the chosen subset that has a missing value somewhere.
-  # Used by: the yellow NA box, the observations table, and the FIML checkbox.
-  incompleteCases <- reactive({
-    req(userDataNA())
-    !stats::complete.cases(userDataNA())
-  })
-
-  output$incompleteCasesBoolRV <- reactive(any(incompleteCases()))
-  outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
-
-  ## subsetSelectionTab naInfoBox ----
-  output$naInfoBox <- shinydashboard::renderValueBox({
-    shinydashboard::valueBox(
-      value = sum(incompleteCases()),
-      color = if (any(incompleteCases())) "yellow" else "green",
-      subtitle = "rows with missing values in this subset",
-      icon = icon("exclamation-triangle"))
-  })
-
-  ## subsetSelectionTab naTable ----
-  output$naTable <- renderUI({
-    HTML(makeKable(data.frame(NAs = colSums(is.na(userDataChosen())))))
-  })
-
-  ## subsetSelectionTab obsTable ----
-  output$obsTable <- renderUI({
-    nTotal <- nrow(userDataNA())
-    nComplete <- sum(!incompleteCases())
-
-    HTML(makeKable(data.frame(Total = nTotal, Complete = nComplete)))
-  })
-
-  ## subsetSelectionTab obsPerGroupTable ----
-  output$obsPerGroupTable <- renderUI({
-      req(input$groupCol)
-
-      if (input$groupCol != "noGroupSelected") {
-        HTML(makeKable(t(table(userDataChosen()[, input$groupCol], useNA = "ifany"))))
-      } else {
-        helpText("No group column selected.")
-      }
-  })
-
-  ## subsetSelectionTab observeEvent subsetSelectButton ----
-  observeEvent(input$subsetSelectButton, {
+  # Pressing Select is the only thing that fills subset$data(), so this is where step 2
+  # ends and step 3 begins. The three controls switched on here live on later tabs, which
+  # is why they are not the subset box's own business.
+  observeEvent(subset$data(), {
     appStage("statistics")
 
-    fimlRV(any(incompleteCases()) && isTRUE(input$useFIML))
-
-    if (input$groupCol != "noGroupSelected") {
-
-      subset <- userDataChosen()[, input$groupCol] %in% input$groups
-      select <- c(input$groupCol, input$itemCols)
-    } else {
-
-      subset <- rep(TRUE, nrow(userDataChosen()))
-      select <- input$itemCols
-    }
-
-    userDataGroup(
-      subset(
-        userDataChosen(),
-        subset = subset,
-        select = select))
-
-    validGroupsRV(
-      input$groupCol != "noGroupSelected" &&
-        !any(c(table(userDataGroup()[, input$groupCol])) == 1) &&
-        length(input$groups) > 1)
-
-    if (validGroupsRV()) {
+    if (isTRUE(subset$hasGroups())) {
       shinyjs::enable("doMg")
 
       updateCheckboxInput(
@@ -588,26 +192,32 @@ server <- function(input, output, session) {
 
     # The two boxes on the Correlations tab relabel their own controls; this is the one on
     # the Testing Parameters tab.
-    if (fimlRV()) {
+    if (subset$useFIML()) {
       updateRadioButtons(
         inputId = "estimator",
         choices = c("(Full Information) Maximum Likelihood" = "ML",
                     "Robust (Full Information) Maximum Likelihood" = "MLR"))
     }
+  })
 
-    if (any(incompleteCases())) {
-      notifications$notList$NAhand <- shinydashboard::notificationItem(
-        text = HTML("For all plots and the multivariate normality analyses<br/>
-                      rows with missing values have been removed."),
-        icon = icon("exclamation-triangle"),
-        status = "warning")
+  ## keep the model selection in step with the item count ----
+  # The checkboxes are on the Testing Parameters tab, so this is the app's job rather than
+  # the subset box's.
+  observeEvent(subset$itemCols(), {
+    req(identical(appStage(), "subset"))
 
-      showNotification(
-        ui = "For all plots and the multivariate normality analyses
-                rows with missing values have been removed.",
-        duration = 5,
-        id = "NAremovedNot",
-        type = "warning")
+    # TRUE for each model the current item count is enough to test.
+    enoughItems <- minItems <= length(subset$itemCols())
+
+    for (thisModel in models) {
+      updateCheckboxInput(session, thisModel, value = unname(enoughItems[thisModel]))
+    }
+
+    for (thisComp in possComps) {
+      updateCheckboxInput(
+        session,
+        thisComp,
+        value = enoughItems[substr(thisComp, 1, 3)] && enoughItems[substr(thisComp, 4, 6)])
     }
   })
 
@@ -616,91 +226,60 @@ server <- function(input, output, session) {
   # The whole box and both tables live in R/mod-descriptives.R.
   descriptivesServer(
     "descriptives",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    groupCol = reactive(input$groupCol),
-    hasGroups = validGroupsRV)
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()),
+    groupCol = reactive(subset$groupCol()),
+    hasGroups = subset$hasGroups)
 
   ## statisticsTab histogram ----
   # The whole box, its controls and both plots live in R/mod-histogram.R.
   histogramServer(
     "histogram",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    groupCol = reactive(input$groupCol),
-    hasGroups = validGroupsRV,
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()),
+    groupCol = reactive(subset$groupCol()),
+    hasGroups = subset$hasGroups,
     groupColors = groupColors)
 
   ## statisticsTab covariance matrix ----
   # The whole box and both tables live in R/mod-covmatrix.R.
   covMatrixServer(
     "covmatrix",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    groupCol = reactive(input$groupCol),
-    hasGroups = validGroupsRV)
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()),
+    groupCol = reactive(subset$groupCol()),
+    hasGroups = subset$hasGroups)
 
   # corrTab ----
   ## corrTab test on correlative independence ----
   # The whole box, its two controls and the test live in R/mod-corr-independence.R.
   corrIndependenceServer(
     "corrIndependence",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    useFIML = fimlRV)
-
-  ## mvnTab multivariate plot ----
-  output$mvnPlot <- renderPlot({
-    req(userDataGroup(), input$mvnPlotType)
-    if (input$mvnPlotType != "qq") req(input$mvnItemX, input$mvnItemY)
-
-    userDataNAOmit <- stats::na.omit(userDataGroup())
-
-    if (input$mvnPlotType == "qq") {
-      MVN::multivariate_diagnostic_plot(
-        stats::na.omit(userDataNAOmit[, input$itemCols]),
-        type = "qq")
-
-    } else if (input$mvnPlotType == "persp") {
-      graphics::persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
-                            userDataNAOmit[, input$mvnItemY],
-                            n = 100),
-            theta = 1, phi = 30, border = NA, shade = 0.5, box = T,
-            xlab = input$mvnItemX,
-            ylab = input$mvnItemY,
-            zlab = "Density")
-
-    } else if (input$mvnPlotType == "contour") {
-      graphics::contour(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
-                              userDataNAOmit[, input$mvnItemY],
-                              n = 100),
-              nlevels = 20,
-              xlab = input$mvnItemX,
-              ylab = input$mvnItemY)
-    }
-  })
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()),
+    useFIML = subset$useFIML)
 
   ## corrTab scatter plot ----
   # The whole box, its controls and both plots live in R/mod-scatter.R.
   scatterServer(
     "scatter",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    groupCol = reactive(input$groupCol),
-    hasGroups = validGroupsRV,
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()),
+    groupCol = reactive(subset$groupCol()),
+    hasGroups = subset$hasGroups,
     groupColors = groupColors)
 
   ## corrTab correlation table ----
   # The whole box, its two controls and the table live in R/mod-corr-table.R.
   corrTableServer(
     "corrTable",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    groupCol = reactive(input$groupCol),
-    hasGroups = validGroupsRV,
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()),
+    groupCol = reactive(subset$groupCol()),
+    hasGroups = subset$hasGroups,
     estimatorName = estimatorName,
     sigLvl = sigLvlRV,
-    useFIML = fimlRV,
+    useFIML = subset$useFIML,
     goodColor = goodColor,
     badColor = badColor,
     neutrColor = neutrColor,
@@ -747,8 +326,8 @@ server <- function(input, output, session) {
   # to; moving the radio buttons and saying so is done here.
   recommendedEstimator <- mvnServer(
     "mvn",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols))
+    data = subset$data,
+    itemCols = reactive(subset$itemCols()))
 
   ## act on what the normality test found ----
   # An observer, not an output, so the test runs as soon as the data is ready rather than
@@ -806,51 +385,33 @@ server <- function(input, output, session) {
     modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
     comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
 
-    # Where the data came from, so makeRCode() can write the matching
-    # read.csv() / read_spss() / workspace line into the exported script.
-    dataSource <- switch(
-      input$source,
-      "Workspace" = list(type = "Workspace", object = input$objectFromWorkspace),
-      "CSV" = list(type = "CSV",
-                   name = input$CSVFile$name,
-                   header = input$header,
-                   sep = input$sep,
-                   quote = input$quote),
-      "SPSS" = list(type = "SPSS", name = input$SPSSFile$name))
-
-    # The name of the data set, used as the first part of the factor score filename.
-    dataName <- switch(
-      input$source,
-      "Workspace" = input$objectFromWorkspace,
-      "CSV" = gsub("\\.csv", "", input$CSVFile$name),
-      "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name))
 
     # TRUE when the user left some of the groups out, so the exported script has to
     # subset the data before fitting.
     isSubset <- (
-      validGroupsRV() &&
-        (length(unique(userDataGroup()[, input$groupCol])) <
-           length(unique(userDataRaw()[, input$groupCol]))))
+      subset$hasGroups() &&
+        (length(unique(subset$data()[, subset$groupCol()])) <
+           length(unique(dataSource$raw()[, subset$groupCol()]))))
 
     # Which group each row belongs to, for the predicted factor scores. FALSE when the
     # user chose no group column, because then the data has no such column to read.
-    groupValues <- if (input$groupCol == "noGroupSelected") {
+    groupValues <- if (subset$groupCol() == "noGroupSelected") {
       FALSE
     } else {
-      userDataGroup()[, input$groupCol]
+      subset$data()[, subset$groupCol()]
     }
 
     ## test the models! ----
     # One pass over the whole sample, plus one fitting the groups separately if the user
     # asked for that.
     passes <- list(single = FALSE)
-    if (isTRUE(input$doMg)) passes$multigroup <- input$groupCol
+    if (isTRUE(input$doMg)) passes$multigroup <- subset$groupCol()
 
     modelFitsRV(lapply(passes, function(groupName) {
 
       ### try fitting and capture warning and error messages ----
-      modelCodes <- makeModelCodes(inputData = userDataGroup(),
-                                              itemCols = input$itemCols,
+      modelCodes <- makeModelCodes(inputData = subset$data(),
+                                              itemCols = subset$itemCols(),
                                               group = groupName,
                                               etaIntFree = as.logical(input$etaIntFree))
 
@@ -865,12 +426,12 @@ server <- function(input, output, session) {
           warnCond <- NULL
           fit <- withCallingHandlers(
             tryCatch(lavaan::lavaan(model = model,
-                                    data = userDataGroup(),
+                                    data = subset$data(),
                                     meanstructure = TRUE,
                                     group = if (isFALSE(groupName)) NULL else groupName,
                                     group.equal = if (isFALSE(groupName)) NULL else c("loadings", "intercepts"),
                                     estimator = estimatorRV(),
-                                    missing = ifelse(fimlRV(), "fiml", "listwise"),
+                                    missing = ifelse(subset$useFIML(), "fiml", "listwise"),
                                     int.ov.free = TRUE,
                                     int.lv.free = as.logical(input$etaIntFree),
                                     auto.fix.first = TRUE,
@@ -951,13 +512,13 @@ server <- function(input, output, session) {
         succTable     = succTable,
         estimator     = estimatorRV(),
         estimatorName = estimatorName(),
-        missingMethod = ifelse(fimlRV(), "fiml", "listwise"),
-        itemCols      = input$itemCols,
-        groupCol      = input$groupCol,
-        groups        = input$groups,
+        missingMethod = ifelse(subset$useFIML(), "fiml", "listwise"),
+        itemCols      = subset$itemCols(),
+        groupCol      = subset$groupCol(),
+        groups        = subset$groups(),
         groupValues   = groupValues,
-        dataSource    = dataSource,
-        dataName      = dataName,
+        dataSource    = dataSource$descriptor(),
+        dataName      = dataSource$name(),
         isSubset      = isSubset)
     }))
 
@@ -978,7 +539,7 @@ server <- function(input, output, session) {
     # The lockout only ever disables, so switch these back on by hand. The multigroup box
     # only if there is a usable group column.
     shinyjs::enable("etaIntFree")
-    if (isTRUE(validGroupsRV())) shinyjs::enable("doMg")
+    if (isTRUE(subset$hasGroups())) shinyjs::enable("doMg")
 
     output$goModelsError <- renderUI(
       tagList(

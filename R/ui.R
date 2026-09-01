@@ -130,134 +130,13 @@ ui <- function(request) {
         ### tabItem dataSelectionTab ----
         shinydashboard::tabItem(
           tabName = "dataSelectionTab",
-          fluidRow(
-            column(
-              width = 3,
-
-              shinydashboard::box(
-                width = NULL,
-                selectInput("source", "1a. Choose source of data",
-                            choices = c("Workspace", "CSV", "SPSS"))),
-
-              shinydashboard::box(
-                width = NULL,
-                conditionalPanel(
-                  condition = "input.source == 'Workspace'",
-                  uiOutput("objectsInWorkspace")),
-                conditionalPanel(
-                  condition = "input.source == 'CSV'",
-                  fileInput("CSVFile", "1b. Choose CSV File",
-                            multiple = FALSE,
-                            accept = c("text/csv",
-                                       "text/comma-separated-values,text/plain",
-                                       ".csv")),
-                  checkboxInput("header", "Header", TRUE),
-                  radioButtons("sep", "Separator",
-                               choices = c(Comma = ",",
-                                           Semicolon = ";",
-                                           Tab = "\t"),
-                               selected = ","),
-                  radioButtons("quote", "Quote",
-                               choices = c(None = "",
-                                           "Double Quote" = '"',
-                                           "Single Quote" = "'"),
-                               selected = '"')),
-                conditionalPanel(
-                  condition = "input.source == 'SPSS'",
-                  fileInput("SPSSFile", "1b. Choose SPSS File",
-                            multiple = FALSE,
-                            accept = c(".sav", ".zsav", ".por")))),
-
-              shinydashboard::box(
-                width = NULL,
-                actionButton("dataSelectButton", "Select", width = "100%"))
-
-            ), # column
-            column(
-              width = 9,
-              shinydashboard::box(
-                width = NULL,
-                title = "Raw data:",
-                DT::dataTableOutput("dataOverview")))
-          ) # fluidRow
+          dataSourceUI("dataSource")
         ), # tabItem
 
         ### tabItem subsetSelectionTab ----
         shinydashboard::tabItem(
           tabName = "subsetSelectionTab",
-
-          #### subsetSelectionTab first row info boxes ----
-          fluidRow(
-            shinydashboard::valueBoxOutput("itemInfoBox"),
-            shinydashboard::valueBoxOutput("groupInfoBox"),
-            shinydashboard::valueBoxOutput("naInfoBox")),
-
-          #### subsetSelectionTab second row choosers ----
-          fluidRow(
-
-            column(
-              width = 4,
-
-              shinydashboard::box(
-                width = NULL,
-                uiOutput("itemColsChooser")),
-
-              shinydashboard::box(
-                width = NULL,
-                uiOutput("groupColChooser"),
-                conditionalPanel(
-                  condition = "input.groupCol != 'noGroupSelected'",
-                  uiOutput("groupChooser"))),
-
-              conditionalPanel(
-                "output.incompleteCasesBoolRV",
-
-                shinydashboard::box(
-                  width = NULL,
-                  tagList(
-                    strong("2c. Choose how to handle missing values:"),
-                    checkboxInput(
-                      "useFIML",
-                      "Use Full Information Maximum Likelihood (FIML) for all analyses in lavaan",
-                      value = TRUE),
-
-                    conditionalPanel(
-                      "!input.useFIML",
-                      div(
-                        style = paste0("color:red"),
-                        HTML("WARNING: Not using FIML in the presence of missing
-                                values implies listwise deletion in lavaan.
-                                This is only valid if the data are missing
-                                completely at random (MCAR) and reduces
-                                statistical power.")))))
-              ), # conditionalPanel
-
-              shinydashboard::box(
-                width = NULL,
-                # subset of items
-                actionButton("subsetSelectButton", "Select", width = "100%"))
-            ), # column
-
-            column(
-              width = 4,
-
-              shinydashboard::box(
-                width = NULL,
-                title = "Observations:",
-                htmlOutput("obsTable")),
-
-              shinydashboard::box(
-                width = NULL,
-                title = "Observations per group:",
-                htmlOutput("obsPerGroupTable"))),
-
-            column(
-              width = 4,
-              shinydashboard::box(
-                width = NULL,
-                title = "Missing values per column:",
-                htmlOutput("naTable")))
-          ) # fluidRow
+          dataSubsetUI("subset")
         ), # tabItem
 
         ### tabItem statisticsTab ----

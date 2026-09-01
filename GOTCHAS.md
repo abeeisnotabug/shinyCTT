@@ -250,8 +250,9 @@ reproduces the old vector exactly.
 
 ### Freezing controls only goes one way
 
-The stage lockout in `server.R` disables the controls of every stage already passed, and never
-enables anything. Some controls start disabled for their own reasons — the data Select button
+Each of the first two steps freezes its own controls, from a `frozen` reactive the app hands
+it. What is left of the stage lockout in `server.R` disables the controls of every stage
+already passed, and never enables anything. Some controls start disabled for their own reasons — the data Select button
 until the chosen data validates, the multigroup checkbox until the group column yields usable
 groups — so a blanket "enable everything for the current stage" would switch those on wrongly.
 

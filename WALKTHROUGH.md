@@ -123,7 +123,9 @@ the current stage" would switch those on wrongly. The only backwards move — th
 handler — re-enables its four controls by name.
 
 > **If you add a control**, put its id in the right `stageControls` entry. That is the whole
-> job; you do not need to write a `disable()` call.
+> job; you do not need to write a `disable()` call. Steps 1 and 2 are the exception — those
+> two boxes freeze their own controls, from a `frozen` argument the app hands them, so a new
+> control there goes in that box's own list.
 
 Four controls on the Testing Parameters tab are deliberately in no entry at all, so they stay
 usable after a run: the significance level, the confidence level of the RMSEA interval, the
@@ -188,6 +190,8 @@ setting redraws the table *inside* the open tab and leaves the user where they w
 | `R/comparisonGrid.R` | Draws the 5×5 table of checkboxes on the Testing Parameters tab. |
 | `R/mod-*.R` | One box each, moved out of `server.R` and `ui.R` — see section 5b. |
 | `R/mod-mvn.R` | The whole normality tab. It *reports* which estimator its test points to; `server.R` decides what to do about that. |
+| `R/mod-data-source.R` | Step 1: where the data comes from. |
+| `R/mod-data-subset.R` | Step 2: which items, which groups, missing values. Hands back the six answers the rest of the app works from. |
 | `R/mod-ctt-results.R` | Everything a model run produces: the comparison page, the parameter tables, the factor scores, the model code. Started twice — once for the whole sample, once for the groups. |
 | `R/helperFunsExtract.R` | Pulls fit indices and parameter estimates out of a fitted lavaan object. Contains the reliability confidence intervals. |
 | `R/helperFunsTables.R` | Every HTML table the app shows. |
@@ -246,7 +250,7 @@ table of contents. The number of `#` marks the nesting depth:
   ## dataSelectionTab objectsInWorkspace ----          <- one output within it
 ```
 
-**Keep adding these when you add code.** They are the only navigation aid in a 1000-line file.
+**Keep adding these when you add code.** They are the only navigation aid in a 600-line file.
 
 ---
 
