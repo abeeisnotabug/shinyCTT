@@ -588,336 +588,33 @@ server <- function(input, output, session) {
   })
 
   # statisticsTab ----
-  ## statisticsTab descrBox ----
-  output$descrBox <- renderUI({
-    req(userDataGroup())
+  ## statisticsTab descriptive statistics ----
+  # The whole box and both tables live in R/mod-descriptives.R.
+  descriptivesServer(
+    "descriptives",
+    data = userDataGroup,
+    itemCols = reactive(input$itemCols),
+    groupCol = reactive(input$groupCol),
+    hasGroups = validGroupsRV)
 
-    table <- t(apply(
-      userDataGroup()[, input$itemCols],
-      MARGIN = 2,
-      FUN = function(col) {
-        c(Mean = mean(col, na.rm = TRUE),
-          Sd = stats::sd(col, na.rm = TRUE),
-          Skew = moments::skewness(col, na.rm = TRUE),
-          Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
-      }
-    )) # t(apply(
+  ## statisticsTab histogram ----
+  # The whole box, its controls and both plots live in R/mod-histogram.R.
+  histogramServer(
+    "histogram",
+    data = userDataGroup,
+    itemCols = reactive(input$itemCols),
+    groupCol = reactive(input$groupCol),
+    hasGroups = validGroupsRV,
+    groupColors = groupColors)
 
-    nHeader <- c(1, 4)
-    names(nHeader) <- c(" ", sprintf("n<sub>all</sub> = %i", nrow(userDataGroup())))
-
-    overallDescrTable <- makeKable(table, bold_cols = 1) %>%
-      kableExtra::add_header_above(header = nHeader, escape = FALSE) %>%
-      HTML()
-
-    ## descrBox if (validGroupsRV()) { ----
-    if (validGroupsRV()) {
-      groups <- unique(userDataGroup()[, input$groupCol])
-
-      mgDescrTableList <- lapply(
-        groups,
-        function(group) {
-          t(apply(
-              subset(
-                userDataGroup()[, input$itemCols],
-                userDataGroup()[, input$groupCol] == group),
-              MARGIN = 2,
-              FUN = function(col) {
-                c(Mean = mean(col, na.rm = TRUE), SD = stats::sd(col, na.rm = TRUE),
-                  Skew = moments::skewness(col, na.rm = TRUE),
-                  Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
-              }
-          )) # t(apply(
-        }
-      ) # lapply
-
-      descrGroupHeader <- c(1, rep(4, length(groups)))
-      names(descrGroupHeader) <- c(
-        " ",
-        sprintf(
-          "Group: %s (n<sub>%s</sub> = %i)",
-          groups,
-          groups,
-          c(table(userDataGroup()[, input$groupCol]))[as.character(groups)]))
-
-      mgDescrTableListTagged <- list()
-
-      for (i in 1:((length(groups) + 1) %/% 2)) {
-        mgDescrTableListTagged[i] <-
-          makeKable(
-              do.call(cbind,
-                      mgDescrTableList[(2 * i - 1):min(2 * i, length(groups))]),
-              bold_cols = 1) %>%
-
-            kableExtra::add_header_above(
-              header = descrGroupHeader[c(1, (2 * i):min(2 * i + 1, length(groups) + 1))],
-              escape = FALSE) %>%
-
-            kableExtra::column_spec(
-              column = 5,
-              border_right = "1px solid lightgrey")
-      }
-
-      # output if groups
-      shinydashboard::tabBox(
-        width = 6,
-        title = "Descriptive statistics:",
-        side = "right",
-
-        tabPanel(
-          "Overall",
-          overallDescrTable),
-
-        tabPanel(
-          "Group-wise",
-          tagList(do.call(HTML, mgDescrTableListTagged)))
-
-      ) # tabBox
-
-    } ## descrBox if (!validGroupsRV()) ----
-    else {
-
-      shinydashboard::box(
-        width = 6,
-        title = "Descriptive statistics:",
-        overallDescrTable)
-    }
-  })
-
-  ## statisticsTab histogram plots ----
-  # output$histBox further down draws the box and leaves empty plot slots -> these fill them.
-  output$singleHist <- renderPlot({
-    # histBox builds the dropdown and the slider, so they do not exist on the first run.
-    req(userDataGroup(), input$histItem, input$singleNoBins)
-
-    ggplot2::ggplot(
-      data.frame(item = stats::na.omit(userDataGroup()[, input$histItem])),
-      ggplot2::aes(x = .data$item)) +
-
-      ggplot2::geom_histogram(
-        if (input$singleDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
-        color = "white",
-        fill = "#438BCA",
-        bins = input$singleNoBins) +
-
-      ggplot2::xlab(input$histItem) +
-      ggplot2::theme_classic() +
-
-      if (input$singleDens)
-        # the bars' "#438BCA" mixed 40% toward white
-        ggplot2::geom_density(color = "#8EB9DF", linewidth = 1)
-  })
-
-  output$groupHist <- renderPlot({
-    req(userDataGroup(), input$histItemGroup, input$groupNoBins, input$histGroupGroups)
-
-    ggplot2::ggplot(
-      subset(
-        userDataGroup(),
-        subset = userDataGroup()[, input$groupCol] %in% input$histGroupGroups,
-        select = c(input$groupCol, input$histItemGroup)) %>%
-        stats::na.omit() %>%
-        stats::setNames(nm = c("group", "item")),
-      ggplot2::aes(x = .data$item, fill = .data$group)) +
-
-      ggplot2::geom_histogram(
-        if (input$groupDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
-        color = "white",
-        bins = input$groupNoBins,
-        position = "dodge") +
-
-      ggplot2::xlab(input$histItemGroup) +
-      ggplot2::scale_fill_manual(values = groupColors()$solid, name = input$groupCol) +
-      ggplot2::theme_classic() +
-
-      if (input$groupDens)
-        list(
-          ggplot2::geom_density(
-            ggplot2::aes(color = .data$group),
-            fill = NA,
-            linewidth = 1),
-          ggplot2::scale_color_manual(values = groupColors()$light, name = input$groupCol))
-  })
-
-  ## statisticsTab histBox ----
-  output$histBox <- renderUI({
-
-    ## histBox if (validGroupsRV()) ----
-    if (validGroupsRV()) {
-
-      ### histBox tabBox ----
-      shinydashboard::tabBox(
-        title = "Histogram:",
-        side = "right",
-
-        #### histBox tabBox overall panel ----
-        tabPanel(
-          title = "Overall",
-
-          fluidRow(
-            column(
-              width = 6,
-              selectInput("histItem", "Select the item:", input$itemCols))),
-
-          plotOutput("singleHist"),
-
-          fluidRow(
-            column(
-              width = 6,
-              sliderInput(
-                "singleNoBins",
-                "Choose the number of bins:",
-                min = 1, max = 100, value = 30, step = 1)),
-            column(
-              width = 6,
-              checkboxInput(
-                "singleDens",
-                "Overlay a density curve",
-                value = FALSE)))),
-
-        #### histBox tabBox group-wise panel ----
-        tabPanel(
-          title = "Group-wise",
-
-          fluidRow(
-            column(
-              width = 6,
-              selectInput(
-                "histItemGroup",
-                "Select the item:",
-                choices = input$itemCols)),
-            column(
-              width = 6,
-              checkboxGroupInput(
-                "histGroupGroups",
-                "Select the groups to include:",
-                choices = unique(userDataGroup()[, input$groupCol]),
-                selected = unique(userDataGroup()[, input$groupCol]),
-                inline = TRUE))),
-
-          plotOutput("groupHist"),
-
-          fluidRow(
-            column(
-              width = 6,
-              sliderInput(
-                "groupNoBins",
-                "Choose the number of bins:",
-                min = 1, max = 100, value = 30, step = 1)),
-            column(
-              width = 6,
-              checkboxInput(
-                "groupDens",
-                "Overlay a density curve",
-                value = FALSE)))
-        ) # tabPanel
-      ) # tabBox
-
-    } ## histBox if (!validGroupsRV()) ----
-    else {
-
-      shinydashboard::box(
-        title = "Histogram:",
-
-        fluidRow(
-          column(
-            width = 6,
-            selectInput(
-              "histItem",
-              "Select the item:",
-              choices = input$itemCols))),
-
-        plotOutput("singleHist"),
-
-        fluidRow(
-          column(
-            width = 6,
-            sliderInput(
-              "singleNoBins",
-              "Choose the number of bins:",
-              min = 1, max = 100, value = 30, step = 1)),
-          column(
-            width = 6,
-            checkboxInput(
-              "singleDens",
-              "Overlay a density curve",
-              value = FALSE)))
-
-      ) # box
-    }
-  })
-
-  ## statisticsTab covMatBox ----
-  output$covMatBox <- renderUI({
-    req(userDataGroup())
-
-    table <- stats::cov(userDataGroup()[, input$itemCols], use = "pairwise.complete.obs")
-    table[upper.tri(table)] <- NA
-
-    ## covMatBox if (validGroupsRV()) ----
-    if (validGroupsRV()) {
-      groups <- unique(userDataGroup()[, input$groupCol])
-
-      mgCovMatList <- lapply(
-        groups,
-        function(group) {
-          stats::cov(
-            subset(
-              userDataGroup()[, input$itemCols],
-              userDataGroup()[, input$groupCol] == group),
-            use = "pairwise.complete.obs")
-        })
-
-      for (i in 1:length(mgCovMatList))
-        mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
-
-      mgCovMatTable <- makeKable(do.call(rbind, mgCovMatList),
-                                            bold_cols = 1)
-
-      groupRowHeaders <- sprintf(
-        "Group: %s (n = %i)",
-        groups,
-        c(table(userDataGroup()[, input$groupCol]))[as.character(groups)])
-
-      for (i in 1:length(groups))
-        mgCovMatTable <- mgCovMatTable %>%
-          kableExtra::group_rows(
-            group_label = groupRowHeaders[i],
-            start_row = (i - 1) * length(input$itemCols) + 1,
-            end_row = i * length(input$itemCols),
-            label_row_css = "background-color: #666; color: #fff;")
-
-      # output if groups
-      shinydashboard::tabBox(
-        width = 12,
-        title = "Covariance matrix:",
-        side = "right",
-
-        tabPanel(
-          title = "Overall",
-          makeKable(table, bold_cols = 1) %>%
-            HTML()),
-
-        tabPanel(
-          "Group-wise",
-          HTML(mgCovMatTable))
-
-      ) # tabBox
-
-    } ## covMatBox if (!validGroupsRV()) ----
-    else {
-
-      # output if NO groups
-      shinydashboard::box(
-        width = 12,
-        title = "Covariance matrix:",
-
-        makeKable(table, bold_cols = 1) %>%
-          HTML()
-
-      ) # box
-    }
-  })
+  ## statisticsTab covariance matrix ----
+  # The whole box and both tables live in R/mod-covmatrix.R.
+  covMatrixServer(
+    "covmatrix",
+    data = userDataGroup,
+    itemCols = reactive(input$itemCols),
+    groupCol = reactive(input$groupCol),
+    hasGroups = validGroupsRV)
 
   # corrTab ----
   ## corrTab corrInd ----
@@ -984,43 +681,6 @@ server <- function(input, output, session) {
     }
   })
 
-  ## corrTab scatter plots ----
-  output$singleScatter <- renderPlot({
-    req(userDataGroup(), input$scatterItemX, input$scatterItemY)
-
-    ggplot2::ggplot(
-        data.frame(
-            itemX = userDataGroup()[, input$scatterItemX],
-            itemY = userDataGroup()[, input$scatterItemY]) %>%
-          stats::na.omit(),
-        ggplot2::aes(x = .data$itemX, y = .data$itemY)) +
-
-        ggplot2::geom_point(color = "#438BCA") +
-        ggplot2::xlab(input$scatterItemX) +
-        ggplot2::ylab(input$scatterItemY) +
-        ggplot2::theme_classic()
-  })
-
-  output$groupScatter <- renderPlot({
-    req(userDataGroup(), input$scatterItemXGroup, input$scatterItemYGroup,
-        input$scatterGroupGroups)
-
-    ggplot2::ggplot(
-      subset(
-        userDataGroup(),
-        subset = userDataGroup()[, input$groupCol] %in% input$scatterGroupGroups,
-        select = c(input$groupCol, input$scatterItemXGroup, input$scatterItemYGroup)) %>%
-        stats::na.omit() %>%
-        stats::setNames(nm = c("group", "itemX", "itemY")),
-      ggplot2::aes(x = .data$itemX, y = .data$itemY, color = .data$group)) +
-
-      ggplot2::geom_point() +
-      ggplot2::xlab(input$scatterItemXGroup) +
-      ggplot2::ylab(input$scatterItemYGroup) +
-      ggplot2::scale_color_manual(values = groupColors()$solid, name = input$groupCol) +
-      ggplot2::theme_classic()
-  })
-
   ## mvnTab multivariate plot ----
   output$mvnPlot <- renderPlot({
     req(userDataGroup(), input$mvnPlotType)
@@ -1052,100 +712,15 @@ server <- function(input, output, session) {
     }
   })
 
-  ## corrTab scatterBox ----
-  output$scatterBox <- renderUI({
-
-    req(userDataGroup())
-
-    ## scatterBox if (validGroupsRV()) ----
-    if (validGroupsRV()) {
-
-      ### scatterBox tabBox ----
-      shinydashboard::tabBox(
-        title = "Scatter plot:",
-        width = NULL,
-        side = "right",
-
-        #### scatterBox tabBox overall panel ----
-        tabPanel(
-          title = "Overall",
-
-          fluidRow(
-
-            column(
-              width = 4,
-              selectInput(
-                "scatterItemX",
-                "Select item on the abscissa:",
-                choices = input$itemCols)),
-            column(
-              width = 4,
-              selectInput(
-                "scatterItemY",
-                "Select item on the ordinate:",
-                choices = input$itemCols,
-                selected = input$itemCols[2]))),
-
-          plotOutput("singleScatter")),
-
-        #### scatterBox tabBox group-wise panel ----
-        tabPanel(
-          title = "Group-wise",
-
-          fluidRow(
-
-            column(
-              width = 4,
-              selectInput(
-                "scatterItemXGroup",
-                "Select item on the abscissa:",
-                choices = input$itemCols)),
-            column(
-              width = 4,
-              selectInput(
-                "scatterItemYGroup",
-                "Select item on the ordinate:",
-                choices = input$itemCols,
-                selected = input$itemCols[2])),
-            column(
-              width = 4,
-              checkboxGroupInput(
-                "scatterGroupGroups",
-                "Select the groups to include:",
-                choices = unique(userDataGroup()[, input$groupCol]),
-                selected = unique(userDataGroup()[, input$groupCol]),
-                inline = TRUE))),
-
-          plotOutput("groupScatter"))
-      ) # tabBox
-
-    } ## scatterBox if (!validGroupsRV()) ----
-    else {
-
-      shinydashboard::box(
-        title = "Scatter plot:",
-        width = NULL,
-
-        fluidRow(
-
-          column(
-            width = 4,
-            selectInput(
-              "scatterItemX",
-              "Select item on the abscissa:",
-              choices = input$itemCols)),
-          column(
-              width = 4,
-              selectInput(
-                "scatterItemY",
-                "Select item on the ordinate:",
-                choices = input$itemCols,
-                selected = input$itemCols[2]))),
-
-        plotOutput("singleScatter")
-      ) # box
-    }
-  })
+  ## corrTab scatter plot ----
+  # The whole box, its controls and both plots live in R/mod-scatter.R.
+  scatterServer(
+    "scatter",
+    data = userDataGroup,
+    itemCols = reactive(input$itemCols),
+    groupCol = reactive(input$groupCol),
+    hasGroups = validGroupsRV,
+    groupColors = groupColors)
 
   ## corrTab corrTableBox ----
   output$corrTableBox <- renderUI({

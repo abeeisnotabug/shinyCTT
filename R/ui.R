@@ -264,10 +264,10 @@ ui <- function(request) {
         shinydashboard::tabItem(
           tabName = "statisticsTab",
           fluidRow(
-            htmlOutput("descrBox"),
-            htmlOutput("histBox")),
+            descriptivesUI("descriptives"),
+            histogramUI("histogram")),
           fluidRow(
-            htmlOutput("covMatBox"))),
+            covMatrixUI("covmatrix"))),
 
         ### tabItem corrTab ----
         shinydashboard::tabItem(
@@ -315,7 +315,7 @@ ui <- function(request) {
 
             column(
               width = 8,
-              htmlOutput("scatterBox"))
+              scatterUI("scatter"))
           ), # fluidRow
 
           fluidRow(
