@@ -60,7 +60,7 @@ Sets `appStage("statistics")`, works out `userDataGroup()` (the data cut down to
 items and groups), decides whether the group column is usable (`validGroupsRV()`), and
 records whether FIML is in play (`fimlRV()`).
 
-### "Test the models" (`goModels`)
+### "Fit and compare models" (`goModels`)
 
 It:
 
@@ -147,12 +147,24 @@ So:
 
 - **Changing the significance level** recolours every table, re-stars every comparison and
   recomputes the parameter confidence intervals, with no refit. It is instant.
+  What you type is never written over — an empty box, or a number out of range, simply is not
+  taken, and the tables go on showing the last usable value with a red note under the box
+  saying so. (Correcting the box instead would rewrite it mid-word; see `GOTCHAS.md`.)
 - **Changing the confidence level of the RMSEA interval** widens or narrows that interval in
   the fit index table, and relabels its header. Also no refit — the interval is worked out
   from the fitted model by `fitMeasures(fm.args = list(rmsea.ci.level = ...))`.
 - **Changing the estimator** *does* need a refit, because it changes how the models are
   fitted. The app does not do it silently: an orange note appears under the button and the
   button's label gains a `*`, until the user presses it.
+
+**Every fit lands you on the model comparison tab**, the first one and every one after it.
+The first happens by itself, because the sidebar block being revealed comes up selected; the
+later ones are `updateTabItems()` at the end of the button's observer.
+
+**The button is switched off while there is nothing to fit.** It is live before the first run,
+and afterwards only while the chosen estimator differs from the one the models on screen were
+fitted with — `refitPending()` compares the two. Choose a different estimator and change your
+mind, and it goes off again, because pressing it would give back the same results.
 
 `modelFitsRV()` holds the settings each pass was fitted with — the estimator, whether FIML
 was used, the item and group columns, where the data came from — alongside the fits. The
@@ -174,12 +186,56 @@ setting redraws the table *inside* the open tab and leaves the user where they w
 | `R/modelFamily.R` | The five models: names, labels, how many items each needs, how they nest. **Start here** if you want to change anything about the models themselves. |
 | `R/makeModelCodes.R` | Turns the chosen item columns into five lavaan syntax strings. The models differ only in which parameter labels they re-use. |
 | `R/comparisonGrid.R` | Draws the 5×5 table of checkboxes on the Testing Parameters tab. |
+| `R/mod-*.R` | One box each, moved out of `server.R` and `ui.R` — see section 5b. |
+| `R/mod-mvn.R` | The whole normality tab. It *reports* which estimator its test points to; `server.R` decides what to do about that. |
+| `R/mod-ctt-results.R` | Everything a model run produces: the comparison page, the parameter tables, the factor scores, the model code. Started twice — once for the whole sample, once for the groups. |
 | `R/helperFunsExtract.R` | Pulls fit indices and parameter estimates out of a fitted lavaan object. Contains the reliability confidence intervals. |
 | `R/helperFunsTables.R` | Every HTML table the app shows. |
 | `R/helperFunsAdvanced.R` | Factor scores, and the copy-pasteable R script shown on the Model Code tab. |
 | `R/ui.R` | The page layout: which boxes sit on which tab. Also the FU Berlin green theme. |
 | `R/sidebar.R` | The left-hand menu, and the four stages the app steps through. |
 | `R/server.R` | Everything that computes or reacts. Long, but sectioned — see below. |
+
+### 5b. The `mod-*.R` files
+
+Seven boxes now live in a file of their own rather than in `server.R` and `ui.R`: the
+descriptive statistics, the histogram, the covariance matrix, the scatter plot, the test on
+correlative independence, the correlation table, and the normality tab. So does everything a
+model run produces, in `R/mod-ctt-results.R`.
+
+**That last one is started twice** — `cttResultsServer("single", ...)` and
+`cttResultsServer("multigroup", ...)` — which is why nothing in the results half has `Mg`
+pasted on the end of its name any more. The names inside the file are plain (`hierPlot`,
+`fitsTable`), and `NS()` keeps the two runs apart on the page (`single-hierPlot`,
+`multigroup-hierPlot`). Its four UI functions share one id because the four pages they fill
+are four tabs of one result. Each file holds the box's *whole* self —
+what it looks like, the controls in it, and what it computes.
+
+Each has two functions. `histogramUI("histogram")` is what `ui.R` puts on the page, and
+`histogramServer("histogram", ...)` is what `server.R` starts up, with the same name string in
+both. The server function is given what the box needs as arguments, so it never reaches into
+the rest of the app:
+
+```r
+  histogramServer(
+    "histogram",
+    data = userDataGroup,
+    itemCols = reactive(input$itemCols),
+    groupCol = reactive(input$groupCol),
+    hasGroups = validGroupsRV,
+    groupColors = groupColors)
+```
+
+Note the arguments are handed over *unread* — `userDataGroup`, not `userDataGroup()`, and
+`reactive(input$itemCols)`, not `input$itemCols`. The box reads them itself, as `data()` and
+`itemCols()`, and re-draws when they change. Reading them here instead would freeze them at
+the value they had when the app started.
+
+**Inside such a file, every id the box creates goes through `ns()`** — `plotOutput(ns("x"))`,
+`selectInput(ns("y"), ...)`. That is what keeps two boxes from fighting over the same name.
+Two things do *not* take `ns()`: reading a control back (`input$histItem`, plain), and telling
+shinyjs to show or hide one (`shinyjs::show("corrTabNA")`, plain — shinyjs adds the box's name
+itself). Both mistakes are silent, so `devtools::test()` checks for them.
 
 `server.R` is navigated by its `----` markers. In RStudio the outline pane (top right of the
 editor, or <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>) turns them into a clickable
@@ -190,7 +246,7 @@ table of contents. The number of `#` marks the nesting depth:
   ## dataSelectionTab objectsInWorkspace ----          <- one output within it
 ```
 
-**Keep adding these when you add code.** They are the only navigation aid in a 2300-line file.
+**Keep adding these when you add code.** They are the only navigation aid in a 1000-line file.
 
 ---
 
@@ -291,7 +347,7 @@ controls do not exist until that `renderUI` has run once.
 ## 8. Checking you have not broken anything
 
 ```r
-devtools::test()     # 46 tests over the calculation helpers - fast, run it constantly
+devtools::test()     # 54 tests: the calculation helpers, plus the module id checks
 devtools::check()    # full R CMD check; the package is kept at 0 errors/warnings/notes
 ```
 

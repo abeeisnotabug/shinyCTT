@@ -71,6 +71,51 @@ eighteen errors per walkthrough.
 Inside a Shiny module a `conditionalPanel` needs `ns = ns` passed to it, **and** the input ids
 inside it need `ns()` applied directly. Missing either half fails silently the same way.
 
+### Writing a number box back rewrites it under the user's fingers
+
+A `numericInput` sends its value on every keystroke, so an observer that "corrects" an
+out-of-range value fights whoever is typing. Typing `0.01` into an empty significance level
+box used to give **`0.0501`**: the leading `0` is out of range, the app put `0.05` in the box,
+and the remaining keystrokes landed on the end of that.
+
+```
+keystroke  box afterwards
+0          0
+.          (emptied by the correction)
+0          0.050
+1          0.0501
+```
+
+So neither level is written back any more. An unusable entry is simply not taken: the tables
+go on showing the last usable value and a red note appears under the box saying what they are
+still using. The bounds live in `sigLvlUsable()` / `rmseaCiLvlUsable()` and nowhere else.
+
+This was invisible while the boxes were frozen after a run. Step 4b made them live, which is
+the whole point of step 4b, and that is what exposed it.
+
+### shinyjs puts the module's name in front of the id itself
+
+Inside a module, `shinyjs::show("corrTabNA")` is right and `shinyjs::show(ns("corrTabNA"))` is
+wrong. shinyjs 2.1.1 checks whether it is being called with a module's session and, if so,
+does the naming itself:
+
+```r
+if (inherits(session, "session_proxy") && isShinyjsFunction) {
+  if ("id" %in% names(params) && !is.null(params[["id"]])) {
+    if (!"asis" %in% names(params) || !params[["asis"]]) {
+      params[["id"]] <- session$ns(params[["id"]])
+```
+
+Write `ns()` as well and the id is named twice — `corrTable-corrTable-corrTabNA` — which
+matches no element on the page, so the call does nothing at all and says nothing about it.
+This happened for real: the "how to handle missing values" control on the correlation tab
+stayed hidden under FIML until the `ns()` came off. `shiny`'s own `update*Input()` functions
+behave the same way, so they too take the plain id.
+
+The `----` markers in `R/mod-*.R` and the test in `tests/testthat/test-moduleNamespacing.R`
+guard both directions: a control's id must go *through* `ns()` where the control is created,
+and must *not* where shinyjs is told to show or hide it.
+
 ### `useShinyjs()` registers its JavaScript at runtime
 
 `shinyjs` 2.1.1 calls `shiny::addResourcePath()` from inside `useShinyjs()` and nowhere else.
@@ -161,8 +206,10 @@ The single-group and multigroup passes are the same code run twice, distinguishe
 - `tkoSep` and `tkoDec` were created with the *same* id in both passes, so the single-group and
   multigroup separator controls were one control and changing either changed both.
 
-All five ids now derive from `groupAppend`-suffixed variables. Real Shiny modules would remove
-the suffixing entirely.
+Both were fixed by deriving all five ids from `groupAppend`-suffixed variables, and the
+suffixing is now gone altogether: `mod-ctt-results.R` is started once per pass, so `NS()` does
+the telling apart and the ids inside it are plain. Only the `tabName`s in `ui.R` still end in
+`Mg`, and those belong to the app rather than to a module.
 
 ### A tab that is appended is appended again next time
 

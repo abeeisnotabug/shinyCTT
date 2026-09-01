@@ -61,7 +61,7 @@ idArgument <- function(call) {
 
   if (is.null(argumentNames)) argumentNames <- rep("", length(arguments))
 
-  for (idName in c("inputId", "outputId")) {
+  for (idName in c("inputId", "outputId", "id")) {
     if (idName %in% argumentNames) return(arguments[[idName]])
   }
 
@@ -70,6 +70,14 @@ idArgument <- function(call) {
   if (length(unnamed) == 0) return(NULL)
 
   arguments[[unnamed[1]]]
+}
+
+## The shinyjs functions that take an id. Inside a module shinyjs puts the module's name in
+## front of the id itself, so these must be given the *plain* id: an ns() there names the
+## control twice and the call silently does nothing.
+shinyjsIdFunctions <- function() {
+  c("show", "hide", "toggle", "enable", "disable", "toggleState", "reset",
+    "addClass", "removeClass", "toggleClass", "delay", "html")
 }
 
 ## The functions that make an input or an output, and so need a namespaced id inside a

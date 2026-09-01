@@ -83,6 +83,38 @@ test_that("every conditionalPanel in a module file passes ns", {
   succeed()
 })
 
+test_that("no shinyjs call in a module file puts its id through ns()", {
+  skip_if(is.na(packageSourceDir()), "R/ sources are not available here")
+
+  moduleFiles <- list.files(packageSourceDir(), pattern = "^mod-.*\\.R$", full.names = TRUE)
+  skip_if(length(moduleFiles) == 0, "there are no module files yet")
+
+  for (moduleFile in moduleFiles) {
+    code <- parse(moduleFile)
+
+    for (functionName in shinyjsIdFunctions()) {
+      for (call in findCalls(code, functionName)) {
+
+        # Only shinyjs::show() and friends are meant here, not a same-named function of
+        # something else, so look at the calls that were written with the package in front.
+        if (!grepl("^shinyjs::", deparse(call[[1]]))) next
+
+        id <- idArgument(call)
+        idIsNamespaced <- is.call(id) && identical(deparse(id[[1]]), "ns")
+
+        expect_false(
+          idIsNamespaced,
+          label = sprintf("shinyjs::%s in %s names its id twice - drop the ns():\n%s",
+                          functionName,
+                          basename(moduleFile),
+                          paste(deparse(call), collapse = "\n")))
+      }
+    }
+  }
+
+  succeed()
+})
+
 test_that("every input and output in a module file has its id put through ns()", {
   skip_if(is.na(packageSourceDir()), "R/ sources are not available here")
 

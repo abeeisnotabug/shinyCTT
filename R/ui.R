@@ -276,41 +276,9 @@ ui <- function(request) {
             column(
               width = 4,
 
-              shinydashboard::box(
-                width = NULL,
-                title = "Test on correlative independence:",
-                radioButtons(
-                  "corrIndEst",
-                  "Choose the estimator for this test:",
-                  choices = c("Maximum Likelihood" = "ML",
-                              "Robust Maximum Likelihood" = "MLR"),
-                  selected = "ML"),
-                numericInput(
-                  "corrIndSL",
-                  "Enter the significance level for this test:",
-                  value = 0.05,
-                  min = 0.001,
-                  max = 1,
-                  step = 0.001),
-                htmlOutput("corrInd")),
+              corrIndependenceUI("corrIndependence"),
 
-              shinydashboard::box(
-                width = NULL,
-                title = "Correlation table with confidence intervals:",
-                shinyjs::hidden(
-                  radioButtons(
-                    "corrTabNA",
-                    "Choose how to handle missing values:",
-                    choices = c("Use pairwise complete observations" = "pairwise.complete.obs",
-                                "Use only complete observations" = "complete.obs"),
-                    selected = "pairwise.complete.obs")),
-                numericInput(
-                  "corrTabSL",
-                  "Enter the significance level for the correlation tests:",
-                  value = 0.05,
-                  min = 0.001,
-                  max = 1,
-                  step = 0.001))
+              corrTableControlsUI("corrTable")
             ), # column
 
             column(
@@ -319,50 +287,13 @@ ui <- function(request) {
           ), # fluidRow
 
           fluidRow(
-            htmlOutput("corrTableBox"))
+            corrTableUI("corrTable"))
         ), # tabItem
 
         ### tabItem mvnTab ----
         shinydashboard::tabItem(
           tabName = "mvnTab",
-          # fluidRow(shinydashboard::infoBox(title = "Hint:")),
-          fluidRow(
-            column(
-              width = 4,
-
-              shinydashboard::box(
-                width = NULL,
-                title = "Normality tests:",
-                numericInput(
-                  "mvnSL",
-                  "Enter the significance level for the tests:",
-                  value = 0.05,
-                  min = 0.001,
-                  max = 1,
-                  step = 0.001)),
-
-              shinydashboard::box(
-                width = NULL,
-                title = "Test on multivariate normality:",
-                htmlOutput("mvnComment")),
-
-              shinydashboard::box(
-                width = NULL,
-                title = "Tests on univariate normality:",
-                htmlOutput("mvnTable"))
-            ), # column
-
-            column(
-              width = 8,
-              fluidRow(htmlOutput("mvnPlotBox")),
-              fluidRow(shinydashboard::infoBox(
-                title = "Hint:",
-                subtitle = "For more extensive analyses on multivariate normality, load() the MVN package and open its shiny app via run_mvn_app()!",
-                icon = icon("lightbulb"),
-                color = "green",
-                width = 12,
-                fill = TRUE)))
-          ) # fluidRow
+          mvnUI("mvn")
         ), # tabItem
 
         ### tabItem testParamTab ----
@@ -373,11 +304,13 @@ ui <- function(request) {
             #### testParamTab left col ----
             column(
               width = 5,
+
+              ##### testParamTab left col how to fit ----
               shinydashboard::box(
                 width = NULL,
+                title = "How the models are fitted:",
                 fluidRow(
 
-                  ##### testParamTab left col estimator ----
                   column(
                     width = 6,
                     radioButtons(
@@ -388,33 +321,6 @@ ui <- function(request) {
                         "Robust Maximum Likelihood" = "MLR"),
                       selected = "ML")),
 
-                  ##### testParamTab left col sigLvl ----
-                  column(
-                    width = 3,
-                    numericInput(
-                      "sigLvl",
-                      "Enter the significance level:",
-                      value = 0.05,
-                      min = 0,
-                      max = 1,
-                      step = 0.001)),
-
-                  ##### testParamTab left col rmseaCiLvl ----
-                  # A confidence level, not a significance level, and set on its own.
-                  # 0.90 is the interval lavaan reports by default.
-                  column(
-                    width = 3,
-                    numericInput(
-                      "rmseaCiLvl",
-                      "Enter the confidence level of the RMSEA interval:",
-                      value = 0.90,
-                      min = 0.5,
-                      max = 0.999,
-                      step = 0.01))),
-
-                fluidRow(
-
-                  ##### testParamTab left col etaIntFree ----
                   column(
                     width = 6,
                     radioButtons(
@@ -423,23 +329,56 @@ ui <- function(request) {
                       choiceNames = list(
                         HTML("Fix the latent mean (&mu;<sub>&eta;</sub> = 0)"),
                         HTML("Fix the first intercept (&alpha;<sub>1</sub> = 0)")),
-                      choiceValues = c(FALSE, TRUE))),
+                      choiceValues = c(FALSE, TRUE)))
+                ), # fluidRow
 
-                  ##### testParamTab left col doMg ----
-                  column(
-                    width = 6,
-                    shinyjs::disabled(
-                      checkboxInput(
-                        "doMg",
-                        "Perform Multigroup Tests",
-                        value = FALSE)))
-                ) # fluidRow
+                # Full width rather than under the estimator buttons: in half a column this
+                # is four words per line.
+                htmlOutput("estimatorNote"),
+
+                hr(),
+
+                shinyjs::disabled(
+                  checkboxInput(
+                    "doMg",
+                    "Perform Multigroup Tests",
+                    value = FALSE))
+              ), # box
+
+              ##### testParamTab left col what the tables show ----
+              # Stacked rather than side by side: the two labels are different lengths, and
+              # in a column this narrow they would sit at different heights and look cramped.
+              shinydashboard::box(
+                width = NULL,
+                title = "What the tables show:",
+                helpText("These two change the tables only. The models are not fitted again,
+                          so both can be changed after a run."),
+
+                numericInput(
+                  "sigLvl",
+                  "Significance level:",
+                  value = 0.05,
+                  min = 0.001,
+                  max = 1,
+                  step = 0.001),
+                htmlOutput("sigLvlNote"),
+
+                # A confidence level, not a significance level, and set on its own.
+                # 0.90 is the interval lavaan reports by default.
+                numericInput(
+                  "rmseaCiLvl",
+                  "Confidence level of the RMSEA interval:",
+                  value = 0.90,
+                  min = 0.5,
+                  max = 0.999,
+                  step = 0.01),
+                htmlOutput("rmseaCiLvlNote")
               ), # box
 
               ##### testParamTab left col goModels ----
               shinydashboard::box(
                 width = NULL,
-                actionButton("goModels", "Test the models", width = "100%"),
+                actionButton("goModels", "Fit and compare models", width = "100%"),
                 htmlOutput("goModelsError"),
                 htmlOutput("refitPendingNote"))
             ), # column
@@ -460,48 +399,42 @@ ui <- function(request) {
         ### tabItem modelTests ----
         shinydashboard::tabItem(
           tabName = "modelTests",
-          htmlOutput("modelTestsCont")),
+          cttResultsUI("single")),
 
         ### tabItem modelTestsMg ----
         shinydashboard::tabItem(
           tabName = "modelTestsMg",
-          htmlOutput("modelTestsContMg")),
+          cttResultsUI("multigroup")),
 
         ### tabItem parTables ----
         shinydashboard::tabItem(
           tabName = "parTables",
-          fluidRow(
-            uiOutput("parTabset"))),
+          cttParTablesUI("single")),
 
         ### tabItem parTablesMg ----
         shinydashboard::tabItem(
           tabName = "parTablesMg",
-          fluidRow(
-            uiOutput("parTabsetMg"))),
+          cttParTablesUI("multigroup")),
 
         ### tabItem facScores ----
         shinydashboard::tabItem(
           tabName = "facScores",
-          fluidRow(
-            uiOutput("fsTabset"))),
+          cttFactorScoresUI("single")),
 
         ### tabItem facScoresMg ----
         shinydashboard::tabItem(
           tabName = "facScoresMg",
-          fluidRow(
-            uiOutput("fsTabsetMg"))),
+          cttFactorScoresUI("multigroup")),
 
         ### tabItem modelCode ----
         shinydashboard::tabItem(
           tabName = "modelCode",
-          fluidRow(
-            uiOutput("mcTabset"))),
+          cttModelCodeUI("single")),
 
         ### tabItem modelCodeMg ----
         shinydashboard::tabItem(
           tabName = "modelCodeMg",
-          fluidRow(
-            uiOutput("mcTabsetMg")))
+          cttModelCodeUI("multigroup"))
 
       ) # tabItems
     ) # dashboardBody
