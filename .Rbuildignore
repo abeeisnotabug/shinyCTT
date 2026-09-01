@@ -3,3 +3,5 @@
 ^\.positai$
 ^\.claude$
 ^data-raw$
+^WALKTHROUGH\.md$
+^GOTCHAS\.md$

@@ -1,0 +1,193 @@
+# Gotchas
+
+Why a few things in this package are written the way they are, and what bit us when they
+weren't. This lives here rather than in the code so the source files stay readable: comments
+in `R/` say what a line does, and anything that needs a paragraph of reasoning goes here.
+
+`WALKTHROUGH.md` is the guide to how the app works. This is the list of traps.
+
+---
+
+## Shiny
+
+### A rebuilt control comes back enabled
+
+`updateCheckboxGroupInput(choices = ...)` and friends build the control again from scratch,
+and the new one has no memory of `shinyjs::disable()`.
+
+This caused a real bug. The "Select all" / "Unselect all" links sit in the same `renderUI` as
+the item checkboxes. Clicking one after the analysis had been run rebuilt the checkbox group,
+handed the user an editable item list, and let them change the items that every already-rendered
+table had been computed from.
+
+Greying the links out is not enough on its own: `shinyjs` marks an `actionLink` disabled, but
+an `<a>` element has no disabled state, so the click still reaches R and the counter still goes
+up. The guard that actually works is the `identical(appStage(), "subset")` test inside each
+observer.
+
+*Where:* `server.R`, the `selectall` / `deselectall` observers.
+
+### Hiding a checkbox does not change its value
+
+`conditionalPanel` only hides things. A model whose cell in the comparison grid says "Too few
+items." still has its checkbox set to `TRUE`, and the run reads the checkboxes, not the grid.
+
+With two items selected this sent an unidentified tau-congeneric model to lavaan. Its RMSEA
+confidence interval called `qchisq()` with negative degrees of freedom, the resulting `NaN`
+reached an `if`, and the whole "Test the models" observer died — leaving every grid cell
+reading "Tested." with no results and no error message anywhere on the page.
+
+The fix is to untick the model itself when the item count drops, not to filter it out later.
+Correcting the input also corrects the grid, because all 33 conditions in the grid read those
+same checkboxes.
+
+*Where:* `server.R`, "keep the model selection in step with the item count".
+
+### `do.call()` on a named list makes children into attributes
+
+`fluidRow()`, `tagList()` and `shinydashboard::menuItem()` all accept a plain list of children
+and unpack it themselves, so `do.call()` is never needed for them.
+
+It is also actively dangerous. `family$names` is a *named* vector, so `lapply()` over it returns
+a named list, and `do.call(fluidRow, cells)` turns those names into HTML attributes:
+
+```html
+<div class="row" tko="&lt;div class=&quot;col-sm-2&quot;..." ete="..."></div>
+```
+
+The cells vanish with no error. Pass the list directly instead.
+
+*Where:* `comparisonGrid.R`, `sidebar.R`.
+
+### `conditionalPanel` conditions are JavaScript
+
+They run in the browser, use `.` rather than `$`, and cannot call R functions. A malformed
+condition does not error — the panel simply never appears.
+
+`input.itemCols` is *undefined* until data has been chosen, which is why every condition in the
+comparison grid starts with `input.itemCols &&`. Without that guard the browser throws roughly
+eighteen errors per walkthrough.
+
+Inside a Shiny module a `conditionalPanel` needs `ns = ns` passed to it, **and** the input ids
+inside it need `ns()` applied directly. Missing either half fails silently the same way.
+
+### `useShinyjs()` registers its JavaScript at runtime
+
+`shinyjs` 2.1.1 calls `shiny::addResourcePath()` from inside `useShinyjs()` and nowhere else.
+While `ui` was a top-level object rather than a function, that call ran in the *installer's* R
+session and was thrown away, so the script 404'd at runtime and every `disable()`, `hide()` and
+`runjs()` in the app was a silent no-op for anyone running an installed build.
+
+`devtools::load_all()` hides this completely, because it sources `ui.R` in the live session.
+
+**So: `ui` must stay `function(request) { ... }`, and anything touching shinyjs must be tested
+against an installed build.** Check it with `window.shinyjs` in the browser console — it should
+be an object, not `undefined`.
+
+### Outputs are suspended while hidden
+
+Shiny does not compute an output that is not currently on screen. Anything that must be
+available before the user visits its tab needs
+`outputOptions(output, "id", suspendWhenHidden = FALSE)` — as `incompleteCasesBoolRV` does,
+because the FIML checkbox's `conditionalPanel` reads it.
+
+---
+
+## lavaan
+
+### A warning is not a failure
+
+lavaan frequently warns and still returns a perfectly usable fit — the essentially
+tau-parallel and tau-parallel models do it routinely. `tryCatch(warning = ...)` exits at the
+first warning and throws the fit away, so those models used to be silently dropped from every
+comparison table with no explanation.
+
+`withCallingHandlers()` plus `invokeRestart("muffleWarning")` records the warning and lets the
+call finish, so one pass gets both. A model that errors is still caught by the surrounding
+`tryCatch()`.
+
+*Where:* `server.R`, the fitting loop.
+
+### `lavTestLRT()` drops its RMSEA column under FIML
+
+If *any* compared model was fitted with `missing = "fiml"`, the output has no RMSEA-of-the-
+difference column at all — whether or not the data actually has missing values. `makeHierTable()`
+fills it with `NA` before selecting columns, and renders it as an explicit "NA" in a grey cell.
+
+Verified present under `"listwise"` and absent under `"fiml"`, on both complete and incomplete
+data, with lavaan 0.6-21.
+
+### The reliability confidence interval is undefined at a Heywood boundary
+
+`extractParameters()` computes reliability intervals on the logit scale and transforms back, to
+keep them inside [0, 1]. When an estimate sits exactly at 0 or 1 — or past it, which happens in
+a genuine Heywood case — the logit is infinite and its standard error blows up too, giving
+`NaN` on one bound.
+
+Both bounds are clamped to the boundary instead. `log()` of a negative number is computed and
+then discarded on that path, so it is wrapped in `suppressWarnings()`.
+
+`rtdataWarn.RData` reproduces this: `item_1`'s error variance comes out at −0.000113 and its
+reliability at 1.000146.
+
+### `minItems` means *positive* degrees of freedom
+
+Not "identified". The tau-congeneric model at 3 items is *just* identified — df = 0, fits
+perfectly, tests nothing. Only at 2 items is it under-identified, with df = −1. The thresholds
+in `cttModelFamily()` are the first item count at which each model has something to test.
+
+---
+
+## This package
+
+### Helpers must never take `input`
+
+Inside a Shiny module, `input` is a namespaced proxy that only sees that module's own
+namespace. A helper reading `input$source` from another namespace gets `NULL` **with no error**,
+so the failure is silent and shows up arbitrarily far downstream.
+
+`makeRCode()` used to take `input = input` and read eight fields off it. It now takes them
+explicitly, with the data source passed in as a small descriptor list. Do not reintroduce the
+pattern. Dynamic `input[[id]]` reads *within one namespace* are fine.
+
+### String suffixes are not a namespace
+
+The single-group and multigroup passes are the same code run twice, distinguished by pasting
+`"Mg"` onto every output id. This broke twice:
+
+- the multigroup factor-score download read `input$tkoFilenameMg`, but the text box was created
+  as `tkoFilename` — so `filename` was `NULL`, `sprintf('...filename="%s"', NULL)` collapsed to
+  `character(0)`, and the response had no `Content-Disposition` header at all;
+- `tkoSep` and `tkoDec` were created with the *same* id in both passes, so the single-group and
+  multigroup separator controls were one control and changing either changed both.
+
+All five ids now derive from `groupAppend`-suffixed variables. Real Shiny modules would remove
+the suffixing entirely.
+
+### The comparison set is derived, not listed
+
+`cttModelFamily()$comparable` used to be
+`outer(models, models, paste0)[lower.tri(diag(5))][-8]`. The `[-8]` dropped the
+tau-equivalent / essentially-tau-parallel pair — the one pair with equal degrees of freedom,
+where neither model is nested in the other, so no likelihood-ratio test exists.
+
+It picked that pair out *by position*. Reordering `models`, or adding a sixth, would have
+silently dropped the wrong one and filled the comparison tables with meaningless tests.
+`nestedPairs()` now works it out from the nesting graph, and a test pins that it still
+reproduces the old vector exactly.
+
+### Freezing controls only goes one way
+
+The stage lockout in `server.R` disables the controls of every stage already passed, and never
+enables anything. Some controls start disabled for their own reasons — the data Select button
+until the chosen data validates, the multigroup checkbox until the group column yields usable
+groups — so a blanket "enable everything for the current stage" would switch those on wrongly.
+
+The one backwards move, the failed-run handler, re-enables its four controls by name.
+
+### Group colours are pinned by name
+
+A discrete ggplot2 scale hands its palette to whichever levels are still present in the data,
+so de-selecting a group in a plot tab used to recolour the remaining ones. `groupColors()`
+builds the palette itself and names it by group, and every group-wise plot uses
+`scale_*_manual()`. Do not put `scale_*_discrete()` back.
