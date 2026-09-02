@@ -151,9 +151,6 @@ server <- function(input, output, session) {
       shinyjs::runjs("location.reload()")
   })
 
-  ## Display NAs correctly in datatable ----
-  options(htmlwidgets.TOJSON_ARGS = list(na = "string"))
-
   # dataSelectionTab ----
   # Step 1 lives in R/mod-data-source.R. It hands back the data it loaded and the copy taken
   # when Select was pressed.
