@@ -136,6 +136,62 @@ available before the user visits its tab needs
 `outputOptions(output, "id", suspendWhenHidden = FALSE)` — as `incompleteCasesBoolRV` does,
 because the FIML checkbox's `conditionalPanel` reads it.
 
+The flip side: an **observer is never suspended**. An `observeEvent()` watching only inputs
+runs the moment the app starts, on a tab the user has not reached, over data that does not
+exist yet — which is how step 2 came to report "No item selected. No analysis possible."
+before any data set had been chosen. An observer that works from the data must say so with
+`req()`; being on a hidden tab protects nothing.
+
+Two more observers fire at startup and get away with it: `mod-corr-independence.R` and
+`mod-corr-table.R` both watch `useFIML()`, which is a `reactiveVal(FALSE)` and so has a value
+from the first moment. They are harmless only because each does nothing unless `useFIML()` is
+TRUE. Invert either condition and the same bug is back in a second place.
+
+---
+
+### An empty input can mean two different things
+
+`input$itemCols` is `NULL` both when the tick boxes have not been drawn yet and when the
+user has unticked all of them. The first must stay silent, the second must warn — and the
+input itself cannot tell them apart.
+
+The signal that separates them is `input$groupCol`. It is drawn from the same data in the
+same pass and always holds a value once it exists (`"noGroupSelected"` at the least), and
+the browser reports every newly drawn control back in one message. So `req(chosenData(),
+input$groupCol)` means "the choosers are on screen and have told us what they are set to",
+after which an empty `input$itemCols` is the user's doing. Verified in a browser: nothing is
+posted on the way into step 2, and unticking every item posts the warning at once.
+
+Both observers in `mod-data-subset.R` open with that line, and
+`tests/testthat/test-startupGuards.R` pins both halves.
+
+---
+
+### An error inside an observer ends the session
+
+An error in a `render*()` shows up in the box that output draws into and the app carries on.
+An error in an `observe()` or `observeEvent()` has nowhere to be shown, so shiny stops the
+session — the user's app goes dead, mid-click, with no message. Anything an observer does
+with data it did not create needs a `tryCatch()`; step 1's loader is the example, and the
+`observeEvent(input$goModels, tryCatch(...))` around the fitting run is the other.
+
+---
+
+### `req()` raises an error, so it cannot sit inside a `tryCatch()`
+
+`req()` stops an observer by raising a condition that `inherits(e, "error")` is TRUE for.
+A `tryCatch(error = )` wrapped around it therefore catches "the user has not chosen a file
+yet" and reports it as a failure. Keep the `req()`s above the `tryCatch()`, not in it.
+
+---
+
+### A control must be born in the state it belongs in
+
+Step 2's Select button used to arrive switched on and was switched off a moment later by the
+observer above — so guarding that observer handed the user a live button with nothing behind
+it. A control that should start off is wrapped in `shinyjs::disabled()` where it is built,
+and the observer only ever changes it from there.
+
 ---
 
 ## lavaan

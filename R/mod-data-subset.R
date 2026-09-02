@@ -57,7 +57,8 @@ dataSubsetUI <- function(id) {
         shinydashboard::box(
           width = NULL,
           # subset of items
-          actionButton(ns("subsetSelectButton"), tr("Select"), width = "100%"))
+          shinyjs::disabled(
+            actionButton(ns("subsetSelectButton"), tr("Select"), width = "100%")))
       ), # column
 
       column(
@@ -192,7 +193,13 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
            input$groups,
            input$itemCols), {
 
-      req(chosenData())
+      # Nothing to build until step 1 has handed over a data set and the two choosers below
+      # have reported what they are set to. input$groupCol is the one to wait for: its list
+      # always starts with the hard-coded "No group column selected" = "noGroupSelected",
+      # so it holds a value even when the data offers no group column at all. An empty
+      # input$itemCols next to it therefore means the user unticked every item, not that the
+      # tick boxes have yet to be drawn.
+      req(chosenData(), input$groupCol)
 
       if (input$groupCol != "noGroupSelected") {
 
@@ -245,6 +252,9 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       list(input$groupCol,
            input$groups,
            input$itemCols), {
+
+      # Same guard as the observer above: no data chosen yet -> no item count to report on.
+      req(chosenData(), input$groupCol)
 
       # Only while this step is current: once the app has moved on, the item and group
       # selections are frozen and this must not hand the button back.

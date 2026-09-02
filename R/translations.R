@@ -222,6 +222,7 @@ germanText <- function() {
     "There was an ERROR/WARNING:" = "",
     "There was an ERROR:" = "",
     "These two change the tables only. The models are not fitted again, so both can be changed after a run." = "",
+    "This data set could not be read." = "",
     "Too few items." = "",
     "Total" = "",
     "Unselect all" = "",

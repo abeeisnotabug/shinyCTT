@@ -111,32 +111,66 @@ dataSourceServer <- function(id, notifications, frozen) {
         status = "danger")
 
       ### choose data source ----
-      if (input$source == "CSV") {
-        req(input$CSVFile)
+      # Nothing to read until the control that goes with the chosen source has something in
+      # it. This stays outside the tryCatch below, because req() stops the observer by
+      # raising an error of its own and would otherwise be reported as a failed read.
+      req(switch(
+        input$source,
+        "CSV" = input$CSVFile,
+        "SPSS" = input$SPSSFile,
+        "Workspace" = input$objectFromWorkspace))
 
-        userDataTmp <- utils::read.csv(
-          file = input$CSVFile$datapath,
-          header = input$header,
-          sep = input$sep,
-          quote = input$quote,
-          stringsAsFactors = FALSE)
-      } else if (input$source == "SPSS") {
-        req(input$SPSSFile)
+      # Reading is caught, because it fails on plenty of things a user can point at: a
+      # malformed CSV, a corrupt SPSS file, or a workspace object that gets past the
+      # chooser's filter without being something data.frame() can make a table of - a sparse
+      # Matrix, for one. An error let out of an observer ends the session on the spot, so
+      # the user would lose the app rather than be told the data set is unusable.
+      loadedData <- tryCatch({
 
-        userDataTmp <- haven::read_spss(file = input$SPSSFile$datapath)
-      } else if (input$source == "Workspace") {
-        req(input$objectFromWorkspace)
+        if (input$source == "CSV") {
+          userDataTmp <- utils::read.csv(
+            file = input$CSVFile$datapath,
+            header = input$header,
+            sep = input$sep,
+            quote = input$quote,
+            stringsAsFactors = FALSE)
+        } else if (input$source == "SPSS") {
+          userDataTmp <- haven::read_spss(file = input$SPSSFile$datapath)
+        } else if (input$source == "Workspace") {
+          userDataTmp <- get(input$objectFromWorkspace)
+        }
 
-        userDataTmp <- get(input$objectFromWorkspace)
+        if (any(sapply(userDataTmp, is.factor))) {
+          userDataTmp[sapply(userDataTmp, is.factor)] <- lapply(
+            userDataTmp[sapply(userDataTmp, is.factor)],
+            as.character)
+        }
+
+        data.frame(userDataTmp, stringsAsFactors = FALSE)
+
+      }, error = function(e) e)
+
+      ### the data could not be read ----
+      # raw() and the Select button were already emptied and switched off at the top of this
+      # observer, so saying so and stopping here leaves step 1 where it was.
+      if (inherits(loadedData, "error")) {
+        notifications$notList$unreadable <- shinydashboard::notificationItem(
+          text = tr("This data set could not be read."),
+          icon = icon("times"),
+          status = "danger")
+        showNotification(
+          paste(tr("This data set could not be read."), conditionMessage(loadedData)),
+          duration = 10,
+          id = "unreadableNot",
+          type = "error")
+
+        return()
       }
 
-      if (any(sapply(userDataTmp, is.factor))) {
-        userDataTmp[sapply(userDataTmp, is.factor)] <- lapply(
-          userDataTmp[sapply(userDataTmp, is.factor)],
-          as.character)
-      }
+      notifications$notList$unreadable <- NULL
+      removeNotification("unreadableNot")
 
-      raw(data.frame(userDataTmp, stringsAsFactors = FALSE))
+      raw(loadedData)
 
       notifications$notList$noData <- NULL
 
