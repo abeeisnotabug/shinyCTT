@@ -27,7 +27,6 @@ Imports:
     dashboardthemes (>= 1.1.6),
     shinyjs (>= 1.0),
     MVN (>= 6.0),
-    corrplot (>= 0.84),
     kableExtra (>= 1.0.1),
     haven (>= 2.1.0),
     ggplot2 (>= 3.4.0),
