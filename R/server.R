@@ -66,14 +66,14 @@ server <- function(input, output, session) {
   output$sigLvlNote <- renderUI({
     if (sigLvlUsable()) return(NULL)
 
-    sprintf("Enter a number between 0.001 and 1. The tables still use %s.", sigLvlRV()) %>%
+    sprintf(tr("Enter a number between 0.001 and 1. The tables still use %s."), sigLvlRV()) %>%
       div(style = "color:red")
   })
 
   output$rmseaCiLvlNote <- renderUI({
     if (rmseaCiLvlUsable()) return(NULL)
 
-    sprintf("Enter a number between 0.5 and 0.999. The tables still use %s.", rmseaCiLvlRV()) %>%
+    sprintf(tr("Enter a number between 0.5 and 0.999. The tables still use %s."), rmseaCiLvlRV()) %>%
       div(style = "color:red")
   })
 
@@ -195,10 +195,20 @@ server <- function(input, output, session) {
     if (subset$useFIML()) {
       updateRadioButtons(
         inputId = "estimator",
-        choices = c("(Full Information) Maximum Likelihood" = "ML",
-                    "Robust (Full Information) Maximum Likelihood" = "MLR"))
+        choiceNames = list(
+          tr("(Full Information) Maximum Likelihood"),
+          tr("Robust (Full Information) Maximum Likelihood")),
+        choiceValues = c("ML", "MLR"))
     }
   })
+
+  ## how many items are ticked, for the model grid ----
+  # ui.R draws the grid, so its conditions cannot see input$itemCols any more - that tick
+  # box lives inside the subset box and its id carries that box's name. The count goes out
+  # as a value instead. suspendWhenHidden = FALSE because the grid's conditions have to be
+  # answerable while the Testing Parameters tab is still hidden.
+  output$nItemsChosen <- reactive(length(subset$itemCols()))
+  outputOptions(output, "nItemsChosen", suspendWhenHidden = FALSE)
 
   ## keep the model selection in step with the item count ----
   # The checkboxes are on the Testing Parameters tab, so this is the app's job rather than
@@ -307,7 +317,7 @@ server <- function(input, output, session) {
     updateActionButton(
       session,
       "goModels",
-      label = paste0("Fit and compare models", if (refitPending()) "*"))
+      label = paste0(tr("Fit and compare models"), if (refitPending()) "*"))
   })
 
   output$refitPendingNote <- renderUI({
@@ -315,9 +325,7 @@ server <- function(input, output, session) {
 
     tagList(
       br(),
-      HTML("The estimator has changed. The results still come from the estimator that
-            was chosen when the models were last fitted. Press
-            <b>Fit and compare models*</b> to fit them again.") %>%
+      HTML(tr("The estimator has changed. The results still come from the estimator that was chosen when the models were last fitted. Press <b>Fit and compare models*</b> to fit them again.")) %>%
         div(style = "color:orange"))
   })
 
@@ -337,19 +345,18 @@ server <- function(input, output, session) {
     updateRadioButtons(session, "estimator", selected = recommendedEstimator())
 
     notifications$notList$estUpdate <- shinydashboard::notificationItem(
-      text = "Updated estimator based on MVN test result.",
+      text = tr("Updated estimator based on MVN test result."),
       icon = icon("wrench"),
       status = "warning")
 
     showNotification(
-      ui = "Updated estimator based on MVN test result.",
+      ui = tr("Updated estimator based on MVN test result."),
       duration = 5,
       id = "estUpdateNot",
       type = "warning")
 
     notifications$notList$mvnApp <- shinydashboard::notificationItem(
-      text = HTML("For more extensive analyses on multivariate normality,<br/>
-                    load() the MVN package and open its shiny app via run_mvn_app()!"),
+      text = HTML(tr("For more extensive analyses on multivariate normality,<br/> load() the MVN package and open its shiny app via run_mvn_app()!")),
       icon = icon("lightbulb"),
       status = "success")
   })
@@ -359,11 +366,10 @@ server <- function(input, output, session) {
 
     req(recommendedEstimator())
 
-    estimatorLongName <- c(ML = "Maximum Likelihood",
-                           MLR = "Robust Maximum Likelihood")[recommendedEstimator()]
+    estimatorLongName <- c(ML = tr("Maximum Likelihood"),
+                           MLR = tr("Robust Maximum Likelihood"))[recommendedEstimator()]
 
-    sprintf("The test on multivariate normality recommends %s. See <i>3. Statistics</i>
-             &rarr; <i>Test on Multivariate Normality</i>.",
+    sprintf(tr("The test on multivariate normality recommends %s. See <i>3. Statistics</i> &rarr; <i>Test on Multivariate Normality</i>."),
             estimatorLongName) %>%
       HTML() %>%
       div(style = "color:orange; font-size: 90%")
@@ -544,8 +550,8 @@ server <- function(input, output, session) {
     output$goModelsError <- renderUI(
       tagList(
         br(),
-        strong("The model tests failed:"),
-        paste("There was an ERROR:", conditionMessage(e)) %>%
+        strong(tr("The model tests failed:")),
+        paste(tr("There was an ERROR:"), conditionMessage(e)) %>%
           HTML() %>%
           div(style = "color:red")))
   })) # observeEvent(input$goModels, {

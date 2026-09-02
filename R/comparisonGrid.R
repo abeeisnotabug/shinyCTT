@@ -63,17 +63,19 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
 
         # The strings below are JavaScript, which the browser evaluates to decide which
         # part of the cell to show. Reading them:
-        #   input.itemCols          the item columns the user has ticked, as a list. It is
-        #                           undefined before any data is chosen, which is why every
-        #                           condition tests it first - without that guard the
-        #                           browser throws roughly 18 errors per walkthrough.
-        #   input.itemCols.length   how many items are ticked.
+        #   output.nItemsChosen     how many item columns the user has ticked. A value the
+        #                           server sends rather than an input, because the tick
+        #                           boxes live inside the subset box and their id carries
+        #                           that box's name (see GOTCHAS.md). Undefined before any
+        #                           data is chosen, which is why every condition tests it
+        #                           first - without that guard the browser throws roughly
+        #                           18 errors per walkthrough.
         #   input.goModels          how often "Test the models" has been pressed, so 0
         #                           means the run has not happened yet.
         #   input.tko               whether the tau-congeneric checkbox is ticked, and so on
         #                           for each model.
-        enoughItems <- paste0("input.itemCols.length > ", fewestItems - 1)
-        tooFewItems <- paste0("input.itemCols.length <= ", fewestItems - 1)
+        enoughItems <- paste0("output.nItemsChosen > ", fewestItems - 1)
+        tooFewItems <- paste0("output.nItemsChosen <= ", fewestItems - 1)
         modelIsTicked <- paste0("input.", rowModel)
 
         # Exactly one of these four is visible at any moment.
@@ -82,26 +84,26 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
 
           # Before the run, with enough items: let the user choose.
           conditionalPanel(
-            paste0("input.itemCols && ", enoughItems, " && input.goModels == 0"),
-            checkboxInput(ns(rowModel), "Include", value = TRUE),
+            paste0("output.nItemsChosen && ", enoughItems, " && input.goModels == 0"),
+            checkboxInput(ns(rowModel), tr("Include"), value = TRUE),
             ns = ns),
 
           # Too few items for this model to have any degrees of freedom.
           conditionalPanel(
-            paste0("input.itemCols && ", tooFewItems),
-            helpText("Too few items."),
+            paste0("output.nItemsChosen && ", tooFewItems),
+            helpText(tr("Too few items.")),
             ns = ns),
 
           # After the run: report what was done.
           conditionalPanel(
             paste0("input.goModels > 0 && ", modelIsTicked),
-            helpText("Tested."),
+            helpText(tr("Tested.")),
             ns = ns),
 
           conditionalPanel(
-            paste0("input.itemCols && input.goModels > 0 && !", modelIsTicked,
+            paste0("output.nItemsChosen && input.goModels > 0 && !", modelIsTicked,
                    " && !(", tooFewItems, ")"),
-            helpText("Don't test."),
+            helpText(tr("Don't test.")),
             ns = ns))
 
       } else {
@@ -117,7 +119,7 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
           # These two models are not nested in each other, so a likelihood-ratio test
           # between them would be meaningless. In the CTT family this happens exactly once,
           # for tau-equivalent against essentially tau-parallel.
-          cell <- column(2, helpText("Not testable."))
+          cell <- column(2, helpText(tr("Not testable.")))
 
         } else {
 
@@ -125,8 +127,8 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
           # whichever of the two wants more items.
           fewestItems <- max(family$minItems[[rowModel]], family$minItems[[columnModel]])
 
-          enoughItems <- paste0("input.itemCols.length > ", fewestItems - 1)
-          tooFewItems <- paste0("input.itemCols.length <= ", fewestItems - 1)
+          enoughItems <- paste0("output.nItemsChosen > ", fewestItems - 1)
+          tooFewItems <- paste0("output.nItemsChosen <= ", fewestItems - 1)
           bothModelsTicked <- paste0("input.", columnModel, " && input.", rowModel)
           comparisonIsTicked <- paste0("input.", comparisonId)
 
@@ -135,22 +137,22 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
 
             # Before the run, with enough items and both models included: offer the box.
             conditionalPanel(
-              paste0("input.itemCols && ", bothModelsTicked, " && ", enoughItems,
+              paste0("output.nItemsChosen && ", bothModelsTicked, " && ", enoughItems,
                      " && input.goModels == 0"),
-              checkboxInput(ns(comparisonId), "Compare", value = TRUE),
+              checkboxInput(ns(comparisonId), tr("Compare"), value = TRUE),
               ns = ns),
 
             # Not available: one of the two models is not included, or there are too few
             # items, or the run has happened and this comparison was not ticked.
             conditionalPanel(
-              paste0("input.itemCols && (!(", bothModelsTicked, ") || ", tooFewItems,
+              paste0("output.nItemsChosen && (!(", bothModelsTicked, ") || ", tooFewItems,
                      " || (input.goModels > 0 && !", comparisonIsTicked, "))"),
-              helpText("Don't test."),
+              helpText(tr("Don't test.")),
               ns = ns),
 
             conditionalPanel(
               paste0("input.goModels > 0 && ", comparisonIsTicked),
-              helpText("Tested."),
+              helpText(tr("Tested.")),
               ns = ns))
         }
       }
