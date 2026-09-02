@@ -86,3 +86,28 @@ test_that("a readable workspace object clears the unreadable notification again"
       expect_equal(colnames(raw()), colnames(rtdata))
     })
 })
+
+test_that("an unreadable object empties the preview left by a readable one", {
+  skip_if_not_installed("Matrix")
+
+  assign("readableObject", rtdata, envir = globalenv())
+  assign("unreadableObject", Matrix::Matrix(0, 3, 3, sparse = TRUE), envir = globalenv())
+  on.exit(rm("readableObject", "unreadableObject", envir = globalenv()))
+
+  notifications <- shiny::reactiveValues(notList = list())
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = notifications, frozen = shiny::reactiveVal(FALSE)),
+    {
+      session$setInputs(source = "Workspace", objectFromWorkspace = "readableObject")
+      expect_equal(nrow(raw()), nrow(rtdata))
+
+      # Picking something unusable must take the data away, not leave the last good one
+      # sitting there under a message saying the new one could not be read. raw() is what
+      # the preview table is drawn from; that the table itself goes blank was checked in a
+      # browser, because DT hands back a widget shell here either way.
+      session$setInputs(objectFromWorkspace = "unreadableObject")
+      expect_null(raw())
+    })
+})

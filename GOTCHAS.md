@@ -167,6 +167,25 @@ Both observers in `mod-data-subset.R` open with that line, and
 
 ---
 
+### An output written from inside an observer can never clear itself
+
+`observeEvent(raw(), { output$dataOverview <- ... })` does not run when `raw()` becomes
+`NULL` — `ignoreNULL = TRUE` is the default — so the last table it wrote stays on screen after
+the data behind it is gone. Step 1's preview went on showing the previous data set under a
+message saying the new one could not be read. The render belongs at the top level, where it
+re-runs on every change of `raw()`, empty ones included.
+
+---
+
+### `req()` does not blank a table that has already been drawn
+
+Verified in a browser: `req(raw())` at the top of a `DT::renderDataTable()` leaves the rows
+from the previous run on screen. `if (is.null(raw())) return(NULL)` clears it completely, back
+to the same blank the tab starts out with. Use `req()` to keep a render from computing;
+use an explicit `NULL` when the point is to take something off the screen.
+
+---
+
 ### An error inside an observer ends the session
 
 An error in a `render*()` shows up in the box that output draws into and the app carries on.

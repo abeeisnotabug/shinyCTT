@@ -217,13 +217,17 @@ dataSourceServer <- function(id, notifications, frozen) {
     })
 
     ## the raw data, as a table ----
-    observeEvent(raw(), {
-      output$dataOverview <- raw() %>%
+    # An output of its own rather than one written from inside an observer: picking a new
+    # source empties raw(), and the table has to empty with it instead of going on showing
+    # the last data set that could be read.
+    output$dataOverview <- DT::renderDataTable({
+      if (is.null(raw())) return(NULL)
+
+      raw() %>%
         DT::datatable() %>%
         DT::formatRound(
           columns = seq_along(raw())[sapply(raw(), is.numeric)],
-          digits = 3) %>%
-        DT::renderDataTable()
+          digits = 3)
     })
 
     ## Select ----
