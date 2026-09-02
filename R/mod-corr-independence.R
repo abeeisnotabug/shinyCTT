@@ -9,16 +9,16 @@ corrIndependenceUI <- function(id) {
 
   shinydashboard::box(
     width = NULL,
-    title = "Test on correlative independence:",
+    title = tr("Test on correlative independence:"),
     radioButtons(
       ns("corrIndEst"),
-      "Choose the estimator for this test:",
-      choices = c("Maximum Likelihood" = "ML",
-                  "Robust Maximum Likelihood" = "MLR"),
+      tr("Choose the estimator for this test:"),
+      choiceNames = list(tr("Maximum Likelihood"), tr("Robust Maximum Likelihood")),
+      choiceValues = c("ML", "MLR"),
       selected = "ML"),
     numericInput(
       ns("corrIndSL"),
-      "Enter the significance level for this test:",
+      tr("Enter the significance level for this test:"),
       value = 0.05,
       min = 0.001,
       max = 1,
@@ -41,8 +41,10 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
 
       updateRadioButtons(
         inputId = "corrIndEst",
-        choices = c("(Full Information) Maximum Likelihood" = "ML",
-                    "Robust (Full Information) Maximum Likelihood" = "MLR"))
+        choiceNames = list(
+          tr("(Full Information) Maximum Likelihood"),
+          tr("Robust (Full Information) Maximum Likelihood")),
+        choiceValues = c("ML", "MLR"))
     })
 
     ## the test result ----
@@ -72,17 +74,13 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
         if (!is.na(input$corrIndSL) && input$corrIndSL < 1 && input$corrIndSL > 0) {
 
           tagList(
-            strong("Test result:"),
+            strong(tr("Test result:")),
 
             sprintf(
               ifelse(
                 corrInd[3] < input$corrIndSL,
-                yes = "The hypothesis that all correlations are equal to
-                        zero has to be discarded on a significance level of
-                        %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).",
-                no = "The hypothesis that all correlations are equal to
-                      zero can be maintained on a significance level of
-                      %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)."),
+                yes = tr("The hypothesis that all correlations are equal to zero has to be discarded on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)."),
+                no = tr("The hypothesis that all correlations are equal to zero can be maintained on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).")),
               input$corrIndSL, # %s
               paste0(if (useFIML()) "FI", input$corrIndEst), # %s
               corrInd[1], # %.3f
@@ -95,15 +93,15 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
           ) # tagList
 
         } else {
-          HTML("Please enter a valid significance level") %>%
+          HTML(tr("Please enter a valid significance level")) %>%
             div(style = "color:red")
         }
 
       } ## result if (class(corrIndRaw)[1] != "lavaan") ----
       else {
         tagList(
-          strong("Test result:"),
-          paste("There was an ERROR/WARNING:", corrIndRaw$message) %>%
+          strong(tr("Test result:")),
+          paste(tr("There was an ERROR/WARNING:"), corrIndRaw$message) %>%
             HTML() %>%
             div(style = "color:red"))
       }

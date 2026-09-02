@@ -34,7 +34,7 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
         fluidRow(
           column(
             width = 6,
-            selectInput(ns("histItem"), "Select the item:", choices = itemCols()))),
+            selectInput(ns("histItem"), tr("Select the item:"), choices = itemCols()))),
 
         plotOutput(ns("singleHist")),
 
@@ -43,43 +43,43 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
             width = 6,
             sliderInput(
               ns("singleNoBins"),
-              "Choose the number of bins:",
+              tr("Choose the number of bins:"),
               min = 1, max = 100, value = 30, step = 1)),
           column(
             width = 6,
             checkboxInput(
               ns("singleDens"),
-              "Overlay a density curve",
+              tr("Overlay a density curve"),
               value = FALSE))))
 
       ### the box without a group column ----
       if (!isTRUE(hasGroups()))
-        return(shinydashboard::box(title = "Histogram:", overallContents))
+        return(shinydashboard::box(title = tr("Histogram:"), overallContents))
 
       ### the tabBox with one ----
       shinydashboard::tabBox(
-        title = "Histogram:",
+        title = tr("Histogram:"),
         side = "right",
 
         tabPanel(
-          title = "Overall",
+          title = tr("Overall"),
           overallContents),
 
         tabPanel(
-          title = "Group-wise",
+          title = tr("Group-wise"),
 
           fluidRow(
             column(
               width = 6,
               selectInput(
                 ns("histItemGroup"),
-                "Select the item:",
+                tr("Select the item:"),
                 choices = itemCols())),
             column(
               width = 6,
               checkboxGroupInput(
                 ns("histGroupGroups"),
-                "Select the groups to include:",
+                tr("Select the groups to include:"),
                 choices = unique(data()[, groupCol()]),
                 selected = unique(data()[, groupCol()]),
                 inline = TRUE))),
@@ -91,13 +91,13 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
               width = 6,
               sliderInput(
                 ns("groupNoBins"),
-                "Choose the number of bins:",
+                tr("Choose the number of bins:"),
                 min = 1, max = 100, value = 30, step = 1)),
             column(
               width = 6,
               checkboxInput(
                 ns("groupDens"),
-                "Overlay a density curve",
+                tr("Overlay a density curve"),
                 value = FALSE)))
         ) # tabPanel
       ) # tabBox

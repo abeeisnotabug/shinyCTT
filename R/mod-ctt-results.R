@@ -210,7 +210,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
 
       rownames(combCompTable) <- modelsAbbrev
       colnames(combCompTable) <- rep(
-        c("&Delta;df", paste0(fit()$estimatorName, "-&Delta;&chi;&sup2;")),
+        c(tr("&Delta;df"), paste0(fit()$estimatorName, tr("-&Delta;&chi;&sup2;"))),
         times = 5)
 
       list(
@@ -233,7 +233,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       if (sum(fit$warns) > 0) {
 
         lavWarnsMsg <- tagList(
-          h6("The following models produced warnings:"),
+          h6(tr("The following models produced warnings:")),
 
           cbind(paste0(modelsLong[fit$warnModels], ":&emsp;"),
                 sapply(fit$fittedModels[fit$warnModels],
@@ -252,7 +252,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       if (sum(fit$errs) > 0) {
 
         lavErrsMsg <- tagList(
-          h6("The following models produced errors:"),
+          h6(tr("The following models produced errors:")),
 
           cbind(paste0(modelsLong[fit$errModels], ":&emsp;"),
                 sapply(fit$fittedModels[fit$errModels],
@@ -269,7 +269,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
 
       lavStatus <- if (sum(fit$warns) > 0 || sum(fit$errs) > 0) {
         wellPanel(
-          h5(sprintf("Lavaan status: %i warnings, %i errors.",
+          h5(sprintf(tr("Lavaan status: %i warnings, %i errors."),
                      sum(fit$warns),
                      sum(fit$errs))),
           lavErrsMsg,
@@ -286,48 +286,48 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
 
         fluidRow(
           shinydashboard::box(
-            title = "Hierarchical model comparison plot:",
+            title = tr("Hierarchical model comparison plot:"),
             width = 12,
             plotOutput(ns("hierPlot")))),
 
         fluidRow(
           shinydashboard::box(
-            title = "Hierarchical model comparison table:",
+            title = tr("Hierarchical model comparison table:"),
             width = 12,
             htmlOutput(ns("hierTable")),
-            actionLink(ns("showLegendHierTable"), "Show/hide legend"),
+            actionLink(ns("showLegendHierTable"), tr("Show/hide legend")),
             conditionalPanel("input.showLegendHierTable % 2 == 1",
                              htmlOutput(ns("hierTableLegend")),
                              ns = ns))),
 
         fluidRow(
           shinydashboard::box(
-            title = "Fit index table",
+            title = tr("Fit index table"),
             width = 12,
             htmlOutput(ns("fitsTable")),
             br(),
-            actionLink(ns("showLegendFitIndexTable"), "Show/hide legend"),
+            actionLink(ns("showLegendFitIndexTable"), tr("Show/hide legend")),
             conditionalPanel("input.showLegendFitIndexTable % 2 == 1",
                              htmlOutput(ns("fitsTableLegend")),
                              ns = ns))),
 
         fluidRow(
           shinydashboard::box(
-            title = HTML("&chi;&sup2;-comparison table:"),
+            title = HTML(tr("&chi;&sup2;-comparison table:")),
             width = 12,
             htmlOutput(ns("combCompTable")),
             br(),
-            actionLink(ns("showLegendCombCompTable"), "Show/hide legend"),
+            actionLink(ns("showLegendCombCompTable"), tr("Show/hide legend")),
             conditionalPanel("input.showLegendCombCompTable % 2 == 1",
                              htmlOutput(ns("combCompTableLegend")),
                              ns = ns))),
 
         fluidRow(
           shinydashboard::box(
-            title = "AIC/BIC-comparison table:",
+            title = tr("AIC/BIC-comparison table:"),
             width = 12,
             htmlOutput(ns("infCompTable")),
-            actionLink(ns("showLegendInfCompTable"), "Show/hide legend"),
+            actionLink(ns("showLegendInfCompTable"), tr("Show/hide legend")),
             conditionalPanel("input.showLegendInfCompTable % 2 == 1",
                              htmlOutput(ns("infCompTableLegend")),
                              ns = ns)))
@@ -388,9 +388,11 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
             x = .data$labelxs,
             y = .data$labelys,
 
+            # Plotmath text: parse = TRUE below means a "~" here is read as a space, not a
+            # literal tilde, so a German translation must use "~" the same way.
             label = ifelse(
               is.na(.data$chisq),
-              yes = "No~Comparison",
+              yes = tr("No~Comparison"),
               no = sprintf(
                 "'%s-'*Delta*chi^2==%.3f*','~Delta*df==%i*','~p%s",
                 fit()$estimatorName, # %s
@@ -477,7 +479,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       paste0(
         "<table align = \"center\", width = \"100%\"> <tr><td>
           <table align = \"center\"> <tr><td>
-            <h5>AIC:</h5>",
+            <h5>", tr("AIC:"), "</h5>",
 
         makeKable(compMatrices()$aic, bold_cols = 1),
 
@@ -486,7 +488,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       <td>&nbsp;</td>
       <td>
         <table align = \"center\"> <tr><td>
-          <h5>BIC:</h5>",
+          <h5>", tr("BIC:"), "</h5>",
 
         makeKable(compMatrices()$bic, bold_cols = 1),
 
@@ -529,7 +531,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       do.call(
         shinydashboard::tabBox,
         c(list(id = ns("parTabsetTab"),
-               title = "Estimated parameters",
+               title = tr("Estimated parameters"),
                width = 12),
           unname(panels)))
     })
@@ -542,32 +544,34 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
           sidebarLayout(
 
             sidebarPanel(
-              h4("Download Predicted Factor Scores as CSV"),
+              h4(tr("Download Predicted Factor Scores as CSV")),
 
               textInput(
                 ns(paste0(thisModel, "Filename")),
-                "Filename:",
+                tr("Filename:"),
                 sprintf("%s_%s_factorscores.csv", fit()$dataName, thisModel)),
 
               hr(),
 
               radioButtons(
                 ns(paste0(thisModel, "Sep")),
-                "Separator",
-                choices = c(Comma = ",", Semicolon = ";", Tab = "\t"),
+                tr("Separator"),
+                choiceNames = list(tr("Comma"), tr("Semicolon"), tr("Tab")),
+                choiceValues = c(",", ";", "\t"),
                 selected = ","),
 
               radioButtons(
                 ns(paste0(thisModel, "Dec")),
-                "Decimal Separator",
-                choices = c(Comma = ",", Dot = "."),
+                tr("Decimal Separator"),
+                choiceNames = list(tr("Comma"), tr("Dot")),
+                choiceValues = c(",", "."),
                 selected = "."),
 
               hr(),
 
               downloadButton(
                 ns(paste0(thisModel, "ScoresDownload")),
-                "Download Factor Scores") %>%
+                tr("Download Factor Scores")) %>%
 
                 div(align = "center"),
 
@@ -575,7 +579,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
             ), # sidebarPanel
 
             mainPanel(
-              h4("Data Overview"),
+              h4(tr("Data Overview")),
               DT::dataTableOutput(ns(paste0(thisModel, "Scores"))))
 
           ) # sidebarLayout
@@ -584,7 +588,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       do.call(
         shinydashboard::tabBox,
         c(list(id = ns("fsTabsetTab"),
-               title = HTML("Predicted factor scores (&eta;&#x302;)"),
+               title = HTML(tr("Predicted factor scores (&eta;&#x302;)")),
                width = 12),
           unname(panels)))
     })
@@ -594,13 +598,13 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
         fit()$goodModels,
         function(thisModel) tabPanel(
           title = HTML(modelsLong[thisModel]),
-          h5("The following R code can be used to fit this model with lavaan:"),
+          h5(tr("The following R code can be used to fit this model with lavaan:")),
           verbatimTextOutput(ns(paste0(thisModel, "Code")))))
 
       do.call(
         shinydashboard::tabBox,
         c(list(id = ns("mcTabsetTab"),
-               title = "Model code",
+               title = tr("Model code"),
                width = 12),
           unname(panels)))
     })
@@ -636,7 +640,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
         if (!isFALSE(fit$groupName)) {
           for (i in 1:thisModelsNgroups) {
 
-            groupRowHeaders <- sprintf("Group: %s", fittedModel@Data@group.label)
+            groupRowHeaders <- sprintf(tr("Group: %s"), fittedModel@Data@group.label)
 
             parTableWithCIs <- kableExtra::group_rows(
               parTableWithCIs,

@@ -29,13 +29,13 @@ sidebarGroups <- function(stage, doMg) {
   ## ---- Always shown: the first two steps. ----
   dataAndSubsetEntries <- list(
     shinydashboard::menuItem(
-      "1. Data selection",
+      tr("1. Data selection"),
       tabName = "dataSelectionTab",
       icon = icon("database")))
 
   if (atLeastStage(stage, "subset")) {
     dataAndSubsetEntries[[2]] <- shinydashboard::menuItem(
-      "2. Subset selection",
+      tr("2. Subset selection"),
       tabName = "subsetSelectionTab",
       icon = icon("table"),
       selected = stage == "subset")
@@ -47,16 +47,16 @@ sidebarGroups <- function(stage, doMg) {
   if (atLeastStage(stage, "statistics")) {
 
     blocks[[length(blocks) + 1]] <- list(shinydashboard::menuItem(
-      "3. Statistics",
-      shinydashboard::menuSubItem("Descriptive Statistics", tabName = "statisticsTab",
+      tr("3. Statistics"),
+      shinydashboard::menuSubItem(tr("Descriptive Statistics"), tabName = "statisticsTab",
                                   selected = stage == "statistics"),
-      shinydashboard::menuSubItem("Correlational Analysis", tabName = "corrTab"),
-      shinydashboard::menuSubItem("Test on Multivariate Normality", tabName = "mvnTab"),
+      shinydashboard::menuSubItem(tr("Correlational Analysis"), tabName = "corrTab"),
+      shinydashboard::menuSubItem(tr("Test on Multivariate Normality"), tabName = "mvnTab"),
       icon = icon("chart-bar"),
       startExpanded = TRUE))
 
     blocks[[length(blocks) + 1]] <- list(shinydashboard::menuItem(
-      "4. Testing Parameters",
+      tr("4. Testing Parameters"),
       tabName = "testParamTab",
       icon = icon("cog")))
   }
@@ -68,10 +68,10 @@ sidebarGroups <- function(stage, doMg) {
     # tab. Listed here as heading / single-group tab / multigroup tab so the loop below
     # can build them all the same way.
     resultsSections <- list(
-      c("5. Model Comparison Tests", "modelTests", "modelTestsMg"),
-      c("6. Parameter Tables",       "parTables",  "parTablesMg"),
-      c("7. Factor Scores",          "facScores",  "facScoresMg"),
-      c("8. Model Code",             "modelCode",  "modelCodeMg"))
+      c(tr("5. Model Comparison Tests"), "modelTests", "modelTestsMg"),
+      c(tr("6. Parameter Tables"),       "parTables",  "parTablesMg"),
+      c(tr("7. Factor Scores"),          "facScores",  "facScoresMg"),
+      c(tr("8. Model Code"),             "modelCode",  "modelCodeMg"))
 
     resultsBlock <- list()
 
@@ -87,12 +87,12 @@ sidebarGroups <- function(stage, doMg) {
       isFirstSection <- sectionNumber == 1
 
       subItems <- list(
-        shinydashboard::menuSubItem("Single Group",
+        shinydashboard::menuSubItem(tr("Single Group"),
                                     tabName = singleGroupTab,
                                     selected = isFirstSection))
 
       if (doMg) {
-        subItems[[2]] <- shinydashboard::menuSubItem("Multigroup",
+        subItems[[2]] <- shinydashboard::menuSubItem(tr("Multigroup"),
                                                      tabName = multigroupTab)
       }
 
@@ -108,7 +108,7 @@ sidebarGroups <- function(stage, doMg) {
 
   ## ---- Always last. ----
   blocks[[length(blocks) + 1]] <- list(shinydashboard::menuItem(
-    "Reload",
+    tr("Reload"),
     tabName = "reloadTab",
     icon = icon("sync"),
     selected = FALSE))

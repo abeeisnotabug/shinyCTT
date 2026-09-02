@@ -2,16 +2,22 @@
 % Please edit documentation in R/shinyCTTApp.R
 \name{shinyCTTApp}
 \alias{shinyCTTApp}
-\title{A wrapper function for the Shiny App. This is the function that should be called to run the app. It has no arguments.}
+\title{A wrapper function for the Shiny App. This is the function that should be called to run the app.}
 \usage{
-shinyCTTApp()
+shinyCTTApp(language = "en")
+}
+\arguments{
+\item{language}{Which language to show the app in: "en" (the default) or "de". Stored as
+options(shinyCTT.language = language) before the app starts, which every screen reads
+through tr() (see R/translations.R).}
 }
 \value{
 None. This function is called for its side effect of launching the Shiny app.
 }
 \description{
-A wrapper function for the Shiny App. This is the function that should be called to run the app. It has no arguments.
+A wrapper function for the Shiny App. This is the function that should be called to run the app.
 }
 \examples{
 if (interactive()) shinyCTTApp()
+if (interactive()) shinyCTTApp(language = "de")
 }

@@ -92,7 +92,7 @@ makeCorrTableWithCIs <- function(
   corrTableComb[seq(2, nrow(corrTableComb), 2), ] <- corrTableCIs
 
   colnames(corrTableComb) <- itemCols
-  rownames(corrTableComb) <- c(rbind(itemCols, "CI"))
+  rownames(corrTableComb) <- c(rbind(itemCols, tr("CI")))
 
   corrTableComb
 }
@@ -128,7 +128,7 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
 
   rmseaD <- hierTable[-1, "RMSEA"]
   hierTable[-1, "RMSEA"] <- kableExtra::cell_spec(
-    ifelse(is.na(rmseaD), "NA", formatBounded(rmseaD)),
+    ifelse(is.na(rmseaD), tr("NA"), formatBounded(rmseaD)),
     color = textColor,
     background = ifelse(is.na(rmseaD), neutrColor, ifelse(rmseaD < 0.05, goodColor, badColor)))
 
@@ -158,10 +158,10 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, goodColor, bad
     color = textColor,
     background = ifelse(bicRounded == min(bicRounded), goodColor, badColor))
 
-  names(hierTable) <- c("&Delta;df", paste0(estimatorName, "-&Delta;&chi;&sup2;"), "p",
-                        "RMSEA<sub>D</sub>",
-                        "CFI",
-                        "AIC", "BIC")
+  names(hierTable) <- c(tr("&Delta;df"), paste0(estimatorName, tr("-&Delta;&chi;&sup2;")), tr("p"),
+                        tr("RMSEA<sub>D</sub>"),
+                        tr("CFI"),
+                        tr("AIC"), tr("BIC"))
 
   rownames(hierTable) <- modelsAbbrev[rownames(hierTable)]
 
@@ -234,10 +234,10 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, goodColor, ba
     fitsTable[, c("df", "chisq", "pvalue",
                   "rmsea", "rmsea.ci", "rmsea.pvalue", "rmsea.notclose.pvalue",
                   "cfi", "srmr")],
-    col.names = c("df", paste0(estimatorName, "-&chi;&sup2;"), "p",
-                  "RMSEA", sprintf("%g%%-CI", 100 * rmseaCiLvl),
-                  "p<sub>H0:RMSEA<=.05</sub>", "p<sub>H0:RMSEA>=.08</sub>",
-                  "CFI", "SRMR"),
+    col.names = c(tr("df"), paste0(estimatorName, tr("-&chi;&sup2;")), tr("p"),
+                  tr("RMSEA"), sprintf(tr("%g%%-CI"), 100 * rmseaCiLvl),
+                  tr("p<sub>H0:RMSEA<=.05</sub>"), tr("p<sub>H0:RMSEA>=.08</sub>"),
+                  tr("CFI"), tr("SRMR")),
     bold_cols = 1) %>%
 
     kableExtra::column_spec(
@@ -246,34 +246,40 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, goodColor, ba
 }
 
 makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, Ngroups) {
-  SECIestName <- paste0(c("SE", "CI"), "<sub>", estimatorName, "</sub>")
+  SECIestName <- paste0(c(tr("SE"), tr("CI")), "<sub>", estimatorName, "</sub>")
+
+  # The header spans a colspan count per group, so the label has to be attached with
+  # names() rather than c(name = value): tr() is a function call, and a call cannot stand
+  # on the left of "=" inside c().
+  parGroupHeader <- c(1, 7, 4, 4, 4)
+  names(parGroupHeader) <- c(
+    " ",
+    tr("Discrimination Parameters (Factor Loadings)"),
+    tr("Easiness Parameters (Intercepts)"),
+    tr("Variances"),
+    tr("Reliabilities"))
 
   makeKable(
     extractParameters(
       fitObject,
       alpha = sigLvl),
     col.names = c(
-      "Item",
-      "&lambda;<sub>i</sub>",
-      "Est.", SECIestName,
-      "Std. Est.", SECIestName,
-      "&alpha;<sub>i</sub>",
-      "Est.", SECIestName,
-      "&sigma;&sup2;<sub>&epsilon;<sub>i</sub></sub>",
-      "Est.", SECIestName,
-      "R<sub>i</sub>",
-      "Est.", SECIestName),
+      tr("Item"),
+      tr("&lambda;<sub>i</sub>"),
+      tr("Est."), SECIestName,
+      tr("Std. Est."), SECIestName,
+      tr("&alpha;<sub>i</sub>"),
+      tr("Est."), SECIestName,
+      tr("&sigma;&sup2;<sub>&epsilon;<sub>i</sub></sub>"),
+      tr("Est."), SECIestName,
+      tr("R<sub>i</sub>"),
+      tr("Est."), SECIestName),
     bold_cols = 1) %>%
 
     kableExtra::row_spec(
       row = (length(itemCols) + 1) * 1:Ngroups,
       bold = TRUE) %>%
-    kableExtra::add_header_above(
-      header =c(" ",
-                "Discrimination Parameters (Factor Loadings)" = 7,
-                "Easiness Parameters (Intercepts)" = 4,
-                "Variances" = 4,
-                "Reliabilities" = 4))
+    kableExtra::add_header_above(header = parGroupHeader)
 }
 
 ## Builds the legend under one of the tables.
@@ -288,200 +294,200 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, goodColor, badColor, 
         whichLegend,
 
         "corrTable" = cbind(
-          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(tr("Legend:"), bold = TRUE),
           kableExtra::cell_spec(
-            "Sig. pos.",
+            tr("Sig. pos."),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            "Sig. neg.",
+            tr("Sig. neg."),
             color = textColor,
             background = badColor),
           kableExtra::cell_spec(
-            "Not sig.",
+            tr("Not sig."),
             color = textColor,
             background = neutrColor)),
 
         "hierTables" = cbind(
-          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(tr("Legend:"), bold = TRUE),
           kableExtra::cell_spec(
-            paste(c("&Delta;df", paste0(estimatorName, "-&Delta;&chi;&sup2;"), "p:"),
+            paste(c(tr("&Delta;df"), paste0(estimatorName, tr("-&Delta;&chi;&sup2;")), tr("p:")),
                   collapse = ", "),
             escape = FALSE),
           kableExtra::cell_spec(
-            paste0("p >= ", formatBounded(sigLvl)),
+            paste0(tr("p >= "), formatBounded(sigLvl)),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            paste0("p < ", formatBounded(sigLvl)),
+            paste0(tr("p < "), formatBounded(sigLvl)),
             color = textColor,
             background = badColor),
 
           kableExtra::cell_spec(
-            "RMSEA<sub>D</sub>",
+            tr("RMSEA<sub>D</sub>"),
             escape = FALSE),
           kableExtra::cell_spec(
-            "< .05",
+            tr("< .05"),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            ">= .05",
+            tr(">= .05"),
             color = textColor,
             background = badColor),
           kableExtra::cell_spec(
-            "NA (FIML, lavaan >= 0.6-21)",
+            tr("NA (FIML, lavaan >= 0.6-21)"),
             color = textColor,
             background = neutrColor),
 
-          kableExtra::cell_spec("CFI:"),
+          kableExtra::cell_spec(tr("CFI:")),
           kableExtra::cell_spec(
-            ">= .97",
+            tr(">= .97"),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            ">= .95",
+            tr(">= .95"),
             color = textColor,
             background = neutrColor),
           kableExtra::cell_spec(
-            "< .95",
+            tr("< .95"),
             color = textColor,
             background = badColor),
 
-          kableExtra::cell_spec("AIC, BIC:"),
+          kableExtra::cell_spec(tr("AIC, BIC:")),
           kableExtra::cell_spec(
-            "min.",
+            tr("min."),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            "else",
+            tr("else"),
             color = textColor,
             background = badColor)),
 
         "fitIndexTable" = rbind(
           cbind(
-            kableExtra::cell_spec("Legend:", bold = TRUE),
+            kableExtra::cell_spec(tr("Legend:"), bold = TRUE),
             kableExtra::cell_spec(
-              paste(c("&Delta;df", paste0(estimatorName, "-&Delta;&chi;&sup2;"), "p:"),
+              paste(c(tr("&Delta;df"), paste0(estimatorName, tr("-&Delta;&chi;&sup2;")), tr("p:")),
                     collapse = ", "),
               escape = FALSE),
             kableExtra::cell_spec(
-              paste0("p >= ", formatBounded(sigLvl)),
+              paste0(tr("p >= "), formatBounded(sigLvl)),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              paste0("p < ", formatBounded(sigLvl)),
+              paste0(tr("p < "), formatBounded(sigLvl)),
               color = textColor,
               background = badColor),
             kableExtra::cell_spec(""), kableExtra::cell_spec(""), kableExtra::cell_spec(""), kableExtra::cell_spec(""),
-            kableExtra::cell_spec("CFI"),
+            kableExtra::cell_spec(tr("CFI")),
             kableExtra::cell_spec(
-              ">= .97",
+              tr(">= .97"),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              ">= .95",
+              tr(">= .95"),
               color = textColor,
               background = neutrColor),
             kableExtra::cell_spec(
-              "< .95",
+              tr("< .95"),
               color = textColor,
               background = badColor),
 
-            kableExtra::cell_spec("SRMR"),
+            kableExtra::cell_spec(tr("SRMR")),
             kableExtra::cell_spec(
-              "< .05",
+              tr("< .05"),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              ">= .05",
+              tr(">= .05"),
               color = textColor,
               background = badColor)),
 
           cbind(
             kableExtra::cell_spec(""),
-            kableExtra::cell_spec("RMSEA"),
+            kableExtra::cell_spec(tr("RMSEA")),
             kableExtra::cell_spec(
-              "< .05",
+              tr("< .05"),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              ">= .05",
+              tr(">= .05"),
               color = textColor,
               background = badColor),
 
-            kableExtra::cell_spec(sprintf("%g%%-CI", 100 * rmseaCiLvl)),
+            kableExtra::cell_spec(sprintf(tr("%g%%-CI"), 100 * rmseaCiLvl)),
             kableExtra::cell_spec(
-              "< .05",
+              tr("< .05"),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              "> .05",
+              tr("> .05"),
               color = textColor,
               background = badColor),
             kableExtra::cell_spec(
-              "&ni; .05",
+              tr("&ni; .05"),
               escape = FALSE,
               color = textColor,
               background = neutrColor),
 
             kableExtra::cell_spec(
-              "p<sub>.05</sub>",
+              tr("p<sub>.05</sub>"),
               escape = FALSE),
             kableExtra::cell_spec(
-              paste0(">= ", formatBounded(sigLvl)),
+              paste0(tr(">= "), formatBounded(sigLvl)),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              paste0("< ", formatBounded(sigLvl)),
+              paste0(tr("< "), formatBounded(sigLvl)),
               color = textColor,
               background = badColor),
 
             kableExtra::cell_spec(
-              "p<sub>.08</sub>",
+              tr("p<sub>.08</sub>"),
               escape = FALSE),
             kableExtra::cell_spec(
-              paste0("< ", formatBounded(sigLvl)),
+              paste0(tr("< "), formatBounded(sigLvl)),
               color = textColor,
               background = goodColor),
             kableExtra::cell_spec(
-              paste0(">= ", formatBounded(sigLvl)),
+              paste0(tr(">= "), formatBounded(sigLvl)),
               color = textColor,
               background = badColor),
             kableExtra::cell_spec(""))),
 
         "combCompTable" = cbind(
-          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(tr("Legend:"), bold = TRUE),
           kableExtra::cell_spec(
-            paste0("&Delta;df, ", estimatorName, "-&Delta;&chi;&sup2;:"),
+            paste0(tr("&Delta;df, "), estimatorName, tr("-&Delta;&chi;&sup2;:")),
             escape = FALSE),
           kableExtra::cell_spec(
-            paste0("p >= ", formatBounded(sigLvl)),
+            paste0(tr("p >= "), formatBounded(sigLvl)),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            paste0("p < ", formatBounded(sigLvl)),
+            paste0(tr("p < "), formatBounded(sigLvl)),
             color = textColor,
             background = badColor),
           kableExtra::cell_spec(
-            "* / ** / *** if p < .05 / .01 / .001",
+            tr("* / ** / *** if p < .05 / .01 / .001"),
             color = textColor,
             background = neutrColor)),
 
         "infCompTable" = cbind(
-          kableExtra::cell_spec("Legend:", bold = TRUE),
+          kableExtra::cell_spec(tr("Legend:"), bold = TRUE),
           kableExtra::cell_spec(
-            "AIC/BIC",
+            tr("AIC/BIC"),
             escape = FALSE),
           kableExtra::cell_spec(
-            "< 0",
+            tr("< 0"),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            "> 0",
+            tr("> 0"),
             color = textColor,
             background = badColor),
           kableExtra::cell_spec(
-            "= 0",
+            tr("= 0"),
             color = textColor,
             background = neutrColor)),
 

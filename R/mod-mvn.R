@@ -13,10 +13,10 @@ mvnUI <- function(id) {
 
       shinydashboard::box(
         width = NULL,
-        title = "Normality tests:",
+        title = tr("Normality tests:"),
         numericInput(
           ns("mvnSL"),
-          "Enter the significance level for the tests:",
+          tr("Enter the significance level for the tests:"),
           value = 0.05,
           min = 0.001,
           max = 1,
@@ -24,12 +24,12 @@ mvnUI <- function(id) {
 
       shinydashboard::box(
         width = NULL,
-        title = "Test on multivariate normality:",
+        title = tr("Test on multivariate normality:"),
         htmlOutput(ns("comment"))),
 
       shinydashboard::box(
         width = NULL,
-        title = "Tests on univariate normality:",
+        title = tr("Tests on univariate normality:"),
         htmlOutput(ns("table")))
     ), # column
 
@@ -37,8 +37,8 @@ mvnUI <- function(id) {
       width = 8,
       fluidRow(htmlOutput(ns("plotBox"))),
       fluidRow(shinydashboard::infoBox(
-        title = "Hint:",
-        subtitle = "For more extensive analyses on multivariate normality, load() the MVN package and open its shiny app via run_mvn_app()!",
+        title = tr("Hint:"),
+        subtitle = tr("For more extensive analyses on multivariate normality, load() the MVN package and open its shiny app via run_mvn_app()!"),
         icon = icon("lightbulb"),
         color = "green",
         width = 12,
@@ -106,29 +106,32 @@ mvnServer <- function(id, data, itemCols) {
         mvnMV$Signif. <- ifelse(mvnMV$p < input$mvnSL, "*", "")
         mvnMV$p <- ifelse(mvnMV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnMV$p, 3)))
 
-        if ("*" %in% mvnMV$Signif.) {
+        # Read before the columns are renamed for display below - once translated, the
+        # column is no longer reliably called "Signif.".
+        anySignif <- "*" %in% mvnMV$Signif.
+
+        # The data.frame's own column names become the table's header row, so they are
+        # translated here rather than at data.frame(Test = ..., ...) above - a function
+        # call cannot stand on the left of "=" in an argument list.
+        colnames(mvnMV) <- c(tr("Test"), tr("Statistic"), tr("p"), tr("Signif."))
+
+        if (anySignif) {
 
           tagList(
-            sprintf("At least one of the hypotheses that Mardia's Skewness statistic
-                      or Mardias' Kurtosis statistic matches one of a
-                      normal distribution has to be discarded on a significance
-                      level of %s. Test result:", input$mvnSL),
+            sprintf(tr("At least one of the hypotheses that Mardia's Skewness statistic or Mardias' Kurtosis statistic matches one of a normal distribution has to be discarded on a significance level of %s. Test result:"), input$mvnSL),
             HTML(makeKable(mvnMV, bootstrap_options = "basic")),
-            HTML("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator."))
+            HTML(tr("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator.")))
 
         } else {
 
           tagList(
-            sprintf("The hypotheses that Mardia's Skewness statistic
-                      and Mardias' Kurtosis statistic match those of a
-                      normal distribution can be maintained on a significance
-                      level of %s. Test result:", input$mvnSL),
+            sprintf(tr("The hypotheses that Mardia's Skewness statistic and Mardias' Kurtosis statistic match those of a normal distribution can be maintained on a significance level of %s. Test result:"), input$mvnSL),
             HTML(makeKable(mvnMV, bootstrap_options = "basic")),
-            HTML("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
+            HTML(tr("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator.")))
         }
       } ### if it did not ----
       else {
-        paste("There was an ERROR/WARNING:", mvnResult()$message) %>%
+        paste(tr("There was an ERROR/WARNING:"), mvnResult()$message) %>%
           HTML() %>%
           div(style = "color:red")
       }
@@ -151,10 +154,15 @@ mvnServer <- function(id, data, itemCols) {
         mvnUV$Signif. <- ifelse(mvnUV$p < input$mvnSL, "*", "")
         mvnUV$p <- ifelse(mvnUV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnUV$p, 3)))
 
+        # The data.frame's own column names become the table's header row, so they are
+        # translated here rather than at data.frame(Test = ..., ...) above - a function
+        # call cannot stand on the left of "=" in an argument list.
+        colnames(mvnUV) <- c(tr("Test"), tr("Item"), tr("Statistic"), tr("p"), tr("Signif."))
+
         HTML(makeKable(mvnUV, bootstrap_options = "basic"))
 
       } else {
-        paste("There was an ERROR/WARNING:", mvnResult()$message) %>%
+        paste(tr("There was an ERROR/WARNING:"), mvnResult()$message) %>%
           HTML() %>%
           div(style = "color:red")
       }
@@ -165,15 +173,18 @@ mvnServer <- function(id, data, itemCols) {
 
       shinydashboard::box(
         width = 12,
-        title = "Multivariate plot:",
+        title = tr("Multivariate plot:"),
 
         fluidRow(
 
           column(
             width = 4,
+            # The three plot type labels are a selectInput()'s named choices, and
+            # input$mvnPlotType is compared against their values below, so they are left
+            # untranslated - see the translation report.
             selectInput(
               ns("mvnPlotType"),
-              "Choose the type of Plot:",
+              tr("Choose the type of Plot:"),
               choices = c(
                 "Q-Q Plot (all items)" = "qq",
                 "Perspective Plot" = "persp",
@@ -184,7 +195,7 @@ mvnServer <- function(id, data, itemCols) {
               "input.mvnPlotType != 'qq'",
               selectInput(
                 ns("mvnItemX"),
-                "Select item on the abscissa:",
+                tr("Select item on the abscissa:"),
                 itemCols()),
               ns = ns)),
           column(
@@ -193,7 +204,7 @@ mvnServer <- function(id, data, itemCols) {
               "input.mvnPlotType != 'qq'",
               selectInput(
                 ns("mvnItemY"),
-                "Select item on the ordinate:",
+                tr("Select item on the ordinate:"),
                 itemCols(),
                 selected = itemCols()[2]),
               ns = ns))

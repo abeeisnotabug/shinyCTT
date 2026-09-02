@@ -47,7 +47,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
                                               bold_cols = 1)
 
         groupRowHeaders <- sprintf(
-          "Group: %s (n = %i)",
+          tr("Group: %s (n = %i)"),
           groups,
           c(table(data()[, groupCol()]))[as.character(groups)])
 
@@ -62,16 +62,16 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # output if groups
         shinydashboard::tabBox(
           width = 12,
-          title = "Covariance matrix:",
+          title = tr("Covariance matrix:"),
           side = "right",
 
           tabPanel(
-            title = "Overall",
+            title = tr("Overall"),
             makeKable(table, bold_cols = 1) %>%
               HTML()),
 
           tabPanel(
-            "Group-wise",
+            tr("Group-wise"),
             HTML(mgCovMatTable))
 
         ) # tabBox
@@ -82,7 +82,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # output if NO groups
         shinydashboard::box(
           width = 12,
-          title = "Covariance matrix:",
+          title = tr("Covariance matrix:"),
 
           makeKable(table, bold_cols = 1) %>%
             HTML()

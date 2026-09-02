@@ -33,13 +33,13 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
           width = 4,
           selectInput(
             ns("scatterItemX"),
-            "Select item on the abscissa:",
+            tr("Select item on the abscissa:"),
             choices = itemCols())),
         column(
           width = 4,
           selectInput(
             ns("scatterItemY"),
-            "Select item on the ordinate:",
+            tr("Select item on the ordinate:"),
             choices = itemCols(),
             selected = itemCols()[2])))
 
@@ -47,7 +47,7 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
       if (!isTRUE(hasGroups()))
         return(
           shinydashboard::box(
-            title = "Scatter plot:",
+            title = tr("Scatter plot:"),
             width = NULL,
 
             overallContents,
@@ -57,13 +57,13 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
 
       ### the tabBox with one ----
       shinydashboard::tabBox(
-        title = "Scatter plot:",
+        title = tr("Scatter plot:"),
         width = NULL,
         side = "right",
 
         #### box tabBox overall panel ----
         tabPanel(
-          title = "Overall",
+          title = tr("Overall"),
 
           overallContents,
 
@@ -71,7 +71,7 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
 
         #### box tabBox group-wise panel ----
         tabPanel(
-          title = "Group-wise",
+          title = tr("Group-wise"),
 
           fluidRow(
 
@@ -79,20 +79,20 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
               width = 4,
               selectInput(
                 ns("scatterItemXGroup"),
-                "Select item on the abscissa:",
+                tr("Select item on the abscissa:"),
                 choices = itemCols())),
             column(
               width = 4,
               selectInput(
                 ns("scatterItemYGroup"),
-                "Select item on the ordinate:",
+                tr("Select item on the ordinate:"),
                 choices = itemCols(),
                 selected = itemCols()[2])),
             column(
               width = 4,
               checkboxGroupInput(
                 ns("scatterGroupGroups"),
-                "Select the groups to include:",
+                tr("Select the groups to include:"),
                 choices = unique(data()[, groupCol()]),
                 selected = unique(data()[, groupCol()]),
                 inline = TRUE))),

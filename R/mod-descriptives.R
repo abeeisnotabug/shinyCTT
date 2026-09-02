@@ -34,8 +34,13 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         }
       )) # t(apply(
 
+      # These column names become the table's header row, so they go through tr() here
+      # rather than inside the c() above - a function call cannot stand on the left of "="
+      # inside c().
+      colnames(table) <- c(tr("Mean"), tr("Sd"), tr("Skew"), tr("Excess"))
+
       nHeader <- c(1, 4)
-      names(nHeader) <- c(" ", sprintf("n<sub>all</sub> = %i", nrow(data())))
+      names(nHeader) <- c(" ", sprintf(tr("n<sub>all</sub> = %i"), nrow(data())))
 
       overallDescrTable <- makeKable(table, bold_cols = 1) %>%
         kableExtra::add_header_above(header = nHeader, escape = FALSE) %>%
@@ -48,7 +53,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         mgDescrTableList <- lapply(
           groups,
           function(group) {
-            t(apply(
+            groupTable <- t(apply(
                 subset(
                   data()[, itemCols()],
                   data()[, groupCol()] == group),
@@ -59,6 +64,11 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
                     Excess = moments::kurtosis(col, na.rm = TRUE) - 3)
                 }
             )) # t(apply(
+
+            # Same reasoning as the overall table above: the column names become the
+            # header row, so they are translated after the fact.
+            colnames(groupTable) <- c(tr("Mean"), tr("SD"), tr("Skew"), tr("Excess"))
+            groupTable
           }
         ) # lapply
 
@@ -66,7 +76,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         names(descrGroupHeader) <- c(
           " ",
           sprintf(
-            "Group: %s (n<sub>%s</sub> = %i)",
+            tr("Group: %s (n<sub>%s</sub> = %i)"),
             groups,
             groups,
             c(table(data()[, groupCol()]))[as.character(groups)]))
@@ -92,15 +102,15 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # output if groups
         shinydashboard::tabBox(
           width = 6,
-          title = "Descriptive statistics:",
+          title = tr("Descriptive statistics:"),
           side = "right",
 
           tabPanel(
-            "Overall",
+            tr("Overall"),
             overallDescrTable),
 
           tabPanel(
-            "Group-wise",
+            tr("Group-wise"),
             tagList(do.call(HTML, mgDescrTableListTagged)))
 
         ) # tabBox
@@ -110,7 +120,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
         shinydashboard::box(
           width = 6,
-          title = "Descriptive statistics:",
+          title = tr("Descriptive statistics:"),
           overallDescrTable)
       }
     })

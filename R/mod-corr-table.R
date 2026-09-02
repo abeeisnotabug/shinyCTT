@@ -8,17 +8,19 @@ corrTableControlsUI <- function(id) {
 
   shinydashboard::box(
     width = NULL,
-    title = "Correlation table with confidence intervals:",
+    title = tr("Correlation table with confidence intervals:"),
     shinyjs::hidden(
       radioButtons(
         ns("corrTabNA"),
-        "Choose how to handle missing values:",
-        choices = c("Use pairwise complete observations" = "pairwise.complete.obs",
-                    "Use only complete observations" = "complete.obs"),
+        tr("Choose how to handle missing values:"),
+        choiceNames = list(
+          tr("Use pairwise complete observations"),
+          tr("Use only complete observations")),
+        choiceValues = c("pairwise.complete.obs", "complete.obs"),
         selected = "pairwise.complete.obs")),
     numericInput(
       ns("corrTabSL"),
-      "Enter the significance level for the correlation tests:",
+      tr("Enter the significance level for the correlation tests:"),
       value = 0.05,
       min = 0.001,
       max = 1,
@@ -76,17 +78,17 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
         cbind(
           kableExtra::cell_spec(
-            "Legend:"),
+            tr("Legend:")),
           kableExtra::cell_spec(
-            "Sig. pos.",
+            tr("Sig. pos."),
             color = textColor,
             background = goodColor),
           kableExtra::cell_spec(
-            "Sig. neg.",
+            tr("Sig. neg."),
             color = textColor,
             background = badColor),
           kableExtra::cell_spec(
-            "Not sig.",
+            tr("Not sig."),
             color = textColor,
             background = neutrColor)) %>%
 
@@ -116,7 +118,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
       } ## box singleCorrTable if errors: ----
       else {
         singleCorrTable <-
-          paste("There was an ERROR/WARNING:", corrTableWithCIsRaw$test) %>%
+          paste(tr("There was an ERROR/WARNING:"), corrTableWithCIsRaw$test) %>%
           HTML() %>%
           div(style = "color:red")
       }
@@ -159,7 +161,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
           bold_cols = 1)
 
         # add group headers
-        groupRowHeaders <- sprintf("Group: %s", groups)
+        groupRowHeaders <- sprintf(tr("Group: %s"), groups)
 
         for (i in 1:length(groups))
           mgCorrTable <- mgCorrTable %>%
@@ -172,17 +174,17 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
         # assemble in tabBox
         shinydashboard::tabBox(
           width = 12,
-          title = "Correlation table with confidence intervals:",
+          title = tr("Correlation table with confidence intervals:"),
           side = "right",
 
           tabPanel(
-              "Overall",
+              tr("Overall"),
               singleCorrTable,
               br(),
               HTML(makeLegend("corrTable", estimatorName(), sigLvl(),
                               goodColor, badColor, neutrColor, textColor))),
           tabPanel(
-              "Group-wise",
+              tr("Group-wise"),
               HTML(mgCorrTable),
               br(),
               HTML(makeLegend("corrTable", estimatorName(), sigLvl(),
@@ -195,7 +197,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
         shinydashboard::box(
             width = 12,
-            title = "Correlation table with confidence intervals:",
+            title = tr("Correlation table with confidence intervals:"),
 
             singleCorrTable,
             br(),
