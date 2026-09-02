@@ -221,7 +221,19 @@ dataSourceServer <- function(id, notifications, frozen) {
     # source empties raw(), and the table has to empty with it instead of going on showing
     # the last data set that could be read.
     output$dataOverview <- DT::renderDataTable({
-      if (is.null(raw())) return(NULL)
+
+      # No data -> one empty column, which draws as an empty table. Neither NULL nor a
+      # data.frame() with no columns at all will do: both reach the browser with nothing
+      # for DT to draw, and the error DT throws there stops shiny applying the rest of
+      # that batch of outputs - the workspace chooser among them (see GOTCHAS.md).
+      # dom = "t" leaves out the search box, the length menu and the row count, so an
+      # empty preview is a blank panel rather than the furniture of a table with nothing
+      # in it.
+      if (is.null(raw()))
+        return(DT::datatable(
+          stats::setNames(data.frame(character(0)), " "),
+          rownames = FALSE,
+          options = list(dom = "t")))
 
       raw() %>%
         DT::datatable() %>%
