@@ -120,7 +120,15 @@ ui <- function(request) {
         tags$style(".checkbox-inline {margin: 0 !important;}"),
         tags$style(HTML(".navbar-custom-menu>.navbar-nav>li>.dropdown-menu {width:600px;}")),
         tags$style(".bg-green { background-color: #99CC00 !important; color: #FFFFFF !important; }"),
-        tags$style(".bg-blue { background-color: #003F8A !important; color: #FFFFFF !important; }")),
+        tags$style(".bg-blue { background-color: #003F8A !important; color: #FFFFFF !important; }"),
+
+        # AdminLTE puts white-space: nowrap on an entry in the notification bell, so a long
+        # message was cut off with a horizontal ellipsis. Two of them used to exist twice in
+        # the text file, once with a <br/> in the middle, to work round this - and markup
+        # does not belong in text a translator is handed.
+        tags$style(HTML(
+          ".navbar-nav > .notifications-menu > .dropdown-menu > li .menu > li > a
+             {white-space: normal;}"))),
 
       shinyjs::useShinyjs(),
 
