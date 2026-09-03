@@ -128,7 +128,7 @@ server <- function(input, output, session) {
 
   ## Notifications ----
   output$infoMenu <- shinydashboard::renderMenu({
-    if (any(sapply(notifications$notList, grepl, pattern = "danger"))) {
+    if (any(vapply(notifications$notList, grepl, logical(1), pattern = "danger"))) {
       status <- "danger"
     } else {
       status <- "primary"
@@ -385,8 +385,8 @@ server <- function(input, output, session) {
     doMgRV(isTRUE(input$doMg))
     appStage("results")
 
-    modelsToTest <- models[sapply(models, function(thisModel) input[[thisModel]])]
-    comps <- possComps[sapply(possComps, function(thisComp) input[[thisComp]])]
+    modelsToTest <- models[vapply(models, function(thisModel) input[[thisModel]], logical(1))]
+    comps <- possComps[vapply(possComps, function(thisComp) input[[thisComp]], logical(1))]
 
 
     # TRUE when the user left some of the groups out, so the exported script has to
@@ -455,8 +455,8 @@ server <- function(input, output, session) {
         })
 
       #### warning and error counting and capturing ----
-      errs <- sapply(fittedModelsWarns, inherits, what = "error")
-      warns <- sapply(fittedModelsWarns, function(f) !is.null(attr(f, "shinyCTTwarning")))
+      errs <- vapply(fittedModelsWarns, inherits, logical(1), what = "error")
+      warns <- vapply(fittedModelsWarns, function(f) !is.null(attr(f, "shinyCTTwarning")), logical(1))
 
       # A model that only warns is still usable - its fit was kept above - so only a
       # genuine error excludes it from goodModels. warnModels is purely informational now.

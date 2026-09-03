@@ -127,23 +127,24 @@ dataSourceServer <- function(id, notifications, frozen) {
       # the user would lose the app rather than be told the data set is unusable.
       loadedData <- tryCatch({
 
-        if (input$source == "CSV") {
-          userDataTmp <- utils::read.csv(
+        # The same three names the req() above tests, so input$source is always one of
+        # them by the time this runs.
+        userDataTmp <- switch(
+          input$source,
+          "CSV" = utils::read.csv(
             file = input$CSVFile$datapath,
             header = input$header,
             sep = input$sep,
             quote = input$quote,
-            stringsAsFactors = FALSE)
-        } else if (input$source == "SPSS") {
-          userDataTmp <- haven::read_spss(file = input$SPSSFile$datapath)
-        } else if (input$source == "Workspace") {
-          userDataTmp <- get(input$objectFromWorkspace)
-        }
+            stringsAsFactors = FALSE),
+          "SPSS" = haven::read_spss(file = input$SPSSFile$datapath),
+          "Workspace" = get(input$objectFromWorkspace))
 
-        if (any(sapply(userDataTmp, is.factor))) {
-          userDataTmp[sapply(userDataTmp, is.factor)] <- lapply(
-            userDataTmp[sapply(userDataTmp, is.factor)],
-            as.character)
+        # TRUE for every column that arrived as a factor -> those become plain text.
+        factorColumns <- vapply(userDataTmp, is.factor, logical(1))
+
+        if (any(factorColumns)) {
+          userDataTmp[factorColumns] <- lapply(userDataTmp[factorColumns], as.character)
         }
 
         data.frame(userDataTmp, stringsAsFactors = FALSE)
@@ -175,7 +176,7 @@ dataSourceServer <- function(id, notifications, frozen) {
       notifications$notList$noData <- NULL
 
       ### Test the data for problems ----
-      if (!any(sapply(raw(), is.numeric))) {
+      if (!any(vapply(raw(), is.numeric, logical(1)))) {
         notifications$notList$noNumeric <- shinydashboard::notificationItem(
           text = tr("No numeric columns found"),
           icon = icon("times"),
@@ -238,7 +239,7 @@ dataSourceServer <- function(id, notifications, frozen) {
       raw() %>%
         DT::datatable() %>%
         DT::formatRound(
-          columns = seq_along(raw())[sapply(raw(), is.numeric)],
+          columns = seq_along(raw())[vapply(raw(), is.numeric, logical(1))],
           digits = 3)
     })
 

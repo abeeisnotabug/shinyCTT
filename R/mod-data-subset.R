@@ -116,17 +116,22 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     itemColsRV <- reactiveVal()
     groupColRV <- reactiveVal()
 
+    # The columns the item tick boxes are built from: every numeric column of the chosen
+    # data. Read in three places - the chooser below and the two Select all / Unselect all
+    # observers - which all have to offer the same list.
+    possibleItemColumns <- reactive(
+      colnames(chosenData())[vapply(chosenData(), is.numeric, logical(1))])
+
     ## itemColsChooser ----
     output$itemColsChooser <- renderUI({
-      possibleItemColumns <- colnames(chosenData())[sapply(chosenData(), is.numeric)]
-      itemColsRV(length(possibleItemColumns))
+      itemColsRV(length(possibleItemColumns()))
 
       tagList(
         checkboxGroupInput(
           ns("itemCols"),
           tr("2a. Select the item columns:"),
-          choices = possibleItemColumns,
-          selected = possibleItemColumns,
+          choices = possibleItemColumns(),
+          selected = possibleItemColumns(),
           inline = TRUE),
         fluidRow(actionLink(ns("selectall"), tr("Select all"), style = "margin-left: 15px"),
                  actionLink(ns("deselectall"), tr("Unselect all"), style = "margin-left: 15px")))
@@ -222,28 +227,26 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     observeEvent(input$selectall, {
       # Only act while the user is still choosing items (see GOTCHAS.md).
       if (input$selectall != 0 && !frozen()) {
-        possibleItemColumns <- colnames(chosenData())[sapply(chosenData(), is.numeric)]
-        itemColsRV(length(possibleItemColumns))
+        itemColsRV(length(possibleItemColumns()))
 
         updateCheckboxGroupInput(
           session,
           "itemCols",
           inline = TRUE,
-          choices = possibleItemColumns,
-          selected = possibleItemColumns)
+          choices = possibleItemColumns(),
+          selected = possibleItemColumns())
       }
     })
 
     observeEvent(input$deselectall, {
       if (input$deselectall != 0 && !frozen()) {
-        possibleItemColumns <- colnames(chosenData())[sapply(chosenData(), is.numeric)]
-        itemColsRV(length(possibleItemColumns))
+        itemColsRV(length(possibleItemColumns()))
 
         updateCheckboxGroupInput(
           session,
           "itemCols",
           inline = TRUE,
-          choices = possibleItemColumns)
+          choices = possibleItemColumns())
       }
     })
 
