@@ -29,7 +29,7 @@ readTranslationFile <- function() {
 test_that("the file has the three expected columns and no broken rows", {
   table <- readTranslationFile()
 
-  expect_named(table, c("key", "en", "de"))
+  expect_named(table, c("key", appLanguages))
   expect_gt(nrow(table), 0)
 
   expect_false(any(duplicated(table$key)))

@@ -22,7 +22,7 @@
 ## The languages on offer, in the order the chooser lists them. The first is the fallback:
 ## an entry with no translation yet comes back in it. Adding one means a column of the same
 ## name in inst/translations.csv and a sym.lang.<code> row for the chooser's label.
-appLanguages <- c("en", "de")
+appLanguages <- c("en", "de", "fr")
 
 ## What the chooser in the header calls each language: its flag, and its own name for
 ## itself. Written out one by one rather than built with paste0(), because
@@ -30,7 +30,8 @@ appLanguages <- c("en", "de")
 ## assembled at run time.
 languageLabels <- function() {
   c(en = tr("sym.lang.en"),
-    de = tr("sym.lang.de"))
+    de = tr("sym.lang.de"),
+    fr = tr("sym.lang.fr"))
 }
 
 ## Read the text into an option. Called once, by .onLoad() in zzz.R.
