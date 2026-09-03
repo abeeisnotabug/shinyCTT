@@ -10,6 +10,25 @@ cttColors <- function() {
     text = "#FFFFFF")
 }
 
+## The words DT puts around a table of its own - the search box, the row count, the two
+## paging buttons. DT ships them in English only, so they are handed to it as text like
+## everything else the user reads.
+##
+## The _MENU_, _START_, _END_, _TOTAL_ and _MAX_ are DataTables\' own placeholders: it
+## fills the numbers in. A translation has to keep them.
+dtLanguage <- function() {
+  list(
+    search = tr("dt.search"),
+    lengthMenu = tr("dt.length.menu"),
+    info = tr("dt.info"),
+    infoEmpty = tr("dt.info.empty"),
+    infoFiltered = tr("dt.info.filtered"),
+    zeroRecords = tr("dt.zero.records"),
+    emptyTable = tr("dt.empty.table"),
+    paginate = list(previous = tr("dt.paginate.previous"),
+                    `next` = tr("dt.paginate.next")))
+}
+
 ## The heading above one group's table. Bold, because the table's own row labels are, and
 ## with far more space above it than below so it reads as belonging to the table under it
 ## rather than to the one before.

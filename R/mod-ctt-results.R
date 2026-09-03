@@ -676,7 +676,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
           fit()$fittedModels[[thisModel]],
           fit()$groupValues)
 
-      }, options = list(pageLength = 10))
+      }, options = list(pageLength = 10, language = dtLanguage()))
 
       output[[scoresDLStr]] <- downloadHandler(
         filename = function() input[[scoresDLFileStr]],
