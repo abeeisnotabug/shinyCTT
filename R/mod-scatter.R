@@ -112,7 +112,7 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
             stats::na.omit(),
           ggplot2::aes(x = .data$itemX, y = .data$itemY)) +
 
-          ggplot2::geom_point(color = "#438BCA") +
+          ggplot2::geom_point(color = fuColors()$mark) +
           ggplot2::xlab(input$scatterItemX) +
           ggplot2::ylab(input$scatterItemY) +
           ggplot2::theme_classic()

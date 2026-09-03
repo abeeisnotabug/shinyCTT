@@ -117,15 +117,15 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
         ggplot2::geom_histogram(
           if (input$singleDens) ggplot2::aes(y = ggplot2::after_stat(.data$density)),
           color = "white",
-          fill = "#438BCA",
+          fill = fuColors()$fill,
           bins = input$singleNoBins) +
 
         ggplot2::xlab(input$histItem) +
         ggplot2::theme_classic() +
 
         if (input$singleDens)
-          # the bars' "#438BCA" mixed 40% toward white
-          ggplot2::geom_density(color = "#8EB9DF", linewidth = 1)
+          # the group's own colour mixed 40% toward white, so the curve reads on the bars
+          ggplot2::geom_density(color = fuColors()$mark, linewidth = 1)
     })
 
     ## the group-wise histogram ----

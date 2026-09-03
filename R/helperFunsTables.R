@@ -1,20 +1,12 @@
-## The three colours a table cell can be painted, and the text colour that goes on top of
-## them. Written down here once. The tables below no longer take them as arguments: each
-## works out a rating - "good", "bad" or "neutral" - and ratingStyle() turns that into a
-## colour. The hierarchy plot in mod-ctt-results.R reads them from here too.
-cttColors <- function() {
-  list(
-    good = "#6B8E23",     # olivedrab: the FU green #99CC00, a little darkened
-    bad = "#B33A2B",      # a brick red of about the same weight
-    neutral = "#767676",  # the grey the dashboard theme already uses
-    text = "#FFFFFF")
-}
+## Everything the app builds a table out of: how a number is formatted, how a rating is
+## turned into a header or a divider, and the tables themselves. The colours those ratings
+## stand for are in R/colors.R.
 
 ## The words DT puts around a table of its own - the search box, the row count, the two
 ## paging buttons. DT ships them in English only, so they are handed to it as text like
 ## everything else the user reads.
 ##
-## The _MENU_, _START_, _END_, _TOTAL_ and _MAX_ are DataTables\' own placeholders: it
+## The _MENU_, _START_, _END_, _TOTAL_ and _MAX_ are DataTables' own placeholders: it
 ## fills the numbers in. A translation has to keep them.
 dtLanguage <- function() {
   list(
@@ -37,15 +29,6 @@ groupHeading <- function(text) {
     HTML(text),
     style = paste("font-weight: bold; font-size: 15px;",
                   "margin: 28px 0 6px 0; color: #444;"))
-}
-
-## What a rated cell looks like. Handed to a column's style, which reactable calls once per
-## row. NA -> no colour at all, for a cell with nothing to rate (the empty upper triangle of
-## the correlation table, the first row of the hierarchical table).
-ratingStyle <- function(rating) {
-  if (length(rating) != 1 || is.na(rating)) return(NULL)
-
-  list(background = cttColors()[[rating]], color = cttColors()$text)
 }
 
 ## CFI is rated the same way in the fit index table and in the hierarchical table, so the

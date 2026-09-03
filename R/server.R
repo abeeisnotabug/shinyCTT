@@ -125,19 +125,8 @@ server <- function(input, output, session) {
   # de-selecting a group in a plot tab used to recolour the ones that remain. The light
   # variants - the same colours mixed 40% toward white - are for the density curves,
   # which are drawn on top of bars in the solid colour.
-  groupColors <- reactive({
-    groupLevels <- sort(unique(subset$data()[, subset$groupCol()]))
-    solid <- grDevices::hcl(
-      h = seq(15, 375, length.out = length(groupLevels) + 1)[seq_along(groupLevels)],
-      c = 100,
-      l = 65)
-
-    list(
-      solid = stats::setNames(solid, groupLevels),
-      light = stats::setNames(
-        grDevices::rgb(t(0.6 * grDevices::col2rgb(solid) + 0.4 * 255), maxColorValue = 255),
-        groupLevels))
-  })
+  groupColors <- reactive(
+    groupPalette(sort(unique(subset$data()[, subset$groupCol()]))))
 
   ## Notifications ----
   output$infoMenu <- shinydashboard::renderMenu({
