@@ -100,11 +100,30 @@ makeFUdashboardtheme <- function() {
 }
 
 ui <- function(request) {
+
+  # Which language to build this page in. It comes out of the address the browser asked
+  # for (...?lang=de), so two people can have the app open in different languages at the
+  # same time. No ?lang= at all gives NULL, which falls back to whatever
+  # shinyCTTApp(language = ) was given.
+  setUiLanguage(parseQueryString(request$QUERY_STRING)$lang)
+
   shinydashboard::dashboardPage(
     # dashboardHeader ----
     shinydashboard::dashboardHeader(
       title = "shinyCTT",
-      shinydashboard::dropdownMenuOutput("infoMenu")),
+      shinydashboard::dropdownMenuOutput("infoMenu"),
+
+      # The language chooser. shinydashboard puts anything else in the header inside a
+      # <li class="dropdown">, so that is what it is wrapped in.
+      tags$li(
+        class = "dropdown",
+        style = "padding: 8px 12px 0 0;",
+        selectInput(
+          "language",
+          label = NULL,
+          width = "150px",
+          selected = currentLanguage(),
+          choices = stats::setNames(appLanguages, languageLabels()[appLanguages])))),
 
     # dashboardSidebar ----
     shinydashboard::dashboardSidebar(

@@ -1,4 +1,29 @@
 server <- function(input, output, session) {
+  ## Language ----
+  # Which language this visitor is being shown. It is read out of the address the browser
+  # asked for (...?lang=de) and kept in the session, so two people using the app at the
+  # same time can be reading it in different languages. tr() looks here for every piece of
+  # text rendered while the app runs; the page itself was already built by ui().
+  #
+  # isolate() because clientData is a reactive value and this line is not inside a reactive
+  # block - the address does not change while the page is open.
+  #
+  # What is stored is the resolved language, not what the address literally said. That is
+  # what stops the observer below reloading the page once on every first visit: the chooser
+  # reports "en", so "en" is what this has to hold for the two to match.
+  session$userData$lang <- resolveLanguage(
+    isolate(parseQueryString(session$clientData$url_search)$lang))
+
+  # Picking a language puts ?lang= into the address and reloads, which runs ui() again and
+  # builds the whole page in the new language. The req() stops it firing when the chooser
+  # merely reports the language already in use, which it does once on every page load.
+  observeEvent(input$language, {
+    req(!identical(input$language, session$userData$lang))
+
+    updateQueryString(paste0("?lang=", input$language), mode = "push")
+    session$reload()
+  })
+
   # Preparation ----
 
   # Everything about the five models comes from one place: cttModelFamily(), defined in

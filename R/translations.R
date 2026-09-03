@@ -19,7 +19,19 @@
 ## Symbols live in the same file under sym.*. They are not translated - a sigma is a sigma
 ## in German - but they are text, so they belong outside R/ for reason 1.
 
-appLanguages <- c("en", "de")   # the languages on offer; the first one is the fallback
+## The languages on offer, in the order the chooser lists them. The first is the fallback:
+## an entry with no translation yet comes back in it. Adding one means a column of the same
+## name in inst/translations.csv and a sym.lang.<code> row for the chooser's label.
+appLanguages <- c("en", "de")
+
+## What the chooser in the header calls each language: its flag, and its own name for
+## itself. Written out one by one rather than built with paste0(), because
+## test-translations.R reads the source for tr("...") and cannot see a key that is
+## assembled at run time.
+languageLabels <- function() {
+  c(en = tr("sym.lang.en"),
+    de = tr("sym.lang.de"))
+}
 
 ## Read the text into an option. Called once, by .onLoad() in zzz.R.
 ##
@@ -33,18 +45,53 @@ loadTranslations <- function(path) {
   table <- utils::read.csv(path, colClasses = "character", encoding = "UTF-8",
                            na.strings = character(0))
 
-  # One named vector per language: the names are the keys, the values the text.
-  options(shinyCTT.text = list(
-    en = stats::setNames(table$en, table$key),
-    de = stats::setNames(table$de, table$key)))
+  # One named vector per language: the names are the keys, the values the text. Built from
+  # appLanguages rather than named one by one, so a new language is a new column and
+  # nothing here changes.
+  options(shinyCTT.text = stats::setNames(
+    lapply(appLanguages, function(language) {
+      stats::setNames(table[[language]], table$key)
+    }),
+    appLanguages))
 }
 
-## Which language the app is showing. Set by shinyCTTApp(language = "de"); an unknown one
-## falls back to English.
-appLanguage <- function() {
-  language <- getOption("shinyCTT.language", default = appLanguages[1])
+## Which language to show, given whatever the address asked for. Anything unknown - or
+## nothing at all - falls back to what shinyCTTApp(language = ) was given, and that to the
+## first language on the list.
+resolveLanguage <- function(asked) {
+  if (isTRUE(asked %in% appLanguages)) return(asked)
 
-  if (isTRUE(language %in% appLanguages)) language else appLanguages[1]
+  fallback <- getOption("shinyCTT.language", default = appLanguages[1])
+
+  if (isTRUE(fallback %in% appLanguages)) fallback else appLanguages[1]
+}
+
+## Remember the language the next page is being built in. Called at the top of ui(), from
+## the ?lang= part of the address the browser asked for.
+##
+## One value for the whole app rather than one per visitor, which is safe only because R
+## runs one thing at a time: ui() is called, builds the page and returns before the next
+## visitor's ui() starts. The language of a visitor whose page is already open is a
+## different value and lives in their own session - see tr() below.
+setUiLanguage <- function(asked) {
+  options(shinyCTT.uiLanguage = resolveLanguage(asked))
+}
+
+## The language this piece of text is being asked for in.
+##
+## While the server is running there is a session, and the language chosen for THAT session
+## is kept in it - server() puts it there, so two people using the app at the same time can
+## be reading it in different languages. While the page is being built there is no session
+## yet, so the language ui() just set is used. Both halves are needed: the page is built
+## once per visit, and the server goes on rendering text afterwards.
+currentLanguage <- function() {
+  session <- shiny::getDefaultReactiveDomain()
+
+  if (is.null(session)) {
+    resolveLanguage(getOption("shinyCTT.uiLanguage"))
+  } else {
+    resolveLanguage(session$userData$lang)
+  }
 }
 
 ## The text to put on the screen, looked up by its short name.
@@ -63,9 +110,11 @@ tr <- function(key) {
 
   if (is.na(english)) return(key)
 
-  if (identical(appLanguage(), "en")) return(unname(english))
+  language <- currentLanguage()
 
-  translated <- text[[appLanguage()]][key]
+  if (identical(language, appLanguages[1])) return(unname(english))
+
+  translated <- text[[language]][key]
 
   if (is.na(translated) || !nzchar(translated)) unname(english) else unname(translated)
 }

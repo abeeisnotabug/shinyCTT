@@ -132,10 +132,9 @@ test_that("tr() says so when no text has been read", {
 ## tr() call takes one plain string - checked by the test below - so the argument can be
 ## read straight out of the parsed call.
 keysUsedInSource <- function() {
+  # translations.R is scanned too. Defining tr() there is an assignment rather than a call
+  # to it, so the definition is not picked up, and languageLabels() does ask for two keys.
   files <- list.files(packageSourceDir(), pattern = "[.]R$", full.names = TRUE)
-
-  # translations.R is where tr() is defined; the tr() inside it is the definition.
-  files <- files[basename(files) != "translations.R"]
 
   calls <- unlist(lapply(files, function(file) findCalls(parse(file), "tr")), recursive = FALSE)
 
