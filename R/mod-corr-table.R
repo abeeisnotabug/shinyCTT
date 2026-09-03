@@ -85,11 +85,8 @@ corrTableUI <- function(id) {
 ##   estimatorName : the estimator label shown in the legend, e.g. "ML" or "FIML"
 ##   sigLvl        : the significance level from the Statistics tab, used only in the legend
 ##   useFIML       : TRUE when the fit should use full information maximum likelihood
-##
-## The four colours are the app's, passed in the same way every make*Table() call takes
-## them, so they are written down in one place only.
 corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorName, sigLvl,
-                            useFIML, goodColor, badColor, neutrColor, textColor) {
+                            useFIML) {
   moduleServer(id, function(input, output, session) {
 
     ns <- session$ns
@@ -119,49 +116,18 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
           warning = function(w) w,
           error = function(e) e))
 
-      corrTableLegend <- tagList(
+      ## box the overall table ----
+      # corTestMatrices() gives back a list when it worked and a condition when it did not.
+      if (identical(class(corrTableWithCIsRaw$test)[1], "list")) {
 
-        cbind(
-          kableExtra::cell_spec(
-            tr("Legend:")),
-          kableExtra::cell_spec(
-            tr("Sig. pos."),
-            color = textColor,
-            background = goodColor),
-          kableExtra::cell_spec(
-            tr("Sig. neg."),
-            color = textColor,
-            background = badColor),
-          kableExtra::cell_spec(
-            tr("Not sig."),
-            color = textColor,
-            background = neutrColor)) %>%
+        singleCorrTable <- drawCorrTable(
+          makeCorrTableWithCIs(
+            rawTable = corrTableWithCIsRaw,
+            sigLvl = input$corrTabSL,
+            itemCols = itemCols()),
+          itemCols())
 
-          makeKable(
-            position = "left") %>%
-          HTML()
-
-      ) # tagList
-
-      ## box singleCorrTable if no errors: ----
-      if (class(corrTableWithCIsRaw$test)[1] == "list") {
-
-        singleCorrTable <- makeCorrTableWithCIs(
-          rawTable = corrTableWithCIsRaw,
-          goodColor,
-          badColor,
-          neutrColor,
-          textColor,
-          sigLvl = input$corrTabSL,
-          itemCols = itemCols()) %>%
-
-          makeKable(
-            bootstrap_options = c("condensed", "striped"),
-            bold_cols = 1) %>%
-          HTML()
-
-      } ## box singleCorrTable if errors: ----
-      else {
+      } else {
         singleCorrTable <-
           paste(tr("There was an ERROR/WARNING:"), corrTableWithCIsRaw$test) %>%
           HTML() %>%
@@ -173,49 +139,28 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
         groups <- unique(data()[, groupCol()])
 
-        mgCorrTableList <- lapply(
-          groups,
-          function(group) {
+        # One table per group, each under its own heading. kableExtra put that heading in
+        # a dark band row inside one tall table; reactable cannot draw a row that is not in
+        # the data.
+        mgCorrTables <- lapply(groups, function(group) {
+          groupRows <- data()[, groupCol()] == group
 
-            makeCorrTableWithCIs(
-
-              rawTable = list(
-                cor = suppressWarnings(stats::cor(
-                  subset(
-                    data()[, itemCols()],
-                    data()[, groupCol()] == group),
-                  use = input$corrTabNA)),
-                test = corTestMatrices(
-                  subset(
-                    data()[, itemCols()],
-                    data()[, groupCol()] == group),
-                  use = input$corrTabNA,
-                  confLevel = (1 - input$corrTabSL))),
-
-              goodColor,
-              badColor,
-              neutrColor,
-              textColor,
-              sigLvl = input$corrTabSL,
-              itemCols = itemCols())
+          tagList(
+            h5(sprintf(tr("Group: %s"), group)),
+            drawCorrTable(
+              makeCorrTableWithCIs(
+                rawTable = list(
+                  cor = suppressWarnings(stats::cor(
+                    subset(data()[, itemCols()], groupRows),
+                    use = input$corrTabNA)),
+                  test = corTestMatrices(
+                    subset(data()[, itemCols()], groupRows),
+                    use = input$corrTabNA,
+                    confLevel = (1 - input$corrTabSL))),
+                sigLvl = input$corrTabSL,
+                itemCols = itemCols()),
+              itemCols()))
         })
-
-        # join each group corrTable
-        mgCorrTable <- makeKable(
-          do.call(rbind, mgCorrTableList),
-          bootstrap_options = c("condensed", "striped"),
-          bold_cols = 1)
-
-        # add group headers
-        groupRowHeaders <- sprintf(tr("Group: %s"), groups)
-
-        for (i in 1:length(groups))
-          mgCorrTable <- mgCorrTable %>%
-            kableExtra::group_rows(
-              group_label = groupRowHeaders[i],
-              start_row = (i - 1) * length(itemCols()) * 2 + 1,
-              end_row = i * length(itemCols()) * 2,
-              label_row_css = "background-color: #666; color: #fff;")
 
         # assemble in tabBox
         shinydashboard::tabBox(
@@ -227,14 +172,12 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
               tr("Overall"),
               singleCorrTable,
               br(),
-              HTML(makeLegend("corrTable", estimatorName(), sigLvl(),
-                              goodColor, badColor, neutrColor, textColor))),
+              makeLegend("corrTable", estimatorName(), sigLvl())),
           tabPanel(
               tr("Group-wise"),
-              HTML(mgCorrTable),
+              unname(mgCorrTables),
               br(),
-              HTML(makeLegend("corrTable", estimatorName(), sigLvl(),
-                              goodColor, badColor, neutrColor, textColor)))
+              makeLegend("corrTable", estimatorName(), sigLvl()))
 
         ) # tabBox
 
@@ -247,7 +190,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
             singleCorrTable,
             br(),
-            corrTableLegend)
+            makeLegend("corrTable", estimatorName(), sigLvl()))
       }
     })
   })

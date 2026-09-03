@@ -38,9 +38,7 @@ cttModelCodeUI <- function(id) {
 ##                it, so the pages stay blank until the models have been fitted.
 ##   sigLvl     : a reactive holding the significance level
 ##   rmseaCiLvl : a reactive holding the confidence level of the RMSEA interval
-##   the four colours : the app's, passed in the same way every make*Table() call takes them
-cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
-                             goodColor, badColor, neutrColor, textColor) {
+cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
   moduleServer(id, function(input, output, session) {
 
     ns <- session$ns
@@ -67,6 +65,10 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
     # difference against an earlier model to the left of it, and the same layout again for
     # AIC and BIC. The chi-square cells are coloured by significance, so all of this is
     # redrawn when the significance level changes.
+    #
+    # Each table comes out as three matrices of the same shape: what every cell says, how
+    # every cell is rated, and which cells hold a model's own fit rather than a difference
+    # (those are set in italics). The colours are not here - ratingStyle() has them.
     compMatrices <- reactive({
       fits <- fitIndices()
       fittedModels <- fit()$fittedModels
@@ -74,18 +76,25 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
       comps <- fit()$comps
 
       # Cells are addressed by pair, "etetko" being the ess. tau-equivalent model against
-      # the tau-congeneric one. Anything still empty at the end prints as a blank cell.
+      # the tau-congeneric one.
       cellNames <- outer(models, models, paste0)
 
-      chisqCells <- dfCells <- aicCells <- bicCells <-
+      chisqText <- dfText <- aicText <- bicText <-
+        stats::setNames(rep("", 25), cellNames)
+
+      chisqRating <- dfRating <- aicRating <- bicRating <-
         stats::setNames(rep(NA_character_, 25), cellNames)
+
+      ownFit <- stats::setNames(rep(FALSE, 25), cellNames)
 
       # Comparing A with B is the same test as comparing B with A, so only the diagonal
       # and the cells left of it are used. Those start as a grey X and are overwritten
       # below wherever there is something to write.
-      chisqCells[lower.tri(diag(5), diag = TRUE)] <-
-        aicCells[lower.tri(diag(5), diag = TRUE)] <-
-        bicCells[lower.tri(diag(5), diag = TRUE)] <- "<span style=\"color: lightgrey;\" >X</span>"
+      usedCells <- lower.tri(diag(5), diag = TRUE)
+      greyX <- "<span style=\"color: lightgrey;\">X</span>"
+
+      chisqText[usedCells] <- dfText[usedCells] <-
+        aicText[usedCells] <- bicText[usedCells] <- greyX
 
       for (thisModel in goodModels) {
 
@@ -93,66 +102,37 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
         thisModelStr <- paste0(thisModel, thisModel)
 
         ### write to diag(chisq comp table) ----
-        if (fits[thisModel, "pvalue"] < sigLvl()) {
-          sigAddon <- "*"
-          sigColor <- badColor
+        # The model's own chi-square, with a star per significance level passed.
+        modelP <- fits[thisModel, "pvalue"]
 
-          if (fits[thisModel, "pvalue"] < 0.01)
-            sigAddon <- paste0(sigAddon, "*")
+        sigAddon <- paste(rep("*", sum(modelP < c(sigLvl(), 0.01, 0.001))), collapse = "")
+        sigRating <- if (modelP < sigLvl()) "bad" else "good"
 
-          if (fits[thisModel, "pvalue"] < 0.001)
-            sigAddon <- paste0(sigAddon, "*")
+        chisqText[thisModelStr] <- sprintf(paste0("%.2f", sigAddon), fits[thisModel, "chisq"])
+        dfText[thisModelStr] <- sprintf("%i", fits[thisModel, "df"])
 
-        } else {
-
-          sigAddon <- ""
-          sigColor <- goodColor
-        }
-
-        chisqCells[thisModelStr] <-
-          kableExtra::cell_spec(
-            sprintf(paste0("%.2f", sigAddon), fits[thisModel, "chisq"]),
-            background = sigColor,
-            color = textColor,
-            italic = TRUE)
-
-        dfCells[thisModelStr] <-
-          kableExtra::cell_spec(
-            sprintf("%i", fits[thisModel, "df"]),
-            background = sigColor,
-            color = textColor,
-            italic = TRUE)
+        chisqRating[thisModelStr] <- dfRating[thisModelStr] <- sigRating
+        ownFit[thisModelStr] <- TRUE
 
         ### write to AIC/BIC comp table ----
-        aicCells[thisModelStr] <-
-          kableExtra::cell_spec(
-            sprintf("%.1f", fits[thisModel, "aic"]),
-            color = textColor,
-            background = neutrColor)
+        aicText[thisModelStr] <- sprintf("%.1f", fits[thisModel, "aic"])
+        bicText[thisModelStr] <- sprintf("%.1f", fits[thisModel, "bic"])
 
-        bicCells[thisModelStr] <-
-          kableExtra::cell_spec(
-            sprintf("%.1f", fits[thisModel, "bic"]),
-            color = textColor,
-            background = neutrColor)
+        aicRating[thisModelStr] <- bicRating[thisModelStr] <- "neutral"
 
         #### if there is more than one good model ----
         if (whichModel > 1) {
 
+          earlierModels <- paste0(thisModel, rownames(fits)[1:(whichModel - 1)])
+
           aicDiffs <- fits[thisModel, "aic"] - fits[1:(whichModel - 1), "aic"]
           bicDiffs <- fits[thisModel, "bic"] - fits[1:(whichModel - 1), "bic"]
 
-          aicCells[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
-            kableExtra::cell_spec(
-              sprintf(ifelse(aicDiffs < 0, "%.1f", "+%.1f"), aicDiffs),
-              color = textColor,
-              background = ifelse(aicDiffs < 0, goodColor, badColor))
+          aicText[earlierModels] <- sprintf(ifelse(aicDiffs < 0, "%.1f", "+%.1f"), aicDiffs)
+          bicText[earlierModels] <- sprintf(ifelse(bicDiffs < 0, "%.1f", "+%.1f"), bicDiffs)
 
-          bicCells[paste0(thisModel, rownames(fits)[1:(whichModel - 1)])] <-
-            kableExtra::cell_spec(
-              sprintf(ifelse(bicDiffs < 0, "%.1f", "+%.1f"), bicDiffs),
-              color = textColor,
-              background = ifelse(bicDiffs < 0, goodColor, badColor))
+          aicRating[earlierModels] <- ifelse(aicDiffs < 0, "good", "bad")
+          bicRating[earlierModels] <- ifelse(bicDiffs < 0, "good", "bad")
         }
 
         ### write to lower.tri(chisq comp table) ----
@@ -173,53 +153,99 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
 
         for (thisComp in compsWithThisModel) {
 
-          if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < sigLvl()) {
-            sigAddon <- "*"
-            sigColor <- badColor
+          compP <- fitCompsWithThisModel["Pr(>Chisq)", thisComp]
 
-            if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.01)
-              sigAddon <- paste0(sigAddon, "*")
-
-            if (fitCompsWithThisModel["Pr(>Chisq)", thisComp] < 0.001)
-              sigAddon <- paste0(sigAddon, "*")
-
-          } else {
-
-            sigAddon <- ""
-            sigColor <- goodColor
-          }
-
+          sigAddon <- paste(rep("*", sum(compP < c(sigLvl(), 0.01, 0.001))), collapse = "")
           thisModelCompStr <- paste0(thisModel, thisComp)
 
-          chisqCells[thisModelCompStr] <- kableExtra::cell_spec(
-            sprintf(paste0("+%.2f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp]),
-            background = sigColor,
-            color = textColor)
+          chisqText[thisModelCompStr] <- sprintf(
+            paste0("+%.2f", sigAddon), fitCompsWithThisModel["Chisq diff", thisComp])
 
-          dfCells[thisModelCompStr] <- kableExtra::cell_spec(
-            sprintf("+%i", fitCompsWithThisModel["Df diff", thisComp]),
-            background = sigColor,
-            color = textColor)
+          dfText[thisModelCompStr] <- sprintf(
+            "+%i", fitCompsWithThisModel["Df diff", thisComp])
+
+          chisqRating[thisModelCompStr] <- dfRating[thisModelCompStr] <-
+            if (compP < sigLvl()) "bad" else "good"
         }
       }
 
       ### the df and the chi-square of one pair go in two columns side by side ----
-      combCompTable <- matrix(NA, nrow = 5, ncol = 10)
-      combCompTable[, seq(1, 10, 2)] <- matrix(dfCells, nrow = 5, ncol = 5)
-      combCompTable[, seq(2, 10, 2)] <- matrix(chisqCells, nrow = 5, ncol = 5)
+      # Ten columns, two per model, so the keys carry the model name and which of the two
+      # they are: "tkoDf", "tkoChisq", "eteDf", ...
+      pairColumns <- as.vector(rbind(paste0(models, "Df"), paste0(models, "Chisq")))
 
-      rownames(combCompTable) <- modelsAbbrev
-      colnames(combCompTable) <- rep(
-        c(tr("&Delta;df"), paste0(fit()$estimatorName, tr("-&Delta;&chi;&sup2;"))),
-        times = 5)
+      # Recycling dfPart into the full 5 x 10 first keeps the matrix the same type as what
+      # goes into it - these are called with text, with ratings and with TRUE/FALSE.
+      interleave <- function(dfPart, chisqPart) {
+        both <- matrix(dfPart, nrow = 5, ncol = 10)
+        both[, seq(1, 10, 2)] <- matrix(dfPart, nrow = 5, ncol = 5)
+        both[, seq(2, 10, 2)] <- matrix(chisqPart, nrow = 5, ncol = 5)
+        dimnames(both) <- list(modelsAbbrev, pairColumns)
+        both
+      }
+
+      squareMatrix <- function(cells) {
+        matrix(cells, nrow = 5, ncol = 5, dimnames = list(modelsAbbrev, models))
+      }
 
       list(
-        chisq = combCompTable,
-        aic = matrix(aicCells, nrow = 5, ncol = 5,
-                     dimnames = list(modelsAbbrev, modelsAbbrev)),
-        bic = matrix(bicCells, nrow = 5, ncol = 5,
-                     dimnames = list(modelsAbbrev, modelsAbbrev)))
+        chisq = list(
+          shown = interleave(dfText, chisqText),
+          ratings = interleave(dfRating, chisqRating),
+          ownFit = interleave(ownFit, ownFit)),
+        aic = list(
+          shown = squareMatrix(aicText),
+          ratings = squareMatrix(aicRating),
+          ownFit = squareMatrix(ownFit)),
+        bic = list(
+          shown = squareMatrix(bicText),
+          ratings = squareMatrix(bicRating),
+          ownFit = squareMatrix(ownFit)))
     })
+
+    ## drawing one comparison table ----
+    # `cells` is what compMatrices() gave back for one of the three. `headers` names each
+    # column; `groups`, when given, is the band above them - the combined table puts two
+    # columns under each model's name.
+    drawCompTable <- function(cells, headers, groups = NULL) {
+
+      columns <- lapply(names(headers), function(column) {
+        reactable::colDef(
+          name = headers[[column]],
+          html = TRUE,
+          style = function(value, index) {
+            c(ratingStyle(cells$ratings[index, column]),
+              if (cells$ownFit[index, column]) list(fontStyle = "italic"))
+          })
+      })
+
+      reactable::reactable(
+        as.data.frame(cells$shown, stringsAsFactors = FALSE),
+        rownames = TRUE,
+        columns = c(
+          list(.rownames = reactable::colDef(
+            name = "", html = TRUE, style = list(fontWeight = "bold"))),
+          stats::setNames(columns, names(headers))),
+        columnGroups = groups,
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
+    }
+
+    ## what lavaan said about a model ----
+    # The orange and the red box above the results: one row per model, its name and what
+    # lavaan said about it.
+    messageTable <- function(modelNames, messages) {
+      tags$table(
+        class = "table table-condensed",
+        style = "width: auto;",
+
+        tags$tbody(Map(function(modelName, message) {
+          tags$tr(
+            tags$td(HTML(paste0(modelName, ":&emsp;")), style = "font-weight: bold;"),
+            tags$td(message))
+        }, modelNames, messages)))
+    }
 
     ## the page holding the comparison of all models ----
     # Only the boxes and their headings. Each table is an output of its own below, so
@@ -235,13 +261,12 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
         lavWarnsMsg <- tagList(
           h6(tr("The following models produced warnings:")),
 
-          cbind(paste0(modelsLong[fit$warnModels], ":&emsp;"),
-                sapply(fit$fittedModels[fit$warnModels],
-                       function(model) attr(model, "shinyCTTwarning")$message)) %>%
-            kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
-            kableExtra::column_spec(column = 1, bold = TRUE) %>%
-            HTML() %>%
-            div(style = "color:orange")
+          div(
+            style = "color:orange",
+            messageTable(
+              modelsLong[fit$warnModels],
+              vapply(fit$fittedModels[fit$warnModels],
+                     function(model) attr(model, "shinyCTTwarning")$message, character(1))))
         ) # tagList
 
       } else {
@@ -254,13 +279,12 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
         lavErrsMsg <- tagList(
           h6(tr("The following models produced errors:")),
 
-          cbind(paste0(modelsLong[fit$errModels], ":&emsp;"),
-                sapply(fit$fittedModels[fit$errModels],
-                       function(model) model$message)) %>%
-            kableExtra::kbl(row.names = FALSE, escape = FALSE) %>%
-            kableExtra::column_spec(column = 1, bold = TRUE) %>%
-            HTML() %>%
-            div(style = "color:red")
+          div(
+            style = "color:red",
+            messageTable(
+              modelsLong[fit$errModels],
+              vapply(fit$fittedModels[fit$errModels],
+                     function(model) model$message, character(1))))
           ) # tagList
 
       } else {
@@ -304,7 +328,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
           shinydashboard::box(
             title = tr("Fit index table"),
             width = 12,
-            htmlOutput(ns("fitsTable")),
+            reactable::reactableOutput(ns("fitsTable")),
             br(),
             actionLink(ns("showLegendFitIndexTable"), tr("Show/hide legend")),
             conditionalPanel("input.showLegendFitIndexTable % 2 == 1",
@@ -315,7 +339,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
           shinydashboard::box(
             title = HTML(tr("&chi;&sup2;-comparison table:")),
             width = 12,
-            htmlOutput(ns("combCompTable")),
+            reactable::reactableOutput(ns("combCompTable")),
             br(),
             actionLink(ns("showLegendCombCompTable"), tr("Show/hide legend")),
             conditionalPanel("input.showLegendCombCompTable % 2 == 1",
@@ -402,13 +426,13 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
 
             fill = c("nsig", "sig")[c(.data$pvalue < sigLvl()) + 1]), # aes
 
-          color = textColor,
+          color = cttColors()$text,
           size = 4.5,
           parse = TRUE) + # geom_label
 
         ggplot2::scale_fill_manual(
-          values = c("nsig" = goodColor, "sig" = badColor),
-          na.value = neutrColor) +
+          values = c("nsig" = cttColors()$good, "sig" = cttColors()$bad),
+          na.value = cttColors()$neutral) +
 
         ggplot2::guides(fill = "none") +
         ggplot2::xlim(c(-4, 4)) +
@@ -433,88 +457,80 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
 
             succTableTmp <- as.data.frame(fit$succTable[[model]])
             makeHierTable(succTableTmp, fitIndices()[rownames(succTableTmp), "cfi"],
-                          fit$estimatorName, sigLvl(),
-                          goodColor, badColor, neutrColor, textColor, modelsAbbrev)
+                          fit$estimatorName, sigLvl(), modelsAbbrev)
           } else {
             NULL
           }
         } # function(model)
       ) # lapply
 
-      paste0(
-        "<table align = \"center\", width = \"100%\"><tr><td>",
-        hierTables[[1]],
-        "</td><td>&nbsp;</td><td>",
-        hierTables[[2]],
-        "</td></tr></table>") %>%
-        HTML()
+      # Side by side, each taking half the width.
+      fluidRow(
+        column(width = 6, hierTables[[1]]),
+        column(width = 6, hierTables[[2]]))
     })
 
     ## fit index table ----
-    output$fitsTable <- renderUI({
+    output$fitsTable <- reactable::renderReactable({
       req(length(fit()$goodModels) > 0)
 
-      HTML(makeFitsTable(fitIndices(), fit()$estimatorName, sigLvl(), rmseaCiLvl(),
-                         goodColor, badColor, neutrColor, textColor,
-                         modelsAbbrev))
+      makeFitsTable(fitIndices(), fit()$estimatorName, sigLvl(), rmseaCiLvl(), modelsAbbrev)
     })
 
     ## chi-square comparison table ----
-    output$combCompTable <- renderUI({
+    output$combCompTable <- reactable::renderReactable({
       req(length(fit()$goodModels) > 0)
 
-      # One header spanning the two columns of each model.
-      headerNames <- c(1, rep(2, 5))
-      names(headerNames) <- c(" ", modelsAbbrev)
+      cells <- compMatrices()$chisq
 
-      makeKable(compMatrices()$chisq, bold_cols = 1) %>%
-        kableExtra::add_header_above(headerNames, escape = FALSE) %>%
-        HTML()
+      # Two columns per model, headed by Delta-df and the estimator's Delta-chi-squared...
+      headers <- stats::setNames(
+        rep(c(tr("&Delta;df"), paste0(fit()$estimatorName, tr("-&Delta;&chi;&sup2;"))), 5),
+        colnames(cells$shown))
+
+      # ...with the model's own name in a band above each pair.
+      groups <- lapply(models, function(model) {
+        reactable::colGroup(
+          name = modelsAbbrev[[model]],
+          html = TRUE,
+          columns = paste0(model, c("Df", "Chisq")))
+      })
+
+      drawCompTable(cells, headers, unname(groups))
     })
 
     ## AIC/BIC comparison table ----
+    # The two tables side by side, each under its own heading. One column per model.
     output$infCompTable <- renderUI({
       req(length(fit()$goodModels) > 0)
 
-      paste0(
-        "<table align = \"center\", width = \"100%\"> <tr><td>
-          <table align = \"center\"> <tr><td>
-            <h5>", tr("AIC:"), "</h5>",
+      headers <- stats::setNames(modelsAbbrev[models], models)
 
-        makeKable(compMatrices()$aic, bold_cols = 1),
-
-        "</td></tr></table>
-      </td>
-      <td>&nbsp;</td>
-      <td>
-        <table align = \"center\"> <tr><td>
-          <h5>", tr("BIC:"), "</h5>",
-
-        makeKable(compMatrices()$bic, bold_cols = 1),
-
-      "</td></tr></table>
-    </td></tr></table>") %>%
-      HTML()
+      fluidRow(
+        column(
+          width = 6,
+          h5(tr("AIC:")),
+          drawCompTable(compMatrices()$aic, headers)),
+        column(
+          width = 6,
+          h5(tr("BIC:")),
+          drawCompTable(compMatrices()$bic, headers)))
     })
 
     ## the four legends ----
     # Each names the significance level it is describing, so each follows it.
     output$hierTableLegend <- renderUI(
-      makeLegend("hierTables", fit()$estimatorName, sigLvl(),
-                 goodColor, badColor, neutrColor, textColor))
+      makeLegend("hierTables", fit()$estimatorName, sigLvl()))
 
     output$fitsTableLegend <- renderUI(
       makeLegend("fitIndexTable", fit()$estimatorName, sigLvl(),
-                 goodColor, badColor, neutrColor, textColor,
                  rmseaCiLvl = rmseaCiLvl()))
 
     output$combCompTableLegend <- renderUI(
-      makeLegend("combCompTable", fit()$estimatorName, sigLvl(),
-                 goodColor, badColor, neutrColor, textColor))
+      makeLegend("combCompTable", fit()$estimatorName, sigLvl()))
 
     output$infCompTableLegend <- renderUI(
-      makeLegend("infCompTable", fit()$estimatorName, sigLvl(),
-                 goodColor, badColor, neutrColor, textColor))
+      makeLegend("infCompTable", fit()$estimatorName, sigLvl()))
 
     ## the three tab strips ----
     # Built whole from the models that fitted, rather than a tab being added per model:
@@ -632,26 +648,19 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl,
         fittedModel <- fit$fittedModels[[thisModel]]
         thisModelsNgroups <- fittedModel@Data@ngroups
 
-        parTableWithCIs <- makeParTableWithCIs(fittedModel, fit$estimatorName,
-                                               sigLvl(), fit$itemCols,
-                                               thisModelsNgroups)
+        # One table per group, each under its own heading, the same shape as the
+        # covariance matrix and the descriptive statistics. A fit with no group column has
+        # exactly one group, and then there is no heading to put above it.
+        groupLabels <- fittedModel@Data@group.label
 
-        #### modify parameter tables if there are groups ----
-        if (!isFALSE(fit$groupName)) {
-          for (i in 1:thisModelsNgroups) {
+        tagList(lapply(seq_len(thisModelsNgroups), function(group) {
+          tagList(
+            if (!isFALSE(fit$groupName))
+              h5(sprintf(tr("Group: %s"), groupLabels[group])),
 
-            groupRowHeaders <- sprintf(tr("Group: %s"), fittedModel@Data@group.label)
-
-            parTableWithCIs <- kableExtra::group_rows(
-              parTableWithCIs,
-              group_label = groupRowHeaders[i],
-              start_row = (i - 1) * (length(fit$itemCols) + 1) + 1,
-              end_row = i * (length(fit$itemCols) + 1),
-              label_row_css = "background-color: #666; color: #fff;")
-          }
-        }
-
-        HTML(parTableWithCIs)
+            makeParTableWithCIs(fittedModel, fit$estimatorName, sigLvl(), fit$itemCols,
+                                group))
+        }))
       })
 
       ### factor scores ----

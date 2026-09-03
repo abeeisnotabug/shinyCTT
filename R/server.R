@@ -1,17 +1,5 @@
 server <- function(input, output, session) {
   # Preparation ----
-  ## Names and colors ----
-  if (TRUE) {
-    goodColor <- "darkgreen"
-    badColor <- "darkred"
-    textColor <- "white"
-    neutrColor <- "grey"
-  } else {
-    goodColor <- "white"
-    badColor <- "white"
-    textColor <- "black"
-    neutrColor <- "white"
-  }
 
   # Everything about the five models comes from one place: cttModelFamily(), defined in
   # R/modelFamily.R. Read that file to see what each of these contains.
@@ -286,11 +274,7 @@ server <- function(input, output, session) {
     hasGroups = subset$hasGroups,
     estimatorName = estimatorName,
     sigLvl = sigLvlRV,
-    useFIML = subset$useFIML,
-    goodColor = goodColor,
-    badColor = badColor,
-    neutrColor = neutrColor,
-    textColor = textColor)
+    useFIML = subset$useFIML)
 
   # observeEvent input$estimator ----
   observeEvent(input$estimator, estimatorRV(input$estimator))
@@ -561,19 +545,11 @@ server <- function(input, output, session) {
     "single",
     fit = reactive(req(modelFitsRV()$single)),
     sigLvl = sigLvlRV,
-    rmseaCiLvl = rmseaCiLvlRV,
-    goodColor = goodColor,
-    badColor = badColor,
-    neutrColor = neutrColor,
-    textColor = textColor)
+    rmseaCiLvl = rmseaCiLvlRV)
 
   cttResultsServer(
     "multigroup",
     fit = reactive(req(modelFitsRV()$multigroup)),
     sigLvl = sigLvlRV,
-    rmseaCiLvl = rmseaCiLvlRV,
-    goodColor = goodColor,
-    badColor = badColor,
-    neutrColor = neutrColor,
-    textColor = textColor)
+    rmseaCiLvl = rmseaCiLvlRV)
 }

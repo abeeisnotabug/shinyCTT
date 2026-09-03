@@ -310,6 +310,23 @@ its table has a sentence above it and a sentence below.
 Unlike DT, `req()` **does** blank a reactable that has already been drawn - checked in a
 browser - so it does not need the explicit `NULL` that `mod-data-source.R`'s preview does.
 
+### `as.data.frame()` also makes duplicate row names unique
+
+The correlation table has two rows per item - the correlation, then its interval - and every
+second row name was the word `CI`. As a matrix that is fine; `as.data.frame()` renames them
+`CI`, `CI.1`, `CI.2`, and that is what the screen showed.
+
+Row labels that repeat therefore have to be a column of their own, with
+`colDef(name = "")` for a blank header, rather than row names.
+
+*Where:* `helperFunsTables.R`, `makeCorrTableWithCIs()`'s `rowLabel` column.
+
+### A row name carrying an HTML entity needs `html = TRUE` on `.rownames`
+
+The model abbreviations are entities (`&#964;-kong.`). Without `html = TRUE` on the
+`.rownames` column they print as that text rather than as a Greek tau. The same applies to
+`colGroup(name = )`, which is why the comparison table's group bands pass it too.
+
 ### `as.data.frame()` melts a one-row `table` object
 
 `reactable()` runs `as.data.frame()` on whatever it is given, and on a `table` that turns a

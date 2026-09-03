@@ -27,7 +27,6 @@ Imports:
     dashboardthemes (>= 1.1.6),
     shinyjs (>= 1.0),
     MVN (>= 6.0),
-    kableExtra (>= 1.0.1),
     reactable (>= 0.4.0),
     haven (>= 2.1.0),
     ggplot2 (>= 3.4.0),
@@ -38,6 +37,7 @@ Imports:
     rlang (>= 1.2.0)
 Suggests: 
     testthat (>= 3.0.0),
+    jsonlite,
     Matrix
 Config/testthat/edition: 3
 RoxygenNote: 7.3.3
