@@ -158,12 +158,16 @@ mvnServer <- function(id, data, itemCols) {
 
       reactable::reactable(
         multivariateTable(),
+        # These two boxes are a third of the page wide, so the columns are given the room
+        # their own contents need rather than reactable's even 100px each: "Mardia
+        # Skewness" wrapped onto two lines while "Signif." was cut short. Measured in a
+        # browser against the widest text in each column, plus the theme's cell padding.
         columns = list(
-          Test = reactable::colDef(name = tr("Test")),
-          Statistic = reactable::colDef(name = tr("Statistic"),
+          Test = reactable::colDef(name = tr("Test"), minWidth = 127),
+          Statistic = reactable::colDef(name = tr("Statistic"), minWidth = 67,
                                         format = reactable::colFormat(digits = 3, locales = "en-US")),
-          p = reactable::colDef(name = tr("p")),
-          `Signif.` = reactable::colDef(name = tr("Signif."))),
+          p = reactable::colDef(name = tr("p"), minWidth = 64),
+          `Signif.` = reactable::colDef(name = tr("Signif."), minWidth = 55)),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -186,13 +190,15 @@ mvnServer <- function(id, data, itemCols) {
 
       reactable::reactable(
         univariateTable(),
+        # Same measurement as the box above: "Anderson-Darling" needs the room, the
+        # single-character p and the star in Signif. do not.
         columns = list(
-          Test = reactable::colDef(name = tr("Test")),
-          Item = reactable::colDef(name = tr("Item")),
-          Statistic = reactable::colDef(name = tr("Statistic"),
+          Test = reactable::colDef(name = tr("Test"), minWidth = 125),
+          Item = reactable::colDef(name = tr("Item"), minWidth = 59),
+          Statistic = reactable::colDef(name = tr("Statistic"), minWidth = 76,
                                         format = reactable::colFormat(digits = 3, locales = "en-US")),
-          p = reactable::colDef(name = tr("p")),
-          `Signif.` = reactable::colDef(name = tr("Signif."))),
+          p = reactable::colDef(name = tr("p"), minWidth = 52),
+          `Signif.` = reactable::colDef(name = tr("Signif."), minWidth = 55)),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
