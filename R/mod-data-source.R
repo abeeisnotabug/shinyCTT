@@ -13,10 +13,14 @@ dataSourceUI <- function(id) {
 
       shinydashboard::box(
         width = NULL,
-        # The three source names are also the values input$source is compared against
-        # elsewhere, so they are left untranslated - see the translation report.
+        # The names are what the user reads, the values what input$source is compared
+        # against - so only the names are translated.
         selectInput(ns("source"), tr("data.source.label"),
-                    choices = c("Workspace", "CSV", "SPSS"))),
+                    choices = stats::setNames(
+                      c("Workspace", "CSV", "SPSS"),
+                      c(tr("data.source.type.workspace"),
+                        tr("data.source.type.csv"),
+                        tr("data.source.type.spss"))))),
 
       shinydashboard::box(
         width = NULL,

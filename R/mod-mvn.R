@@ -227,16 +227,14 @@ mvnServer <- function(id, data, itemCols) {
 
           column(
             width = 4,
-            # The three plot type labels are a selectInput()'s named choices, and
-            # input$mvnPlotType is compared against their values below, so they are left
-            # untranslated - see the translation report.
             selectInput(
               ns("mvnPlotType"),
               tr("stats.mvn.plottype.label"),
-              choices = c(
-                "Q-Q Plot (all items)" = "qq",
-                "Perspective Plot" = "persp",
-                "Contour Plot" = "contour"))),
+              choices = stats::setNames(
+                c("qq", "persp", "contour"),
+                c(tr("stats.mvn.plottype.qq"),
+                  tr("stats.mvn.plottype.persp"),
+                  tr("stats.mvn.plottype.contour"))))),
           column(
             width = 4,
             conditionalPanel(

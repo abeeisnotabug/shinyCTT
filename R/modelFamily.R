@@ -75,21 +75,19 @@ cttModelFamily <- function() {
     names = stats::setNames(nm = models),
 
     # Full names, used for tab titles and the warning/error message tables.
-    long = stats::setNames(
-      c("&tau;-kongeneric",
-        "essentially &tau;-equivalent",
-        "&tau;-equivalent",
-        "essentially &tau;-parallel",
-        "&tau;-parallel"), models),
+    long = c(tko = tr("model.tko.long"),
+             ete = tr("model.ete.long"),
+             teq = tr("model.teq.long"),
+             etp = tr("model.etp.long"),
+             tpa = tr("model.tpa.long")),
 
     # Short names, used for table headers and the comparison grid, where the full ones
     # would not fit.
-    abbrev = stats::setNames(
-      c("&#964;-kong.",
-        "ess. &#964;-equiv.",
-        "&#964;-equiv.",
-        "ess. &#964;-paral.",
-        "&#964;-paral."), models),
+    abbrev = c(tko = tr("model.tko.abbrev"),
+               ete = tr("model.ete.abbrev"),
+               teq = tr("model.teq.abbrev"),
+               etp = tr("model.etp.abbrev"),
+               tpa = tr("model.tpa.abbrev")),
 
     # The fewest items each model can be tested with, meaning at least one degree of
     # freedom left over. One item fewer only just identifies it (df = 0, fits perfectly,
@@ -104,17 +102,18 @@ cttModelFamily <- function() {
 
     # Everything the hierarchical comparison plot needs, one row per model.
     #   name             : the model's label, as an R plotmath expression (the plot draws
-    #                      it with parse = TRUE, so it cannot be HTML). \u03C4 is tau.
+    #                      it with parse = TRUE, so it cannot be HTML). A ~ is a space
+    #                      there, which a translation has to keep using.
     #   x, y             : where that label is printed
     #   xstarts, ystarts : where the line leaving that model begins
     #   xends, yends     : where it ends
     #   labelxs, labelys : where the chi-square label on that line is printed
     plot = data.frame(
-      name = c("bold(\u03C4*'-kongeneric')",
-               "bold(essentially~\u03C4*'-equivalent')",
-               "bold(\u03C4*'-equivalent')",
-               "bold(essentially~\u03C4*'-parallel')",
-               "bold(\u03C4*'-parallel')"),
+      name = c(tr("model.tko.plot"),
+               tr("model.ete.plot"),
+               tr("model.teq.plot"),
+               tr("model.etp.plot"),
+               tr("model.tpa.plot")),
       x       = c(0, 0, -2, 2, 0),
       y       = c(6, 4, 2, 2, 0),
       xstarts = c(0, 0, 0, -2, 2),

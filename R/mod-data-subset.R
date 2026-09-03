@@ -146,14 +146,11 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       possibleGroupCols <- colnames(chosenData())[!(colnames(chosenData()) %in% input$itemCols)]
       groupColRV(length(possibleGroupCols))
 
-      # The "No group column selected" label sits inside a selectInput()'s named choices
-      # vector, so it cannot be run through tr() without breaking the value it is paired
-      # with - see the translation report.
       selectInput(
           ns("groupCol"),
           tr("subset.groupcol.label"),
           choices = c(
-            "No group column selected" = "noGroupSelected",
+            stats::setNames("noGroupSelected", tr("subset.groupcol.none")),
             possibleGroupCols))
     })
 
@@ -404,7 +401,10 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     output$obsPerGroupNote <- renderUI({
       req(input$groupCol)
 
-      if (input$groupCol == "noGroupSelected") helpText(tr("subset.groupcol.none"))
+      # The full stop is punctuation, not language: the dropdown option beside this note
+      # is the same words without one.
+      if (input$groupCol == "noGroupSelected")
+        helpText(paste0(tr("subset.groupcol.none"), "."))
     })
 
     ## Select ----
