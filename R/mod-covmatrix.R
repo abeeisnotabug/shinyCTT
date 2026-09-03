@@ -56,7 +56,8 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # in the data, so the heading sits above its table instead.
         groupTables <- lapply(seq_along(groups), function(position) {
           tagList(
-            h5(sprintf(tr("Group: %s (n = %i)"), groups[position], groupSizes[position])),
+            groupHeading(sprintf(tr("Group: %s (n = %i)"),
+                                 groups[position], groupSizes[position])),
             covarianceTable(
               subset(data()[, itemCols()], data()[, groupCol()] == groups[position])))
         })
@@ -69,6 +70,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
           tabPanel(
             title = tr("Overall"),
+            groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
             covarianceTable(data()[, itemCols()])),
 
           tabPanel(
@@ -85,6 +87,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
           width = 12,
           title = tr("Covariance matrix:"),
 
+          groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
           covarianceTable(data()[, itemCols()])
 
         ) # box

@@ -10,6 +10,16 @@ cttColors <- function() {
     text = "#FFFFFF")
 }
 
+## The heading above one group's table. Bold, because the table's own row labels are, and
+## with far more space above it than below so it reads as belonging to the table under it
+## rather than to the one before.
+groupHeading <- function(text) {
+  tags$p(
+    HTML(text),
+    style = paste("font-weight: bold; font-size: 15px;",
+                  "margin: 28px 0 6px 0; color: #444;"))
+}
+
 ## What a rated cell looks like. Handed to a column's style, which reactable calls once per
 ## row. NA -> no colour at all, for a cell with nothing to rate (the empty upper triangle of
 ## the correlation table, the first row of the hierarchical table).

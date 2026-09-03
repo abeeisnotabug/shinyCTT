@@ -55,13 +55,12 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
     }
 
     ## one descriptives table ----
-    # `header`, when given, is a band across the four columns saying how many rows they
-    # were computed from. The group-wise tables put their group above the table instead,
-    # the same way the covariance matrix does, so they pass no header.
+    # How many rows went into it is said in the heading above it, the same way every other
+    # table on this page says it.
     #
     # locales = "en-US" pins the decimal point - without it reactable rounds in the
     # reader's own language and a German browser prints 1,504 (see GOTCHAS.md).
-    momentsTable <- function(moments, header = NULL) {
+    momentsTable <- function(moments) {
       reactable::reactable(
         as.data.frame(moments),
         rownames = TRUE,
@@ -73,9 +72,6 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
           SD = reactable::colDef(name = tr("SD")),
           Skew = reactable::colDef(name = tr("Skew")),
           Excess = reactable::colDef(name = tr("Excess"))),
-        columnGroups = if (!is.null(header))
-          list(reactable::colGroup(name = header, html = TRUE,
-                                   columns = c("Mean", "SD", "Skew", "Excess"))),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -85,9 +81,9 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
     output$box <- renderUI({
       req(data())
 
-      overallTable <- momentsTable(
-        itemMoments(data()[, itemCols()]),
-        header = sprintf(tr("n<sub>all</sub> = %i"), nrow(data())))
+      overallTable <- tagList(
+        groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
+        momentsTable(itemMoments(data()[, itemCols()])))
 
       ### the box with a group column ----
       if (hasGroups()) {
@@ -98,8 +94,8 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # covariance matrix box next to it.
         groupTables <- lapply(seq_along(groups), function(position) {
           tagList(
-            h5(HTML(sprintf(tr("Group: %s (n<sub>%s</sub> = %i)"),
-                            groups[position], groups[position], groupSizes[position]))),
+            groupHeading(sprintf(tr("Group: %s (n = %i)"),
+                                 groups[position], groupSizes[position])),
             momentsTable(itemMoments(
               subset(data()[, itemCols()], data()[, groupCol()] == groups[position]))))
         })

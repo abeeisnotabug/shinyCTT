@@ -146,7 +146,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
           groupRows <- data()[, groupCol()] == group
 
           tagList(
-            h5(sprintf(tr("Group: %s"), group)),
+            groupHeading(sprintf(tr("Group: %s (n = %i)"), group, sum(groupRows))),
             drawCorrTable(
               makeCorrTableWithCIs(
                 rawTable = list(
@@ -170,6 +170,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
           tabPanel(
               tr("Overall"),
+              groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
               singleCorrTable,
               br(),
               makeLegend("corrTable", estimatorName(), sigLvl())),
@@ -188,6 +189,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
             width = 12,
             title = tr("Correlation table with confidence intervals:"),
 
+            groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
             singleCorrTable,
             br(),
             makeLegend("corrTable", estimatorName(), sigLvl()))

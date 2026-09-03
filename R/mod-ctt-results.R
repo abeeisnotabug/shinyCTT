@@ -652,11 +652,15 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
         # covariance matrix and the descriptive statistics. A fit with no group column has
         # exactly one group, and then there is no heading to put above it.
         groupLabels <- fittedModel@Data@group.label
+        groupSizes <- unlist(fittedModel@Data@nobs)
 
         tagList(lapply(seq_len(thisModelsNgroups), function(group) {
           tagList(
-            if (!isFALSE(fit$groupName))
-              h5(sprintf(tr("Group: %s"), groupLabels[group])),
+            groupHeading(
+              if (isFALSE(fit$groupName))
+                sprintf(tr("Overall n = %i"), groupSizes[group])
+              else
+                sprintf(tr("Group: %s (n = %i)"), groupLabels[group], groupSizes[group])),
 
             makeParTableWithCIs(fittedModel, fit$estimatorName, sigLvl(), fit$itemCols,
                                 group))
