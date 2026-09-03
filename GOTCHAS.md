@@ -258,6 +258,28 @@ in `cttModelFamily()` are the first item count at which each model has something
 
 ---
 
+## reactable
+
+### A reactable fills its box unless told not to, and then overflows it
+
+`kableExtra(full_width = FALSE)` drew an ordinary HTML table, which is as wide as its contents
+need. A reactable is a flexbox and fills its container, so every converted table was stretched
+across its whole box.
+
+`width: fit-content` in the theme fixes that - but on its own it lets a wide table grow *past*
+the box instead of stopping at it. With 20 items the covariance matrix came out 2100px wide
+inside an 1180px box and hung over what was beside it. `max-width: 100%` alongside it stops the
+growth at the box, and `.rt-table`'s own `overflow-x: auto` then scrolls it sideways. Both are
+needed; either one alone is wrong.
+
+Columns do not size themselves to their contents either - each is `colDef(minWidth = )` wide,
+100px by default. A table of N columns is therefore N x 100px, which is what "as wide as it
+needs" means here.
+
+*Where:* `shinyCTTApp.R`, the `reactable.theme` in `onStart`.
+
+---
+
 ## This package
 
 ### Helpers must never take `input`

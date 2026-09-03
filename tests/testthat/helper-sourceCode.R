@@ -87,5 +87,5 @@ idMakingFunctions <- function() {
     "downloadButton", "fileInput", "numericInput", "radioButtons", "selectInput",
     "sliderInput", "textInput", "textAreaInput", "varSelectInput",
     "htmlOutput", "imageOutput", "plotOutput", "tableOutput", "textOutput", "uiOutput",
-    "verbatimTextOutput", "dataTableOutput")
+    "verbatimTextOutput", "dataTableOutput", "reactableOutput")
 }

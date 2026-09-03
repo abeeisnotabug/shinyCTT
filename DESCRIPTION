@@ -28,6 +28,7 @@ Imports:
     shinyjs (>= 1.0),
     MVN (>= 6.0),
     kableExtra (>= 1.0.1),
+    reactable (>= 0.4.0),
     haven (>= 2.1.0),
     ggplot2 (>= 3.4.0),
     lavaan (>= 0.6-21),

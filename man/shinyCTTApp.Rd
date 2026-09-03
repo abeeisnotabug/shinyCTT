@@ -9,8 +9,8 @@ shinyCTTApp(language = "en")
 \arguments{
 \item{language}{Which language to show the app in: "en" (the default) or "de". Stored as
 options(shinyCTT.language = language) while the app runs, which every screen reads
-through tr() (see R/translations.R). Both options the app sets are put back the way they
-were when it closes.}
+through tr() (see R/translations.R). The three options the app sets are put back the way
+they were when it closes.}
 }
 \value{
 None. This function is called for its side effect of launching the Shiny app.
