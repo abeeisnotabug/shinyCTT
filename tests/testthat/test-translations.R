@@ -63,6 +63,29 @@ test_that("no translatable text contains markup", {
   expect_equal(withMarkup, character(0))
 })
 
+test_that("a translation keeps every placeholder the English has", {
+  table <- readTranslationFile()
+
+  # sprintf() fills %s and %i in order, and DataTables fills _START_ and its friends. A
+  # translation that drops one either loses a value or stops the app at the moment it is
+  # rendered, and neither shows up until that screen is opened.
+  placeholders <- function(text) {
+    paste(sort(unlist(regmatches(
+      text, gregexpr("%[-0-9.]*[sdifg%]|_[A-Z]+_", text)))), collapse = " ")
+  }
+
+  for (language in setdiff(appLanguages, appLanguages[1])) {
+    translated <- table[nzchar(table[[language]]), ]
+
+    mismatched <- translated$key[
+      vapply(translated$en, placeholders, character(1)) !=
+        vapply(translated[[language]], placeholders, character(1))]
+
+    expect_equal(paste(sort(mismatched), collapse = ", "), "",
+                 info = paste("language:", language))
+  }
+})
+
 test_that("the row whose text is the word NA survives being read", {
   # The hierarchical table prints "NA" in a cell when lavaan drops the RMSEA column under
   # FIML. read.csv turns that text into a missing value unless na.strings is emptied.
