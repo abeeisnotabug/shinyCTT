@@ -67,19 +67,23 @@ dataSubsetUI <- function(id) {
         shinydashboard::box(
           width = NULL,
           title = tr("Observations:"),
-          htmlOutput(ns("obsTable"))),
+          reactable::reactableOutput(ns("obsTable"))),
 
+        # The group counts are a table when there is a group column and a note when there
+        # is not. renderReactable can only give back a table, so they are two outputs with
+        # a guard on each - only one of them ever fills.
         shinydashboard::box(
           width = NULL,
           title = tr("Observations per group:"),
-          htmlOutput(ns("obsPerGroupTable")))),
+          reactable::reactableOutput(ns("obsPerGroupTable")),
+          uiOutput(ns("obsPerGroupNote")))),
 
       column(
         width = 4,
         shinydashboard::box(
           width = NULL,
           title = tr("Missing values per column:"),
-          htmlOutput(ns("naTable"))))
+          reactable::reactableOutput(ns("naTable"))))
     ) # fluidRow
   ) # tagList
 }
@@ -349,29 +353,58 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     })
 
     ## naTable ----
-    output$naTable <- renderUI({
-      HTML(makeKable(data.frame(NAs = colSums(is.na(chosenData()))), col.names = tr("NAs")))
+    # One column of missing-value counts. The column names of the chosen data sit in the
+    # row names, so rownames = TRUE and the .rownames column gets an empty header.
+    output$naTable <- reactable::renderReactable({
+      reactable::reactable(
+        data.frame(NAs = colSums(is.na(chosenData()))),
+        rownames = TRUE,
+        columns = list(
+          .rownames = reactable::colDef(name = ""),
+          NAs = reactable::colDef(name = tr("NAs"))),
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
     })
 
     ## obsTable ----
-    output$obsTable <- renderUI({
-      nTotal <- nrow(dataWithNAs())
-      nComplete <- sum(!incompleteCases())
-
-      HTML(makeKable(
-        data.frame(Total = nTotal, Complete = nComplete),
-        col.names = c(tr("Total"), tr("Complete"))))
+    # How many rows the subset has, and how many of them are complete.
+    output$obsTable <- reactable::renderReactable({
+      reactable::reactable(
+        data.frame(Total = nrow(dataWithNAs()), Complete = sum(!incompleteCases())),
+        columns = list(
+          Total = reactable::colDef(name = tr("Total")),
+          Complete = reactable::colDef(name = tr("Complete"))),
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
     })
 
     ## obsPerGroupTable ----
-    output$obsPerGroupTable <- renderUI({
-        req(input$groupCol)
+    # How many rows each group value has. Its counterpart is obsPerGroupNote below: this
+    # one fills only when there is a group column, that one only when there is not.
+    output$obsPerGroupTable <- reactable::renderReactable({
+      req(input$groupCol, input$groupCol != "noGroupSelected")
 
-        if (input$groupCol != "noGroupSelected") {
-          HTML(makeKable(t(table(chosenData()[, input$groupCol], useNA = "ifany"))))
-        } else {
-          helpText(tr("No group column selected."))
-        }
+      # as.data.frame.matrix takes the "table" class off, so the counts stay on one row
+      # instead of melting into three long columns. useNA = "ifany" gives its column the
+      # name NA, which needs a printable header.
+      groupSizes <- as.data.frame.matrix(
+        t(table(chosenData()[, input$groupCol], useNA = "ifany")))
+      names(groupSizes)[is.na(names(groupSizes))] <- "NA"
+
+      reactable::reactable(
+        groupSizes,
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
+    })
+
+    ## obsPerGroupNote ----
+    output$obsPerGroupNote <- renderUI({
+      req(input$groupCol)
+
+      if (input$groupCol == "noGroupSelected") helpText(tr("No group column selected."))
     })
 
     ## Select ----

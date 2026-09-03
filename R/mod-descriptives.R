@@ -39,85 +39,70 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
     ns <- session$ns
 
+    ## the four numbers per item ----
+    # Mean, standard deviation, skewness and excess kurtosis of every chosen item, for
+    # whichever rows are handed in.
+    itemMoments <- function(rows) {
+      t(apply(
+        rows,
+        MARGIN = 2,
+        FUN = function(col) {
+          c(Mean = mean(col, na.rm = TRUE),
+            SD = stats::sd(col, na.rm = TRUE),
+            Skew = itemSkewness(col),
+            Excess = itemKurtosis(col) - 3)
+        }))
+    }
+
+    ## one descriptives table ----
+    # `header`, when given, is a band across the four columns saying how many rows they
+    # were computed from. The group-wise tables put their group above the table instead,
+    # the same way the covariance matrix does, so they pass no header.
+    #
+    # locales = "en-US" pins the decimal point - without it reactable rounds in the
+    # reader's own language and a German browser prints 1,504 (see GOTCHAS.md).
+    momentsTable <- function(moments, header = NULL) {
+      reactable::reactable(
+        as.data.frame(moments),
+        rownames = TRUE,
+        defaultColDef = reactable::colDef(
+          format = reactable::colFormat(digits = 3, locales = "en-US")),
+        columns = list(
+          .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold")),
+          Mean = reactable::colDef(name = tr("Mean")),
+          SD = reactable::colDef(name = tr("SD")),
+          Skew = reactable::colDef(name = tr("Skew")),
+          Excess = reactable::colDef(name = tr("Excess"))),
+        columnGroups = if (!is.null(header))
+          list(reactable::colGroup(name = header, html = TRUE,
+                                   columns = c("Mean", "SD", "Skew", "Excess"))),
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
+    }
+
     ## the box ----
     output$box <- renderUI({
       req(data())
 
-      table <- t(apply(
-        data()[, itemCols()],
-        MARGIN = 2,
-        FUN = function(col) {
-          c(Mean = mean(col, na.rm = TRUE),
-            Sd = stats::sd(col, na.rm = TRUE),
-            Skew = itemSkewness(col),
-            Excess = itemKurtosis(col) - 3)
-        }
-      )) # t(apply(
-
-      # These column names become the table's header row, so they go through tr() here
-      # rather than inside the c() above - a function call cannot stand on the left of "="
-      # inside c().
-      colnames(table) <- c(tr("Mean"), tr("Sd"), tr("Skew"), tr("Excess"))
-
-      nHeader <- c(1, 4)
-      names(nHeader) <- c(" ", sprintf(tr("n<sub>all</sub> = %i"), nrow(data())))
-
-      overallDescrTable <- makeKable(table, bold_cols = 1) %>%
-        kableExtra::add_header_above(header = nHeader, escape = FALSE) %>%
-        HTML()
+      overallTable <- momentsTable(
+        itemMoments(data()[, itemCols()]),
+        header = sprintf(tr("n<sub>all</sub> = %i"), nrow(data())))
 
       ### the box with a group column ----
       if (hasGroups()) {
         groups <- unique(data()[, groupCol()])
+        groupSizes <- c(table(data()[, groupCol()]))[as.character(groups)]
 
-        mgDescrTableList <- lapply(
-          groups,
-          function(group) {
-            groupTable <- t(apply(
-                subset(
-                  data()[, itemCols()],
-                  data()[, groupCol()] == group),
-                MARGIN = 2,
-                FUN = function(col) {
-                  c(Mean = mean(col, na.rm = TRUE), SD = stats::sd(col, na.rm = TRUE),
-                    Skew = itemSkewness(col),
-                    Excess = itemKurtosis(col) - 3)
-                }
-            )) # t(apply(
-
-            # Same reasoning as the overall table above: the column names become the
-            # header row, so they are translated after the fact.
-            colnames(groupTable) <- c(tr("Mean"), tr("SD"), tr("Skew"), tr("Excess"))
-            groupTable
-          }
-        ) # lapply
-
-        descrGroupHeader <- c(1, rep(4, length(groups)))
-        names(descrGroupHeader) <- c(
-          " ",
-          sprintf(
-            tr("Group: %s (n<sub>%s</sub> = %i)"),
-            groups,
-            groups,
-            c(table(data()[, groupCol()]))[as.character(groups)]))
-
-        mgDescrTableListTagged <- list()
-
-        for (i in 1:((length(groups) + 1) %/% 2)) {
-          mgDescrTableListTagged[i] <-
-            makeKable(
-                do.call(cbind,
-                        mgDescrTableList[(2 * i - 1):min(2 * i, length(groups))]),
-                bold_cols = 1) %>%
-
-              kableExtra::add_header_above(
-                header = descrGroupHeader[c(1, (2 * i):min(2 * i + 1, length(groups) + 1))],
-                escape = FALSE) %>%
-
-              kableExtra::column_spec(
-                column = 5,
-                border_right = "1px solid lightgrey")
-        }
+        # One table per group, each under its own heading - the same shape as the
+        # covariance matrix box next to it.
+        groupTables <- lapply(seq_along(groups), function(position) {
+          tagList(
+            h5(HTML(sprintf(tr("Group: %s (n<sub>%s</sub> = %i)"),
+                            groups[position], groups[position], groupSizes[position]))),
+            momentsTable(itemMoments(
+              subset(data()[, itemCols()], data()[, groupCol()] == groups[position]))))
+        })
 
         # output if groups
         shinydashboard::tabBox(
@@ -127,11 +112,11 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
           tabPanel(
             tr("Overall"),
-            overallDescrTable),
+            overallTable),
 
           tabPanel(
             tr("Group-wise"),
-            tagList(do.call(HTML, mgDescrTableListTagged)))
+            unname(groupTables))
 
         ) # tabBox
 
@@ -141,7 +126,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         shinydashboard::box(
           width = 6,
           title = tr("Descriptive statistics:"),
-          overallDescrTable)
+          overallTable)
       }
     })
   })

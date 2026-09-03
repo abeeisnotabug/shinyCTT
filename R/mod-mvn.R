@@ -25,12 +25,15 @@ mvnUI <- function(id) {
       shinydashboard::box(
         width = NULL,
         title = tr("Test on multivariate normality:"),
-        htmlOutput(ns("comment"))),
+        uiOutput(ns("comment")),
+        reactable::reactableOutput(ns("mvTable")),
+        uiOutput(ns("recommendation"))),
 
       shinydashboard::box(
         width = NULL,
         title = tr("Tests on univariate normality:"),
-        htmlOutput(ns("table")))
+        reactable::reactableOutput(ns("table")),
+        uiOutput(ns("tableNote")))
     ), # column
 
     column(
@@ -89,79 +92,116 @@ mvnServer <- function(id, data, itemCols) {
       if (notNormal) "MLR" else "ML"
     })
 
+    ## the two result tables ----
+    # The numbers the two boxes show, built once each so the words around them and the
+    # table itself can be separate outputs. Both give back NULL when the test did not run.
+    #
+    # The column names stay English here and are translated in the colDef()s below, so
+    # nothing downstream has to look a column up by its translated name.
+    multivariateTable <- reactive({
+      req(input$mvnSL)
+
+      if (!is.data.frame(mvnResult()$multivariate_normality)) return(NULL)
+
+      mvnMV <- data.frame(Test = mvnResult()$multivariate_normality$Test,
+                          Statistic = mvnResult()$multivariate_normality$Statistic,
+                          p = suppressWarnings(as.numeric(mvnResult()$multivariate_normality$p.value)),
+                          stringsAsFactors = FALSE)
+
+      mvnMV$p[is.na(mvnMV$p)] <- 0
+      mvnMV$Signif. <- ifelse(mvnMV$p < input$mvnSL, "*", "")
+      mvnMV$p <- ifelse(mvnMV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnMV$p, 3)))
+      mvnMV
+    })
+
+    univariateTable <- reactive({
+      req(input$mvnSL)
+
+      if (!identical(class(mvnResult())[1], "mvn")) return(NULL)
+
+      mvnUV <- data.frame(Test = mvnResult()$univariate_normality$Test,
+                          Item = mvnResult()$univariate_normality$Variable,
+                          Statistic = mvnResult()$univariate_normality$Statistic,
+                          p = suppressWarnings(as.numeric(mvnResult()$univariate_normality$p.value)),
+                          stringsAsFactors = FALSE)
+
+      mvnUV$p[is.na(mvnUV$p)] <- 0
+      mvnUV$Signif. <- ifelse(mvnUV$p < input$mvnSL, "*", "")
+      mvnUV$p <- ifelse(mvnUV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnUV$p, 3)))
+      mvnUV
+    })
+
     ## the multivariate test, in words and as a table ----
+    # Three outputs where the box shows one thing: renderReactable can only give back a
+    # table, so the sentence above the table and the sentence below it are their own
+    # outputs. Each is guarded, so a failed test leaves only the red message.
     output$comment <- renderUI({
+      req(data(), input$mvnSL)
 
-      req(data())
-
-      ### if the test ran ----
-      if (is.data.frame(mvnResult()$multivariate_normality)) {
-
-        mvnMV <- data.frame(Test = mvnResult()$multivariate_normality$Test,
-                            Statistic = mvnResult()$multivariate_normality$Statistic,
-                            p = suppressWarnings(as.numeric(mvnResult()$multivariate_normality$p.value)),
-                            stringsAsFactors = F)
-
-        mvnMV$p[is.na(mvnMV$p)] <- 0
-        mvnMV$Signif. <- ifelse(mvnMV$p < input$mvnSL, "*", "")
-        mvnMV$p <- ifelse(mvnMV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnMV$p, 3)))
-
-        # Read before the columns are renamed for display below - once translated, the
-        # column is no longer reliably called "Signif.".
-        anySignif <- "*" %in% mvnMV$Signif.
-
-        # The data.frame's own column names become the table's header row, so they are
-        # translated here rather than at data.frame(Test = ..., ...) above - a function
-        # call cannot stand on the left of "=" in an argument list.
-        colnames(mvnMV) <- c(tr("Test"), tr("Statistic"), tr("p"), tr("Signif."))
-
-        if (anySignif) {
-
-          tagList(
-            sprintf(tr("At least one of the hypotheses that Mardia's Skewness statistic or Mardias' Kurtosis statistic matches one of a normal distribution has to be discarded on a significance level of %s. Test result:"), input$mvnSL),
-            HTML(makeKable(mvnMV, bootstrap_options = "basic")),
-            HTML(tr("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator.")))
-
-        } else {
-
-          tagList(
-            sprintf(tr("The hypotheses that Mardia's Skewness statistic and Mardias' Kurtosis statistic match those of a normal distribution can be maintained on a significance level of %s. Test result:"), input$mvnSL),
-            HTML(makeKable(mvnMV, bootstrap_options = "basic")),
-            HTML(tr("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator.")))
-        }
-      } ### if it did not ----
-      else {
+      ### if the test did not run ----
+      if (is.null(multivariateTable())) {
         paste(tr("There was an ERROR/WARNING:"), mvnResult()$message) %>%
           HTML() %>%
           div(style = "color:red")
+
+      ### if it did ----
+      } else if ("*" %in% multivariateTable()$Signif.) {
+        sprintf(tr("At least one of the hypotheses that Mardia's Skewness statistic or Mardias' Kurtosis statistic matches one of a normal distribution has to be discarded on a significance level of %s. Test result:"), input$mvnSL)
+
+      } else {
+        sprintf(tr("The hypotheses that Mardia's Skewness statistic and Mardias' Kurtosis statistic match those of a normal distribution can be maintained on a significance level of %s. Test result:"), input$mvnSL)
+      }
+    })
+
+    output$mvTable <- reactable::renderReactable({
+      req(multivariateTable())
+
+      reactable::reactable(
+        multivariateTable(),
+        columns = list(
+          Test = reactable::colDef(name = tr("Test")),
+          Statistic = reactable::colDef(name = tr("Statistic"),
+                                        format = reactable::colFormat(digits = 3, locales = "en-US")),
+          p = reactable::colDef(name = tr("p")),
+          `Signif.` = reactable::colDef(name = tr("Signif."))),
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
+    })
+
+    output$recommendation <- renderUI({
+      req(multivariateTable())
+
+      if ("*" %in% multivariateTable()$Signif.) {
+        HTML(tr("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator."))
+      } else {
+        HTML(tr("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
       }
     })
 
     ## the item-by-item tests ----
-    output$table <- renderUI({
+    # Same split again: the table when the test ran, the red message when it did not.
+    output$table <- reactable::renderReactable({
+      req(data(), univariateTable())
 
-      req(data())
+      reactable::reactable(
+        univariateTable(),
+        columns = list(
+          Test = reactable::colDef(name = tr("Test")),
+          Item = reactable::colDef(name = tr("Item")),
+          Statistic = reactable::colDef(name = tr("Statistic"),
+                                        format = reactable::colFormat(digits = 3, locales = "en-US")),
+          p = reactable::colDef(name = tr("p")),
+          `Signif.` = reactable::colDef(name = tr("Signif."))),
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
+    })
 
-      if (class(mvnResult())[1] == "mvn") {
+    output$tableNote <- renderUI({
+      req(data(), input$mvnSL)
 
-        mvnUV <- data.frame(Test = mvnResult()$univariate_normality$Test,
-                            Item = mvnResult()$univariate_normality$Variable,
-                            Statistic = mvnResult()$univariate_normality$Statistic,
-                            p = suppressWarnings(as.numeric(mvnResult()$univariate_normality$p.value)),
-                            stringsAsFactors = F)
-
-        mvnUV$p[is.na(mvnUV$p)] <- 0
-        mvnUV$Signif. <- ifelse(mvnUV$p < input$mvnSL, "*", "")
-        mvnUV$p <- ifelse(mvnUV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnUV$p, 3)))
-
-        # The data.frame's own column names become the table's header row, so they are
-        # translated here rather than at data.frame(Test = ..., ...) above - a function
-        # call cannot stand on the left of "=" in an argument list.
-        colnames(mvnUV) <- c(tr("Test"), tr("Item"), tr("Statistic"), tr("p"), tr("Signif."))
-
-        HTML(makeKable(mvnUV, bootstrap_options = "basic"))
-
-      } else {
+      if (is.null(univariateTable())) {
         paste(tr("There was an ERROR/WARNING:"), mvnResult()$message) %>%
           HTML() %>%
           div(style = "color:red")

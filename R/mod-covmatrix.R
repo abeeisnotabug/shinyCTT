@@ -19,45 +19,47 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
     ns <- session$ns
 
+    ## one covariance matrix ----
+    # The covariance matrix of whichever rows are handed in, as a table. Only the lower
+    # triangle is filled: the upper one repeats it, so it is blanked and shown empty.
+    #
+    # locales = "en-US" pins the decimal point - without it reactable rounds in the
+    # reader's own language and a German browser prints 0,129 (see GOTCHAS.md).
+    covarianceTable <- function(rows) {
+      covariances <- stats::cov(rows, use = "pairwise.complete.obs")
+      covariances[upper.tri(covariances)] <- NA
+
+      reactable::reactable(
+        as.data.frame(covariances),
+        rownames = TRUE,
+        defaultColDef = reactable::colDef(
+          na = "",
+          format = reactable::colFormat(digits = 3, locales = "en-US")),
+        columns = list(
+          .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold"))),
+        sortable = FALSE,
+        pagination = FALSE,
+        compact = TRUE)
+    }
+
     ## the box ----
     output$box <- renderUI({
       req(data())
 
-      table <- stats::cov(data()[, itemCols()], use = "pairwise.complete.obs")
-      table[upper.tri(table)] <- NA
-
       ## box if (hasGroups()) ----
       if (hasGroups()) {
         groups <- unique(data()[, groupCol()])
+        groupSizes <- c(table(data()[, groupCol()]))[as.character(groups)]
 
-        mgCovMatList <- lapply(
-          groups,
-          function(group) {
-            stats::cov(
-              subset(
-                data()[, itemCols()],
-                data()[, groupCol()] == group),
-              use = "pairwise.complete.obs")
-          })
-
-        for (i in 1:length(mgCovMatList))
-          mgCovMatList[[i]][upper.tri(mgCovMatList[[i]])] <- NA
-
-        mgCovMatTable <- makeKable(do.call(rbind, mgCovMatList),
-                                              bold_cols = 1)
-
-        groupRowHeaders <- sprintf(
-          tr("Group: %s (n = %i)"),
-          groups,
-          c(table(data()[, groupCol()]))[as.character(groups)])
-
-        for (i in 1:length(groups))
-          mgCovMatTable <- mgCovMatTable %>%
-            kableExtra::group_rows(
-              group_label = groupRowHeaders[i],
-              start_row = (i - 1) * length(itemCols()) + 1,
-              end_row = i * length(itemCols()),
-              label_row_css = "background-color: #666; color: #fff;")
+        # One table per group, each under its own heading. kableExtra put that heading in a
+        # dark band row inside a single tall table; reactable cannot draw a row that is not
+        # in the data, so the heading sits above its table instead.
+        groupTables <- lapply(seq_along(groups), function(position) {
+          tagList(
+            h5(sprintf(tr("Group: %s (n = %i)"), groups[position], groupSizes[position])),
+            covarianceTable(
+              subset(data()[, itemCols()], data()[, groupCol()] == groups[position])))
+        })
 
         # output if groups
         shinydashboard::tabBox(
@@ -67,12 +69,11 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
           tabPanel(
             title = tr("Overall"),
-            makeKable(table, bold_cols = 1) %>%
-              HTML()),
+            covarianceTable(data()[, itemCols()])),
 
           tabPanel(
             tr("Group-wise"),
-            HTML(mgCovMatTable))
+            unname(groupTables))
 
         ) # tabBox
 
@@ -84,8 +85,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
           width = 12,
           title = tr("Covariance matrix:"),
 
-          makeKable(table, bold_cols = 1) %>%
-            HTML()
+          covarianceTable(data()[, itemCols()])
 
         ) # box
       }

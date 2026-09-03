@@ -278,6 +278,46 @@ needs" means here.
 
 *Where:* `shinyCTTApp.R`, the `reactable.theme` in `onStart`.
 
+### `colFormat()` rounds in the *reader's* language
+
+`reactable::colFormat(digits = 3)` does its formatting in the browser, with
+`Number.toLocaleString()`, so it uses whatever decimal separator that browser is set to. On a
+German-locale browser Mardia's skewness came out as `148,484` in the same row as a p-value of
+`0.039`, which is formatted in R with `sprintf()` and so always has a dot. One table, two
+separators.
+
+Every `colFormat()` in this package therefore passes `locales = "en-US"`, which pins the dot.
+Change that only if the whole app's numbers are meant to change with the language, which is a
+decision about all of them and not about one table.
+
+*Where:* `mod-mvn.R`, and every numeric column converted after it.
+
+### `reactable()` does not round anything by default
+
+`makeKable(digits = 3)` rounded every numeric column, so a converted table with no `format =`
+shows full floating-point precision instead. There is no warning; the numbers are simply
+long. Give any column of real numbers a `colFormat(digits = 3, locales = "en-US")`, and leave
+counts alone - `digits = 3` would turn 238 into `238.000`.
+
+### `renderReactable()` can only give back a table
+
+Several boxes used to return *either* a table *or* a `helpText()` note from one `renderUI()`.
+That has to become two outputs with a guard on each, so only one of them ever fills:
+`obsPerGroupTable` / `obsPerGroupNote` in `mod-data-subset.R`, and the univariate `table` /
+`tableNote` in `mod-mvn.R`. The multivariate box in `mod-mvn.R` is a three-way split, because
+its table has a sentence above it and a sentence below.
+
+Unlike DT, `req()` **does** blank a reactable that has already been drawn - checked in a
+browser - so it does not need the explicit `NULL` that `mod-data-source.R`'s preview does.
+
+### `as.data.frame()` melts a one-row `table` object
+
+`reactable()` runs `as.data.frame()` on whatever it is given, and on a `table` that turns a
+one-row count into three long columns. `as.data.frame.matrix()` first keeps the counts on one
+row. A `useNA = "ifany"` column also arrives named `NA` and needs a printable header.
+
+*Where:* `mod-data-subset.R`, `obsPerGroupTable`.
+
 ---
 
 ## This package
