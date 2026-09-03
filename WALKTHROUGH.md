@@ -387,8 +387,10 @@ Written down because it is a deliberate choice, not an accident:
 - **Long and obvious beats short and clever.** Explicit `for` loops rather than `Reduce()`,
   `do.call()` or `apply()` chains. The app is not slow — fitting all five models takes about
   a third of a second — so there is no reason to trade clarity for speed.
-- **No functions defined inside other functions.** If you have to follow a chain of four calls
-  to find out what a number is, that is a bug in the writing.
+- **No chains of calls you have to follow to find out what a value is.** If you have to follow
+  four calls to find out what a number is, that is a bug in the writing. A function written
+  inside another one is fine when it is used more than once and reads where it stands — what is
+  not fine is one that exists only to move code somewhere else.
 - **But no copy-paste either.** A number that appears in three places will eventually
   disagree with itself. Write it once and read it from there — that is what `cttModelFamily()`
   is for.
