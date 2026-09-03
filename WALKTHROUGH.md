@@ -194,7 +194,10 @@ setting redraws the table *inside* the open tab and leaves the user where they w
 | `R/mod-data-subset.R` | Step 2: which items, which groups, missing values. Hands back the six answers the rest of the app works from. |
 | `R/mod-ctt-results.R` | Everything a model run produces: the comparison page, the parameter tables, the factor scores, the model code. Started twice — once for the whole sample, once for the groups. |
 | `R/helperFunsExtract.R` | Pulls fit indices and parameter estimates out of a fitted lavaan object. Contains the reliability confidence intervals. |
-| `R/helperFunsTables.R` | Every HTML table the app shows. |
+| `R/helperFunsTables.R` | Every table the app shows. They are `reactable`s: a table works out whether each cell is good, bad or neutral, and the colour is looked up from that. |
+| `R/colors.R` | **Every colour the app draws with, and nothing else names one.** The plots' green, the three the tables rate a cell with, and the palette for group-wise plots. |
+| `R/translations.R` | `tr()`, which turns a short name like `common.select` into the words on screen, in whichever language the visitor is reading. |
+| `inst/translations.csv` | **All the text.** One row per piece, one column per language. This is the file to edit to change a word. |
 | `R/helperFunsAdvanced.R` | Factor scores, and the copy-pasteable R script shown on the Model Code tab. |
 | `R/ui.R` | The page layout: which boxes sit on which tab. Also the FU Berlin green theme. |
 | `R/sidebar.R` | The left-hand menu, and the four stages the app steps through. |
@@ -258,24 +261,46 @@ table of contents. The number of `#` marks the nesting depth:
 
 ### "I want to change a label the user sees"
 
-Model names live in `cttModelFamily()` in `R/modelFamily.R`, in three places:
+**Open `inst/translations.csv` and edit that row. Nothing in `R/` holds the words.**
 
-- `long` — full name, for tab titles: `"essentially &tau;-equivalent"`
-- `abbrev` — short name, for table headers: `"ess. &#964;-equiv."`
-- `plot$name` — the same again as an R plotmath expression, for the hierarchical plot
+Each row is one piece of text: a short name, then one column per language. The code says
+`tr("subset.items.label")`; the row says what that is in English, German and French. To find
+the row, search the file for the English words.
 
-Change all three or the app will disagree with itself. Everything else is prose in `ui.R` or
-in the box titles in `server.R`.
+Three things to know while you are in there:
 
-Greek letters are HTML entities (`&tau;`, `&sigma;`) because the tables are HTML strings, not
-Shiny tables. The plot cannot use HTML, so it needs the plotmath form instead.
+- **Leave the `%s`, `%i` and `_TOTAL_` alone.** The code fills those in, by position. A
+  translation that drops one either loses a number or stops the app on that screen —
+  `devtools::test()` checks for it, so you will be told.
+- **Do not put `<b>` or `<i>` in.** Where a sentence needs them, the code puts them around a
+  `%s`, so that German and French can put the emphasised words in a different place.
+- **The `sym.*` rows are symbols**, not sentences — a sigma is a sigma in every language, so
+  they are left untranslated and may carry `<sub>`. They are also where the real Greek
+  characters live: `R CMD check` refuses non-ASCII characters in `R/`, which is half of why
+  the text moved out here in the first place.
+
+The five model names are in that file too, three rows each — `model.tko.long` for tab
+titles, `model.tko.abbrev` for table headers, and `model.tko.plot` for the hierarchical
+plot, which cannot use HTML and needs R's plotmath instead (a `~` there means a space).
+
+### "I want to add a language"
+
+1. A new column in `inst/translations.csv`, headed with its two-letter code.
+2. That code added to `appLanguages` in `R/translations.R`.
+3. A `sym.lang.<code>` row holding its flag and its own name for itself.
+4. One line in `languageLabels()`, next to `appLanguages`.
+
+Written out one by one rather than built with `paste0()`, because the test reads the source
+looking for `tr("...")` and cannot see a name that is assembled while the app runs.
 
 ### "I want to add or remove a model"
 
-1. `cttModelFamily()` — add its short name to `models`, add one entry to each of `long`,
-   `abbrev` and `minItems`, add its nesting edges to `hierarchy`, and add a row to `plot`
-   giving its label and where the plot should draw it.
-2. `makeModelCodes.R` — say which parameters it constrains.
+1. `inst/translations.csv` — three rows for its name: `model.<x>.long`, `model.<x>.abbrev`
+   and `model.<x>.plot`.
+2. `cttModelFamily()` — add its short name to `models`, add one `tr()` line to each of
+   `long`, `abbrev` and `plot$name`, one number to `minItems`, its nesting edges to
+   `hierarchy`, and a row to `plot` saying where to draw it.
+3. `makeModelCodes.R` — say which parameters it constrains.
 
 That is all. The comparison grid, the list of valid comparisons, the item-count limits and
 the checkbox ids all follow from step 1.
@@ -351,7 +376,7 @@ controls do not exist until that `renderUI` has run once.
 ## 8. Checking you have not broken anything
 
 ```r
-devtools::test()     # 54 tests: the calculation helpers, plus the module id checks
+devtools::test()     # the calculation helpers, the module id checks, and the text file
 devtools::check()    # full R CMD check; the package is kept at 0 errors/warnings/notes
 ```
 
@@ -377,6 +402,11 @@ Useful data to click through with:
 
 A full manual pass is: pick the data → pick a group column → look at all three statistics
 tabs → run the models → check the results tabs, single-group **and** multigroup.
+
+**Two things only a browser shows.** `devtools::load_all()` hides a whole class of shinyjs
+bug, so anything touching enable/disable has to be checked against an installed build
+(`R CMD INSTALL`); and a wrong colour on a right number is invisible to every test there is.
+When the table code changes, open the old build and the new one and compare what is painted.
 
 ---
 
