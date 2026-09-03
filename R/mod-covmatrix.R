@@ -56,7 +56,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # in the data, so the heading sits above its table instead.
         groupTables <- lapply(seq_along(groups), function(position) {
           tagList(
-            groupHeading(sprintf(tr("Group: %s (n = %i)"),
+            groupHeading(sprintf(tr("common.group.label"),
                                  groups[position], groupSizes[position])),
             covarianceTable(
               subset(data()[, itemCols()], data()[, groupCol()] == groups[position])))
@@ -65,16 +65,16 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # output if groups
         shinydashboard::tabBox(
           width = 12,
-          title = tr("Covariance matrix:"),
+          title = tr("stats.covmatrix.title"),
           side = "right",
 
           tabPanel(
-            title = tr("Overall"),
-            groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
+            title = tr("common.overall"),
+            groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),
             covarianceTable(data()[, itemCols()])),
 
           tabPanel(
-            tr("Group-wise"),
+            tr("common.groupwise"),
             unname(groupTables))
 
         ) # tabBox
@@ -85,9 +85,9 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # output if NO groups
         shinydashboard::box(
           width = 12,
-          title = tr("Covariance matrix:"),
+          title = tr("stats.covmatrix.title"),
 
-          groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
+          groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),
           covarianceTable(data()[, itemCols()])
 
         ) # box

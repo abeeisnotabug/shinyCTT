@@ -93,7 +93,7 @@ makeCorrTableWithCIs <- function(rawTable, sigLvl, itemCols) {
   # The row labels are a column of their own rather than row names: every second one is the
   # word CI, and as.data.frame() would make those unique - CI, CI.1, CI.2 - on the screen.
   shown <- data.frame(
-    rowLabel = c(rbind(itemCols, tr("CI"))),
+    rowLabel = c(rbind(itemCols, tr("results.col.ci"))),
     shown,
     stringsAsFactors = FALSE,
     check.names = FALSE)
@@ -155,7 +155,7 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, modelsAbbrev) 
   ## RMSEA of the difference ----
   rmseaD <- hierTable[laterRows, "RMSEA"]
 
-  rmseaDShown <- c("", ifelse(is.na(rmseaD), tr("NA"), formatBounded(rmseaD)))
+  rmseaDShown <- c("", ifelse(is.na(rmseaD), tr("results.na"), formatBounded(rmseaD)))
   rmseaDRating <- c(
     NA_character_,
     ifelse(is.na(rmseaD), "neutral", ifelse(rmseaD < 0.05, "good", "bad")))
@@ -192,13 +192,13 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, modelsAbbrev) 
     bic = ifelse(bicRounded == min(bicRounded), "good", "bad"))
 
   headers <- c(
-    deltaDf = tr("&Delta;df"),
-    deltaChisq = paste0(estimatorName, tr("-&Delta;&chi;&sup2;")),
-    p = tr("p"),
-    rmseaD = tr("RMSEA<sub>D</sub>"),
-    cfi = tr("CFI"),
-    aic = tr("AIC"),
-    bic = tr("BIC"))
+    deltaDf = tr("sym.delta.df"),
+    deltaChisq = paste0(estimatorName, tr("sym.delta.chi2")),
+    p = tr("common.col.p"),
+    rmseaD = tr("sym.rmsea.d"),
+    cfi = tr("results.col.cfi"),
+    aic = tr("results.col.aic"),
+    bic = tr("results.col.bic"))
 
   reactable::reactable(
     shown,
@@ -269,15 +269,15 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, modelsAbbrev)
     srmr = ifelse(fits$srmr < 0.05, "good", "bad"))
 
   headers <- c(
-    df = tr("df"),
-    chisq = paste0(estimatorName, tr("-&chi;&sup2;")),
-    pvalue = tr("p"),
-    rmsea = tr("RMSEA"),
-    rmseaCi = sprintf(tr("%g%%-CI"), 100 * rmseaCiLvl),
-    rmseaP = tr("p<sub>H0:RMSEA<=.05</sub>"),
-    rmseaNotClose = tr("p<sub>H0:RMSEA>=.08</sub>"),
-    cfi = tr("CFI"),
-    srmr = tr("SRMR"))
+    df = tr("results.col.df"),
+    chisq = paste0(estimatorName, tr("sym.chi2")),
+    pvalue = tr("common.col.p"),
+    rmsea = tr("results.col.rmsea"),
+    rmseaCi = sprintf(tr("results.col.rmsea.ci"), 100 * rmseaCiLvl),
+    rmseaP = tr("sym.p.rmsea.le05"),
+    rmseaNotClose = tr("sym.p.rmsea.ge08"),
+    cfi = tr("results.col.cfi"),
+    srmr = tr("results.col.srmr"))
 
   columns <- ratedColumns(headers, ratings)
 
@@ -334,20 +334,20 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, grou
     "relLabel", "relEst", "relSe", "relCi")
 
   # "SE" and "CI" carry the estimator's name as a subscript, e.g. SE<sub>MLR</sub>.
-  seName <- paste0(tr("SE"), "<sub>", estimatorName, "</sub>")
-  ciName <- paste0(tr("CI"), "<sub>", estimatorName, "</sub>")
+  seName <- paste0(tr("results.col.se"), "<sub>", estimatorName, "</sub>")
+  ciName <- paste0(tr("results.col.ci"), "<sub>", estimatorName, "</sub>")
 
   displayNames <- c(
-    item = tr("Item"),
-    lambdaLabel = tr("&lambda;<sub>i</sub>"),
-    lambdaEst = tr("Est."), lambdaSe = seName, lambdaCi = ciName,
-    stdEst = tr("Std. Est."), stdSe = seName, stdCi = ciName,
-    alphaLabel = tr("&alpha;<sub>i</sub>"),
-    alphaEst = tr("Est."), alphaSe = seName, alphaCi = ciName,
-    errorLabel = tr("&sigma;&sup2;<sub>&epsilon;<sub>i</sub></sub>"),
-    errorEst = tr("Est."), errorSe = seName, errorCi = ciName,
-    relLabel = tr("R<sub>i</sub>"),
-    relEst = tr("Est."), relSe = seName, relCi = ciName)
+    item = tr("common.col.item"),
+    lambdaLabel = tr("sym.lambda.i"),
+    lambdaEst = tr("results.col.est"), lambdaSe = seName, lambdaCi = ciName,
+    stdEst = tr("results.col.std.est"), stdSe = seName, stdCi = ciName,
+    alphaLabel = tr("sym.alpha.i"),
+    alphaEst = tr("results.col.est"), alphaSe = seName, alphaCi = ciName,
+    errorLabel = tr("sym.sigma2.epsilon.i"),
+    errorEst = tr("results.col.est"), errorSe = seName, errorCi = ciName,
+    relLabel = tr("sym.reliability.i"),
+    relEst = tr("results.col.est"), relSe = seName, relCi = ciName)
 
   # The estimates and standard errors are real numbers - makeKable() used to round them to
   # three places for the whole table. Everything else is already text.
@@ -368,17 +368,17 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, grou
 
     columnGroups = list(
       reactable::colGroup(
-        name = tr("Discrimination Parameters (Factor Loadings)"),
+        name = tr("results.partable.loadings"),
         columns = c("lambdaLabel", "lambdaEst", "lambdaSe", "lambdaCi",
                     "stdEst", "stdSe", "stdCi")),
       reactable::colGroup(
-        name = tr("Easiness Parameters (Intercepts)"),
+        name = tr("results.partable.intercepts"),
         columns = c("alphaLabel", "alphaEst", "alphaSe", "alphaCi")),
       reactable::colGroup(
-        name = tr("Variances"),
+        name = tr("results.partable.variances"),
         columns = c("errorLabel", "errorEst", "errorSe", "errorCi")),
       reactable::colGroup(
-        name = tr("Reliabilities"),
+        name = tr("results.partable.reliabilities"),
         columns = c("relLabel", "relEst", "relSe", "relCi"))),
 
     # The last row is the group's own variance and reliability rather than an item's.
@@ -422,94 +422,95 @@ drawLegend <- function(...) {
 makeLegend <- function(whichLegend, estimatorName, sigLvl, rmseaCiLvl = 0.90) {
 
   # The two thresholds every legend below quotes, written once.
-  atLeastSig <- paste0(tr("p >= "), formatBounded(sigLvl))
-  belowSig <- paste0(tr("p < "), formatBounded(sigLvl))
+  atLeastSig <- paste0(tr("results.legend.p.ge"), formatBounded(sigLvl))
+  belowSig <- paste0(tr("results.legend.p.lt"), formatBounded(sigLvl))
 
   # "Delta-df, ML-Delta-chi-squared, p:" - the three columns those chips describe.
   differenceColumns <- paste(
-    c(tr("&Delta;df"), paste0(estimatorName, tr("-&Delta;&chi;&sup2;")), tr("p:")),
+    c(tr("sym.delta.df"), paste0(estimatorName, tr("sym.delta.chi2")),
+      paste0(tr("common.col.p"), ":")),
     collapse = ", ")
 
   switch(
     whichLegend,
 
     "corrTable" = drawLegend(list(
-      chip(tr("Legend:")),
-      chip(tr("Sig. pos."), "good"),
-      chip(tr("Sig. neg."), "bad"),
-      chip(tr("Not sig."), "neutral"))),
+      chip(tr("common.legend")),
+      chip(tr("common.sig.pos"), "good"),
+      chip(tr("common.sig.neg"), "bad"),
+      chip(tr("common.not.sig"), "neutral"))),
 
     "hierTables" = drawLegend(list(
-      chip(tr("Legend:")),
+      chip(tr("common.legend")),
       chip(differenceColumns),
       chip(atLeastSig, "good"),
       chip(belowSig, "bad"),
 
-      chip(tr("RMSEA<sub>D</sub>")),
-      chip(tr("< .05"), "good"),
-      chip(tr(">= .05"), "bad"),
-      chip(tr("NA (FIML, lavaan >= 0.6-21)"), "neutral"),
+      chip(tr("sym.rmsea.d")),
+      chip(tr("results.legend.lt.05"), "good"),
+      chip(tr("results.legend.ge.05"), "bad"),
+      chip(tr("results.legend.na.fiml"), "neutral"),
 
-      chip(tr("CFI:")),
-      chip(tr(">= .97"), "good"),
-      chip(tr(">= .95"), "neutral"),
-      chip(tr("< .95"), "bad"),
+      chip(paste0(tr("results.col.cfi"), ":")),
+      chip(tr("results.legend.ge.97"), "good"),
+      chip(tr("results.legend.ge.95"), "neutral"),
+      chip(tr("results.legend.lt.95"), "bad"),
 
-      chip(tr("AIC, BIC:")),
-      chip(tr("min."), "good"),
-      chip(tr("else"), "bad"))),
+      chip(tr("results.legend.aicbic.label")),
+      chip(tr("results.legend.min"), "good"),
+      chip(tr("results.legend.else"), "bad"))),
 
     "fitIndexTable" = drawLegend(
       list(
-        chip(tr("Legend:")),
+        chip(tr("common.legend")),
         chip(differenceColumns),
         chip(atLeastSig, "good"),
         chip(belowSig, "bad"),
 
         chip(""), chip(""), chip(""), chip(""),
 
-        chip(tr("CFI")),
-        chip(tr(">= .97"), "good"),
-        chip(tr(">= .95"), "neutral"),
-        chip(tr("< .95"), "bad"),
+        chip(tr("results.col.cfi")),
+        chip(tr("results.legend.ge.97"), "good"),
+        chip(tr("results.legend.ge.95"), "neutral"),
+        chip(tr("results.legend.lt.95"), "bad"),
 
-        chip(tr("SRMR")),
-        chip(tr("< .05"), "good"),
-        chip(tr(">= .05"), "bad")),
+        chip(tr("results.col.srmr")),
+        chip(tr("results.legend.lt.05"), "good"),
+        chip(tr("results.legend.ge.05"), "bad")),
 
       list(
         chip(""),
-        chip(tr("RMSEA")),
-        chip(tr("< .05"), "good"),
-        chip(tr(">= .05"), "bad"),
+        chip(tr("results.col.rmsea")),
+        chip(tr("results.legend.lt.05"), "good"),
+        chip(tr("results.legend.ge.05"), "bad"),
 
-        chip(sprintf(tr("%g%%-CI"), 100 * rmseaCiLvl)),
-        chip(tr("< .05"), "good"),
-        chip(tr("> .05"), "bad"),
-        chip(tr("&ni; .05"), "neutral"),
+        chip(sprintf(tr("results.col.rmsea.ci"), 100 * rmseaCiLvl)),
+        chip(tr("results.legend.lt.05"), "good"),
+        chip(tr("results.legend.gt.05"), "bad"),
+        chip(tr("sym.contains.05"), "neutral"),
 
-        chip(tr("p<sub>.05</sub>")),
-        chip(paste0(tr(">= "), formatBounded(sigLvl)), "good"),
-        chip(paste0(tr("< "), formatBounded(sigLvl)), "bad"),
+        chip(tr("sym.p.05")),
+        chip(paste0(tr("results.legend.ge"), formatBounded(sigLvl)), "good"),
+        chip(paste0(tr("results.legend.lt"), formatBounded(sigLvl)), "bad"),
 
-        chip(tr("p<sub>.08</sub>")),
-        chip(paste0(tr("< "), formatBounded(sigLvl)), "good"),
-        chip(paste0(tr(">= "), formatBounded(sigLvl)), "bad"),
+        chip(tr("sym.p.08")),
+        chip(paste0(tr("results.legend.lt"), formatBounded(sigLvl)), "good"),
+        chip(paste0(tr("results.legend.ge"), formatBounded(sigLvl)), "bad"),
         chip(""))),
 
     "combCompTable" = drawLegend(list(
-      chip(tr("Legend:")),
-      chip(paste0(tr("&Delta;df, "), estimatorName, tr("-&Delta;&chi;&sup2;:"))),
+      chip(tr("common.legend")),
+      chip(paste0(tr("sym.delta.df"), ", ", estimatorName, tr("sym.delta.chi2"), ":")),
       chip(atLeastSig, "good"),
       chip(belowSig, "bad"),
-      chip(tr("* / ** / *** if p < .05 / .01 / .001"), "neutral"))),
+      chip(tr("results.legend.stars"), "neutral"))),
 
     "infCompTable" = drawLegend(list(
-      chip(tr("Legend:")),
-      chip(tr("AIC/BIC")),
-      chip(tr("< 0"), "good"),
-      chip(tr("> 0"), "bad"),
-      chip(tr("= 0"), "neutral"))),
+      chip(tr("common.legend")),
+      chip(tr("results.col.aicbic")),
+      chip(tr("results.legend.lt.0"), "good"),
+      chip(tr("results.legend.gt.0"), "bad"),
+      chip(tr("results.legend.eq.0"), "neutral"))),
 
     stop(sprintf("No legend available for table %s.", whichLegend)))
 }

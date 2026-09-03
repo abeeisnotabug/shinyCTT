@@ -68,10 +68,10 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
           format = reactable::colFormat(digits = 3, locales = "en-US")),
         columns = list(
           .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold")),
-          Mean = reactable::colDef(name = tr("Mean")),
-          SD = reactable::colDef(name = tr("SD")),
-          Skew = reactable::colDef(name = tr("Skew")),
-          Excess = reactable::colDef(name = tr("Excess"))),
+          Mean = reactable::colDef(name = tr("stats.desc.mean")),
+          SD = reactable::colDef(name = tr("stats.desc.sd")),
+          Skew = reactable::colDef(name = tr("stats.desc.skew")),
+          Excess = reactable::colDef(name = tr("stats.desc.excess"))),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -82,7 +82,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
       req(data())
 
       overallTable <- tagList(
-        groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
+        groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),
         momentsTable(itemMoments(data()[, itemCols()])))
 
       ### the box with a group column ----
@@ -94,7 +94,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # covariance matrix box next to it.
         groupTables <- lapply(seq_along(groups), function(position) {
           tagList(
-            groupHeading(sprintf(tr("Group: %s (n = %i)"),
+            groupHeading(sprintf(tr("common.group.label"),
                                  groups[position], groupSizes[position])),
             momentsTable(itemMoments(
               subset(data()[, itemCols()], data()[, groupCol()] == groups[position]))))
@@ -103,15 +103,15 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         # output if groups
         shinydashboard::tabBox(
           width = 6,
-          title = tr("Descriptive statistics:"),
+          title = tr("stats.desc.title"),
           side = "right",
 
           tabPanel(
-            tr("Overall"),
+            tr("common.overall"),
             overallTable),
 
           tabPanel(
-            tr("Group-wise"),
+            tr("common.groupwise"),
             unname(groupTables))
 
         ) # tabBox
@@ -121,7 +121,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
         shinydashboard::box(
           width = 6,
-          title = tr("Descriptive statistics:"),
+          title = tr("stats.desc.title"),
           overallTable)
       }
     })

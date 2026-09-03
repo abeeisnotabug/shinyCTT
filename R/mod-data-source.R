@@ -15,7 +15,7 @@ dataSourceUI <- function(id) {
         width = NULL,
         # The three source names are also the values input$source is compared against
         # elsewhere, so they are left untranslated - see the translation report.
-        selectInput(ns("source"), tr("1a. Choose source of data"),
+        selectInput(ns("source"), tr("data.source.label"),
                     choices = c("Workspace", "CSV", "SPSS"))),
 
       shinydashboard::box(
@@ -26,38 +26,38 @@ dataSourceUI <- function(id) {
           ns = ns),
         conditionalPanel(
           condition = "input.source == 'CSV'",
-          fileInput(ns("CSVFile"), tr("1b. Choose CSV File"),
+          fileInput(ns("CSVFile"), tr("data.source.csv"),
                     multiple = FALSE,
                     accept = c("text/csv",
                                "text/comma-separated-values,text/plain",
                                ".csv")),
-          checkboxInput(ns("header"), tr("Header"), TRUE),
-          radioButtons(ns("sep"), tr("Separator"),
-                       choiceNames = list(tr("Comma"), tr("Semicolon"), tr("Tab")),
+          checkboxInput(ns("header"), tr("common.header"), TRUE),
+          radioButtons(ns("sep"), tr("common.separator"),
+                       choiceNames = list(tr("common.comma"), tr("common.semicolon"), tr("common.tab")),
                        choiceValues = c(",", ";", "\t"),
                        selected = ","),
-          radioButtons(ns("quote"), tr("Quote"),
-                       choiceNames = list(tr("None"), tr("Double Quote"), tr("Single Quote")),
+          radioButtons(ns("quote"), tr("data.csv.quote.label"),
+                       choiceNames = list(tr("common.none"), tr("data.csv.quote.double"), tr("data.csv.quote.single")),
                        choiceValues = c("", '"', "'"),
                        selected = '"'),
           ns = ns),
         conditionalPanel(
           condition = "input.source == 'SPSS'",
-          fileInput(ns("SPSSFile"), tr("1b. Choose SPSS File"),
+          fileInput(ns("SPSSFile"), tr("data.source.spss"),
                     multiple = FALSE,
                     accept = c(".sav", ".zsav", ".por")),
           ns = ns)),
 
       shinydashboard::box(
         width = NULL,
-        actionButton(ns("dataSelectButton"), tr("Select"), width = "100%"))
+        actionButton(ns("dataSelectButton"), tr("common.select"), width = "100%"))
 
     ), # column
     column(
       width = 9,
       shinydashboard::box(
         width = NULL,
-        title = tr("Raw data:"),
+        title = tr("data.preview.title"),
         DT::dataTableOutput(ns("dataOverview"))))
   ) # fluidRow
 }
@@ -84,7 +84,7 @@ dataSourceServer <- function(id, notifications, frozen) {
     output$objectsInWorkspace <- renderUI({
       selectInput(
         ns("objectFromWorkspace"),
-        tr("1b. Choose data object from Workspace"),
+        tr("data.source.workspace"),
         Filter(
           function(object) !is.null(dim(get(object))) && typeof(get(object)) != "character",
           ls(envir = globalenv())))
@@ -106,7 +106,7 @@ dataSourceServer <- function(id, notifications, frozen) {
       shinyjs::disable("dataSelectButton")
 
       notifications$notList$noData <- shinydashboard::notificationItem(
-        text = tr("No data selected"),
+        text = tr("data.preview.empty"),
         icon = icon("times"),
         status = "danger")
 
@@ -156,11 +156,11 @@ dataSourceServer <- function(id, notifications, frozen) {
       # observer, so saying so and stopping here leaves step 1 where it was.
       if (inherits(loadedData, "error")) {
         notifications$notList$unreadable <- shinydashboard::notificationItem(
-          text = tr("This data set could not be read."),
+          text = tr("data.error.unreadable"),
           icon = icon("times"),
           status = "danger")
         showNotification(
-          paste(tr("This data set could not be read."), conditionMessage(loadedData)),
+          paste(tr("data.error.unreadable"), conditionMessage(loadedData)),
           duration = 10,
           id = "unreadableNot",
           type = "error")
@@ -178,11 +178,11 @@ dataSourceServer <- function(id, notifications, frozen) {
       ### Test the data for problems ----
       if (!any(vapply(raw(), is.numeric, logical(1)))) {
         notifications$notList$noNumeric <- shinydashboard::notificationItem(
-          text = tr("No numeric columns found"),
+          text = tr("data.error.no.numeric"),
           icon = icon("times"),
           status = "danger")
         showNotification(
-          tr("No numeric columns found"),
+          tr("data.error.no.numeric"),
           duration = 5,
           id = "noNumericNot",
           type = "error")
@@ -194,11 +194,11 @@ dataSourceServer <- function(id, notifications, frozen) {
 
       if (length(raw()) <= 1) {
         notifications$notList$oneCol <- shinydashboard::notificationItem(
-          text = tr("Only one column found"),
+          text = tr("data.error.one.column"),
           icon = icon("times"),
           status = "danger")
         showNotification(
-          tr("Only one column found"),
+          tr("data.error.one.column"),
           duration = 5,
           id = "oneColNot",
           type = "error")

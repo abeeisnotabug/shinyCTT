@@ -74,8 +74,7 @@ cttModelFamily <- function() {
     # subsetting keeps the names: models[c(TRUE, FALSE, ...)] stays labelled.
     names = stats::setNames(nm = models),
 
-    # Full names, used for tab titles and the warning/error message tables. HTML entities,
-    # because these are printed with HTML() rather than as plain text.
+    # Full names, used for tab titles and the warning/error message tables.
     long = stats::setNames(
       c("&tau;-kongeneric",
         "essentially &tau;-equivalent",

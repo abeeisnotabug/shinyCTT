@@ -85,25 +85,25 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
           # Before the run, with enough items: let the user choose.
           conditionalPanel(
             paste0("output.nItemsChosen && ", enoughItems, " && input.goModels == 0"),
-            checkboxInput(ns(rowModel), tr("Include"), value = TRUE),
+            checkboxInput(ns(rowModel), tr("params.grid.include"), value = TRUE),
             ns = ns),
 
           # Too few items for this model to have any degrees of freedom.
           conditionalPanel(
             paste0("output.nItemsChosen && ", tooFewItems),
-            helpText(tr("Too few items.")),
+            helpText(tr("params.grid.too.few")),
             ns = ns),
 
           # After the run: report what was done.
           conditionalPanel(
             paste0("input.goModels > 0 && ", modelIsTicked),
-            helpText(tr("Tested.")),
+            helpText(tr("params.grid.tested")),
             ns = ns),
 
           conditionalPanel(
             paste0("output.nItemsChosen && input.goModels > 0 && !", modelIsTicked,
                    " && !(", tooFewItems, ")"),
-            helpText(tr("Don't test.")),
+            helpText(tr("params.grid.dont.test")),
             ns = ns))
 
       } else {
@@ -119,7 +119,7 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
           # These two models are not nested in each other, so a likelihood-ratio test
           # between them would be meaningless. In the CTT family this happens exactly once,
           # for tau-equivalent against essentially tau-parallel.
-          cell <- column(2, helpText(tr("Not testable.")))
+          cell <- column(2, helpText(tr("params.grid.not.testable")))
 
         } else {
 
@@ -139,7 +139,7 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
             conditionalPanel(
               paste0("output.nItemsChosen && ", bothModelsTicked, " && ", enoughItems,
                      " && input.goModels == 0"),
-              checkboxInput(ns(comparisonId), tr("Compare"), value = TRUE),
+              checkboxInput(ns(comparisonId), tr("params.grid.compare"), value = TRUE),
               ns = ns),
 
             # Not available: one of the two models is not included, or there are too few
@@ -147,12 +147,12 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
             conditionalPanel(
               paste0("output.nItemsChosen && (!(", bothModelsTicked, ") || ", tooFewItems,
                      " || (input.goModels > 0 && !", comparisonIsTicked, "))"),
-              helpText(tr("Don't test.")),
+              helpText(tr("params.grid.dont.test")),
               ns = ns),
 
             conditionalPanel(
               paste0("input.goModels > 0 && ", comparisonIsTicked),
-              helpText(tr("Tested.")),
+              helpText(tr("params.grid.tested")),
               ns = ns))
         }
       }

@@ -187,17 +187,17 @@ ui <- function(request) {
               ##### testParamTab left col how to fit ----
               shinydashboard::box(
                 width = NULL,
-                title = tr("How the models are fitted:"),
+                title = tr("params.fit.box.title"),
                 fluidRow(
 
                   column(
                     width = 6,
                     radioButtons(
                       "estimator",
-                      tr("Choose estimator:"),
+                      tr("params.estimator.label"),
                       choiceNames = list(
-                        tr("Maximum Likelihood"),
-                        tr("Robust Maximum Likelihood")),
+                        tr("common.estimator.ml"),
+                        tr("common.estimator.mlr")),
                       choiceValues = c("ML", "MLR"),
                       selected = "ML")),
 
@@ -205,10 +205,12 @@ ui <- function(request) {
                     width = 6,
                     radioButtons(
                       "etaIntFree",
-                      tr("Choose the mean structure parameterization:"),
+                      tr("params.parameterization.label"),
                       choiceNames = list(
-                        HTML(tr("Fix the latent mean (&mu;<sub>&eta;</sub> = 0)")),
-                        HTML(tr("Fix the first intercept (&alpha;<sub>1</sub> = 0)"))),
+                        HTML(sprintf(tr("params.parameterization.mean"),
+                                     tr("sym.mu.eta"))),
+                        HTML(sprintf(tr("params.parameterization.intercept"),
+                                     tr("sym.alpha.1")))),
                       choiceValues = c(FALSE, TRUE)))
                 ), # fluidRow
 
@@ -221,7 +223,7 @@ ui <- function(request) {
                 shinyjs::disabled(
                   checkboxInput(
                     "doMg",
-                    tr("Perform Multigroup Tests"),
+                    tr("params.multigroup.checkbox"),
                     value = FALSE))
               ), # box
 
@@ -230,12 +232,12 @@ ui <- function(request) {
               # in a column this narrow they would sit at different heights and look cramped.
               shinydashboard::box(
                 width = NULL,
-                title = tr("What the tables show:"),
-                helpText(tr("These two change the tables only. The models are not fitted again, so both can be changed after a run.")),
+                title = tr("params.tables.box.title"),
+                helpText(tr("params.tables.hint")),
 
                 numericInput(
                   "sigLvl",
-                  tr("Significance level:"),
+                  tr("params.siglvl.label"),
                   value = 0.05,
                   min = 0.001,
                   max = 1,
@@ -246,7 +248,7 @@ ui <- function(request) {
                 # 0.90 is the interval lavaan reports by default.
                 numericInput(
                   "rmseaCiLvl",
-                  tr("Confidence level of the RMSEA interval:"),
+                  tr("params.rmsea.ci.label"),
                   value = 0.90,
                   min = 0.5,
                   max = 0.999,
@@ -257,7 +259,7 @@ ui <- function(request) {
               ##### testParamTab left col goModels ----
               shinydashboard::box(
                 width = NULL,
-                actionButton("goModels", tr("Fit and compare models"), width = "100%"),
+                actionButton("goModels", tr("params.go.button"), width = "100%"),
                 htmlOutput("goModelsError"),
                 htmlOutput("refitPendingNote"))
             ), # column
@@ -267,7 +269,7 @@ ui <- function(request) {
               width = 7,
               shinydashboard::box(
                 width = NULL,
-                title = tr("Choose models to test and compare:"),
+                title = tr("params.grid.box.title"),
 
                 comparisonGrid(cttModelFamily())
               ) # box

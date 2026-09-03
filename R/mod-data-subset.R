@@ -39,17 +39,17 @@ dataSubsetUI <- function(id) {
           shinydashboard::box(
             width = NULL,
             tagList(
-              strong(tr("2c. Choose how to handle missing values:")),
+              strong(tr("subset.missing.label")),
               checkboxInput(
                 ns("useFIML"),
-                tr("Use Full Information Maximum Likelihood (FIML) for all analyses in lavaan"),
+                tr("subset.fiml.checkbox"),
                 value = TRUE),
 
               conditionalPanel(
                 "!input.useFIML",
                 div(
                   style = paste0("color:red"),
-                  HTML(tr("WARNING: Not using FIML in the presence of missing values implies listwise deletion in lavaan. This is only valid if the data are missing completely at random (MCAR) and reduces statistical power."))),
+                  HTML(tr("subset.fiml.warning"))),
                 ns = ns))),
           ns = ns
         ), # conditionalPanel
@@ -58,7 +58,7 @@ dataSubsetUI <- function(id) {
           width = NULL,
           # subset of items
           shinyjs::disabled(
-            actionButton(ns("subsetSelectButton"), tr("Select"), width = "100%")))
+            actionButton(ns("subsetSelectButton"), tr("common.select"), width = "100%")))
       ), # column
 
       column(
@@ -66,7 +66,7 @@ dataSubsetUI <- function(id) {
 
         shinydashboard::box(
           width = NULL,
-          title = tr("Observations:"),
+          title = tr("subset.obs.title"),
           reactable::reactableOutput(ns("obsTable"))),
 
         # The group counts are a table when there is a group column and a note when there
@@ -74,7 +74,7 @@ dataSubsetUI <- function(id) {
         # a guard on each - only one of them ever fills.
         shinydashboard::box(
           width = NULL,
-          title = tr("Observations per group:"),
+          title = tr("subset.obs.pergroup.title"),
           reactable::reactableOutput(ns("obsPerGroupTable")),
           uiOutput(ns("obsPerGroupNote")))),
 
@@ -82,7 +82,7 @@ dataSubsetUI <- function(id) {
         width = 4,
         shinydashboard::box(
           width = NULL,
-          title = tr("Missing values per column:"),
+          title = tr("subset.na.percol.title"),
           reactable::reactableOutput(ns("naTable"))))
     ) # fluidRow
   ) # tagList
@@ -133,12 +133,12 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       tagList(
         checkboxGroupInput(
           ns("itemCols"),
-          tr("2a. Select the item columns:"),
+          tr("subset.items.label"),
           choices = possibleItemColumns(),
           selected = possibleItemColumns(),
           inline = TRUE),
-        fluidRow(actionLink(ns("selectall"), tr("Select all"), style = "margin-left: 15px"),
-                 actionLink(ns("deselectall"), tr("Unselect all"), style = "margin-left: 15px")))
+        fluidRow(actionLink(ns("selectall"), tr("common.select.all"), style = "margin-left: 15px"),
+                 actionLink(ns("deselectall"), tr("common.unselect.all"), style = "margin-left: 15px")))
     })
 
     ## groupColChooser ----
@@ -151,7 +151,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       # with - see the translation report.
       selectInput(
           ns("groupCol"),
-          tr("2b. Select the group column:"),
+          tr("subset.groupcol.label"),
           choices = c(
             "No group column selected" = "noGroupSelected",
             possibleGroupCols))
@@ -165,15 +165,15 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
         possibleGroups <- unique(stats::na.omit(chosenData()[, input$groupCol]))
 
         if (any(c(table(chosenData()[, input$groupCol])) == 1)) {
-          groupWarning <- tr("There are groups with only one observation, you might have selected an item as group column.")
+          groupWarning <- tr("subset.groups.one.obs")
           possibleGroups <- NULL
 
           notifications$notList$invalGroups <- shinydashboard::notificationItem(
-            text = tr("Invalid groups found."),
+            text = tr("subset.groups.invalid"),
             icon = icon("times"),
             status = "danger")
           showNotification(
-            tr("Invalid groups found."),
+            tr("subset.groups.invalid"),
             duration = 5,
             id = "invalGroups",
             type = "error")
@@ -188,7 +188,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
         tagList(
           checkboxGroupInput(
             ns("groups"),
-            tr("2c. Select which groups to include"),
+            tr("subset.groups.label"),
             choices = possibleGroups,
             selected = possibleGroups,
             inline = TRUE),
@@ -278,19 +278,19 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       notifications$notList$numItems <- switch(
         as.character(length(input$itemCols)),
         "0" = shinydashboard::notificationItem(
-          text = tr("No item selected. No analysis possible."),
+          text = tr("subset.items.none"),
           icon = icon("times"),
           status = "danger"),
         "1" = shinydashboard::notificationItem(
-          text = tr("Only one item selected. No analysis possible."),
+          text = tr("subset.items.only.one"),
           icon = icon("times"),
           status = "danger"),
         "2" = shinydashboard::notificationItem(
-          text = HTML(tr("Only two items selected. Unable to test the &tau;-kongeneric and the ess. &tau;-equivalent model.")),
+          text = HTML(tr("subset.items.only.two")),
           icon = icon("exclamation-triangle"),
           status = "warning"),
         "3" = shinydashboard::notificationItem(
-          text = HTML(tr("Only three items selected. Unable to test the &tau;-kongeneric model.")),
+          text = HTML(tr("subset.items.only.three")),
           icon = icon("exclamation-triangle"),
           status = "warning"),
         NULL)
@@ -319,7 +319,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
             "2" = "orange",
             "3" = "orange",
             "green"),
-        subtitle = tr("possible item column(s) found"),
+        subtitle = tr("subset.items.count"),
         icon = icon("list"))
     })
 
@@ -328,7 +328,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       shinydashboard::valueBox(
         value = groupColRV(),
         color = "blue",
-        subtitle = tr("possible group column(s) found"),
+        subtitle = tr("subset.groupcol.count"),
         icon = icon("users"))
     })
 
@@ -348,7 +348,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       shinydashboard::valueBox(
         value = sum(incompleteCases()),
         color = if (any(incompleteCases())) "yellow" else "green",
-        subtitle = tr("rows with missing values in this subset"),
+        subtitle = tr("subset.na.rows.note"),
         icon = icon("exclamation-triangle"))
     })
 
@@ -361,7 +361,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
         rownames = TRUE,
         columns = list(
           .rownames = reactable::colDef(name = ""),
-          NAs = reactable::colDef(name = tr("NAs"))),
+          NAs = reactable::colDef(name = tr("subset.na.col.header"))),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -373,8 +373,8 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       reactable::reactable(
         data.frame(Total = nrow(dataWithNAs()), Complete = sum(!incompleteCases())),
         columns = list(
-          Total = reactable::colDef(name = tr("Total")),
-          Complete = reactable::colDef(name = tr("Complete"))),
+          Total = reactable::colDef(name = tr("common.total")),
+          Complete = reactable::colDef(name = tr("subset.obs.complete"))),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -404,7 +404,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     output$obsPerGroupNote <- renderUI({
       req(input$groupCol)
 
-      if (input$groupCol == "noGroupSelected") helpText(tr("No group column selected."))
+      if (input$groupCol == "noGroupSelected") helpText(tr("subset.groupcol.none"))
     })
 
     ## Select ----
@@ -435,12 +435,12 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
 
       if (any(incompleteCases())) {
         notifications$notList$NAhand <- shinydashboard::notificationItem(
-          text = HTML(tr("For all plots and the multivariate normality analyses<br/> rows with missing values have been removed.")),
+          text = HTML(tr("subset.na.removed.note")),
           icon = icon("exclamation-triangle"),
           status = "warning")
 
         showNotification(
-          ui = tr("For all plots and the multivariate normality analyses rows with missing values have been removed."),
+          ui = tr("subset.na.removed.note"),
           duration = 5,
           id = "NAremovedNot",
           type = "warning")

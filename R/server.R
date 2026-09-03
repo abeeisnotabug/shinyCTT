@@ -54,14 +54,14 @@ server <- function(input, output, session) {
   output$sigLvlNote <- renderUI({
     if (sigLvlUsable()) return(NULL)
 
-    sprintf(tr("Enter a number between 0.001 and 1. The tables still use %s."), sigLvlRV()) %>%
+    sprintf(tr("params.siglvl.hint"), sigLvlRV()) %>%
       div(style = "color:red")
   })
 
   output$rmseaCiLvlNote <- renderUI({
     if (rmseaCiLvlUsable()) return(NULL)
 
-    sprintf(tr("Enter a number between 0.5 and 0.999. The tables still use %s."), rmseaCiLvlRV()) %>%
+    sprintf(tr("params.rmsea.ci.hint"), rmseaCiLvlRV()) %>%
       div(style = "color:red")
   })
 
@@ -181,8 +181,8 @@ server <- function(input, output, session) {
       updateRadioButtons(
         inputId = "estimator",
         choiceNames = list(
-          tr("(Full Information) Maximum Likelihood"),
-          tr("Robust (Full Information) Maximum Likelihood")),
+          tr("common.estimator.fiml"),
+          tr("common.estimator.fimlr")),
         choiceValues = c("ML", "MLR"))
     }
   })
@@ -298,7 +298,7 @@ server <- function(input, output, session) {
     updateActionButton(
       session,
       "goModels",
-      label = paste0(tr("Fit and compare models"), if (refitPending()) "*"))
+      label = paste0(tr("params.go.button"), if (refitPending()) "*"))
   })
 
   output$refitPendingNote <- renderUI({
@@ -306,7 +306,9 @@ server <- function(input, output, session) {
 
     tagList(
       br(),
-      HTML(tr("The estimator has changed. The results still come from the estimator that was chosen when the models were last fitted. Press <b>Fit and compare models*</b> to fit them again.")) %>%
+      sprintf(tr("params.refit.pending"),
+              paste0("<b>", tr("params.go.button"), "*</b>")) %>%
+        HTML() %>%
         div(style = "color:orange"))
   })
 
@@ -326,18 +328,18 @@ server <- function(input, output, session) {
     updateRadioButtons(session, "estimator", selected = recommendedEstimator())
 
     notifications$notList$estUpdate <- shinydashboard::notificationItem(
-      text = tr("Updated estimator based on MVN test result."),
+      text = tr("params.estimator.updated"),
       icon = icon("wrench"),
       status = "warning")
 
     showNotification(
-      ui = tr("Updated estimator based on MVN test result."),
+      ui = tr("params.estimator.updated"),
       duration = 5,
       id = "estUpdateNot",
       type = "warning")
 
     notifications$notList$mvnApp <- shinydashboard::notificationItem(
-      text = HTML(tr("For more extensive analyses on multivariate normality,<br/> load() the MVN package and open its shiny app via run_mvn_app()!")),
+      text = HTML(tr("stats.mvn.app.hint")),
       icon = icon("lightbulb"),
       status = "success")
   })
@@ -347,11 +349,13 @@ server <- function(input, output, session) {
 
     req(recommendedEstimator())
 
-    estimatorLongName <- c(ML = tr("Maximum Likelihood"),
-                           MLR = tr("Robust Maximum Likelihood"))[recommendedEstimator()]
+    estimatorLongName <- c(ML = tr("common.estimator.ml"),
+                           MLR = tr("common.estimator.mlr"))[recommendedEstimator()]
 
-    sprintf(tr("The test on multivariate normality recommends %s. See <i>3. Statistics</i> &rarr; <i>Test on Multivariate Normality</i>."),
-            estimatorLongName) %>%
+    sprintf(tr("params.estimator.mvn.note"),
+            estimatorLongName,
+            paste0("<i>", tr("stats.nav"), "</i>"),
+            paste0("<i>", tr("stats.mvn.title"), "</i>")) %>%
       HTML() %>%
       div(style = "color:orange; font-size: 90%")
   })
@@ -531,8 +535,8 @@ server <- function(input, output, session) {
     output$goModelsError <- renderUI(
       tagList(
         br(),
-        strong(tr("The model tests failed:")),
-        paste(tr("There was an ERROR:"), conditionMessage(e)) %>%
+        strong(tr("params.error.tests.failed")),
+        paste(tr("params.error.prefix"), conditionMessage(e)) %>%
           HTML() %>%
           div(style = "color:red")))
   })) # observeEvent(input$goModels, {

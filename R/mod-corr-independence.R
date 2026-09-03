@@ -9,16 +9,16 @@ corrIndependenceUI <- function(id) {
 
   shinydashboard::box(
     width = NULL,
-    title = tr("Test on correlative independence:"),
+    title = tr("stats.corrind.title"),
     radioButtons(
       ns("corrIndEst"),
-      tr("Choose the estimator for this test:"),
-      choiceNames = list(tr("Maximum Likelihood"), tr("Robust Maximum Likelihood")),
+      tr("stats.corrind.estimator.label"),
+      choiceNames = list(tr("common.estimator.ml"), tr("common.estimator.mlr")),
       choiceValues = c("ML", "MLR"),
       selected = "ML"),
     numericInput(
       ns("corrIndSL"),
-      tr("Enter the significance level for this test:"),
+      tr("stats.corrind.siglvl.label"),
       value = 0.05,
       min = 0.001,
       max = 1,
@@ -42,8 +42,8 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
       updateRadioButtons(
         inputId = "corrIndEst",
         choiceNames = list(
-          tr("(Full Information) Maximum Likelihood"),
-          tr("Robust (Full Information) Maximum Likelihood")),
+          tr("common.estimator.fiml"),
+          tr("common.estimator.fimlr")),
         choiceValues = c("ML", "MLR"))
     })
 
@@ -74,13 +74,13 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
         if (!is.na(input$corrIndSL) && input$corrIndSL < 1 && input$corrIndSL > 0) {
 
           tagList(
-            strong(tr("Test result:")),
+            strong(tr("stats.test.result")),
 
             sprintf(
               ifelse(
                 corrInd[3] < input$corrIndSL,
-                yes = tr("The hypothesis that all correlations are equal to zero has to be discarded on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)."),
-                no = tr("The hypothesis that all correlations are equal to zero can be maintained on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s).")),
+                yes = tr("stats.corrind.result.dependent"),
+                no = tr("stats.corrind.result.independent")),
               input$corrIndSL, # %s
               paste0(if (useFIML()) "FI", input$corrIndEst), # %s
               corrInd[1], # %.3f
@@ -93,15 +93,15 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
           ) # tagList
 
         } else {
-          HTML(tr("Please enter a valid significance level")) %>%
+          HTML(tr("stats.corrind.siglvl.invalid")) %>%
             div(style = "color:red")
         }
 
       } ## result if (class(corrIndRaw)[1] != "lavaan") ----
       else {
         tagList(
-          strong(tr("Test result:")),
-          paste(tr("There was an ERROR/WARNING:"), corrIndRaw$message) %>%
+          strong(tr("stats.test.result")),
+          paste(tr("stats.error.prefix"), corrIndRaw$message) %>%
             HTML() %>%
             div(style = "color:red"))
       }

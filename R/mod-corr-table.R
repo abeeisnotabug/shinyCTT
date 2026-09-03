@@ -52,19 +52,19 @@ corrTableControlsUI <- function(id) {
 
   shinydashboard::box(
     width = NULL,
-    title = tr("Correlation table with confidence intervals:"),
+    title = tr("stats.corrtable.title"),
     shinyjs::hidden(
       radioButtons(
         ns("corrTabNA"),
-        tr("Choose how to handle missing values:"),
+        tr("stats.corrtable.missing.label"),
         choiceNames = list(
-          tr("Use pairwise complete observations"),
-          tr("Use only complete observations")),
+          tr("stats.corrtable.missing.pairwise"),
+          tr("stats.corrtable.missing.complete")),
         choiceValues = c("pairwise.complete.obs", "complete.obs"),
         selected = "pairwise.complete.obs")),
     numericInput(
       ns("corrTabSL"),
-      tr("Enter the significance level for the correlation tests:"),
+      tr("stats.corrtable.siglvl.label"),
       value = 0.05,
       min = 0.001,
       max = 1,
@@ -129,7 +129,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
       } else {
         singleCorrTable <-
-          paste(tr("There was an ERROR/WARNING:"), corrTableWithCIsRaw$test) %>%
+          paste(tr("stats.error.prefix"), corrTableWithCIsRaw$test) %>%
           HTML() %>%
           div(style = "color:red")
       }
@@ -146,7 +146,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
           groupRows <- data()[, groupCol()] == group
 
           tagList(
-            groupHeading(sprintf(tr("Group: %s (n = %i)"), group, sum(groupRows))),
+            groupHeading(sprintf(tr("common.group.label"), group, sum(groupRows))),
             drawCorrTable(
               makeCorrTableWithCIs(
                 rawTable = list(
@@ -165,17 +165,17 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
         # assemble in tabBox
         shinydashboard::tabBox(
           width = 12,
-          title = tr("Correlation table with confidence intervals:"),
+          title = tr("stats.corrtable.title"),
           side = "right",
 
           tabPanel(
-              tr("Overall"),
-              groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
+              tr("common.overall"),
+              groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),
               singleCorrTable,
               br(),
               makeLegend("corrTable", estimatorName(), sigLvl())),
           tabPanel(
-              tr("Group-wise"),
+              tr("common.groupwise"),
               unname(mgCorrTables),
               br(),
               makeLegend("corrTable", estimatorName(), sigLvl()))
@@ -187,9 +187,9 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
         shinydashboard::box(
             width = 12,
-            title = tr("Correlation table with confidence intervals:"),
+            title = tr("stats.corrtable.title"),
 
-            groupHeading(sprintf(tr("Overall n = %i"), nrow(data()))),
+            groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),
             singleCorrTable,
             br(),
             makeLegend("corrTable", estimatorName(), sigLvl()))

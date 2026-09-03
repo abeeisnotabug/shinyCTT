@@ -13,10 +13,10 @@ mvnUI <- function(id) {
 
       shinydashboard::box(
         width = NULL,
-        title = tr("Normality tests:"),
+        title = tr("stats.mvn.normtests.title"),
         numericInput(
           ns("mvnSL"),
-          tr("Enter the significance level for the tests:"),
+          tr("stats.mvn.siglvl.label"),
           value = 0.05,
           min = 0.001,
           max = 1,
@@ -24,14 +24,14 @@ mvnUI <- function(id) {
 
       shinydashboard::box(
         width = NULL,
-        title = tr("Test on multivariate normality:"),
+        title = tr("stats.mvn.title"),
         uiOutput(ns("comment")),
         reactable::reactableOutput(ns("mvTable")),
         uiOutput(ns("recommendation"))),
 
       shinydashboard::box(
         width = NULL,
-        title = tr("Tests on univariate normality:"),
+        title = tr("stats.mvn.univ.title"),
         reactable::reactableOutput(ns("table")),
         uiOutput(ns("tableNote")))
     ), # column
@@ -40,8 +40,8 @@ mvnUI <- function(id) {
       width = 8,
       fluidRow(htmlOutput(ns("plotBox"))),
       fluidRow(shinydashboard::infoBox(
-        title = tr("Hint:"),
-        subtitle = tr("For more extensive analyses on multivariate normality, load() the MVN package and open its shiny app via run_mvn_app()!"),
+        title = tr("stats.mvn.hint.label"),
+        subtitle = tr("stats.mvn.app.hint"),
         icon = icon("lightbulb"),
         color = "green",
         width = 12,
@@ -140,16 +140,16 @@ mvnServer <- function(id, data, itemCols) {
 
       ### if the test did not run ----
       if (is.null(multivariateTable())) {
-        paste(tr("There was an ERROR/WARNING:"), mvnResult()$message) %>%
+        paste(tr("stats.error.prefix"), mvnResult()$message) %>%
           HTML() %>%
           div(style = "color:red")
 
       ### if it did ----
       } else if ("*" %in% multivariateTable()$Signif.) {
-        sprintf(tr("At least one of the hypotheses that Mardia's Skewness statistic or Mardias' Kurtosis statistic matches one of a normal distribution has to be discarded on a significance level of %s. Test result:"), input$mvnSL)
+        sprintf(tr("stats.mvn.result.nonnormal"), input$mvnSL)
 
       } else {
-        sprintf(tr("The hypotheses that Mardia's Skewness statistic and Mardias' Kurtosis statistic match those of a normal distribution can be maintained on a significance level of %s. Test result:"), input$mvnSL)
+        sprintf(tr("stats.mvn.result.normal"), input$mvnSL)
       }
     })
 
@@ -163,11 +163,11 @@ mvnServer <- function(id, data, itemCols) {
         # Skewness" wrapped onto two lines while "Signif." was cut short. Measured in a
         # browser against the widest text in each column, plus the theme's cell padding.
         columns = list(
-          Test = reactable::colDef(name = tr("Test"), minWidth = 127),
-          Statistic = reactable::colDef(name = tr("Statistic"), minWidth = 67,
+          Test = reactable::colDef(name = tr("stats.mvn.col.test"), minWidth = 127),
+          Statistic = reactable::colDef(name = tr("stats.mvn.col.statistic"), minWidth = 67,
                                         format = reactable::colFormat(digits = 3, locales = "en-US")),
-          p = reactable::colDef(name = tr("p"), minWidth = 64),
-          `Signif.` = reactable::colDef(name = tr("Signif."), minWidth = 55)),
+          p = reactable::colDef(name = tr("common.col.p"), minWidth = 64),
+          `Signif.` = reactable::colDef(name = tr("stats.mvn.col.signif"), minWidth = 55)),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -176,11 +176,13 @@ mvnServer <- function(id, data, itemCols) {
     output$recommendation <- renderUI({
       req(multivariateTable())
 
-      if ("*" %in% multivariateTable()$Signif.) {
-        HTML(tr("It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator."))
-      } else {
-        HTML(tr("It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator."))
-      }
+      estimator <- if ("*" %in% multivariateTable()$Signif.) "MLR" else "ML"
+
+      longName <- c(ML = tr("common.estimator.ml"),
+                    MLR = tr("common.estimator.mlr"))[estimator]
+
+      HTML(sprintf(tr("stats.mvn.recommend"),
+                   paste0("<b>", longName, " (", estimator, ")</b>")))
     })
 
     ## the item-by-item tests ----
@@ -193,12 +195,12 @@ mvnServer <- function(id, data, itemCols) {
         # Same measurement as the box above: "Anderson-Darling" needs the room, the
         # single-character p and the star in Signif. do not.
         columns = list(
-          Test = reactable::colDef(name = tr("Test"), minWidth = 125),
-          Item = reactable::colDef(name = tr("Item"), minWidth = 59),
-          Statistic = reactable::colDef(name = tr("Statistic"), minWidth = 76,
+          Test = reactable::colDef(name = tr("stats.mvn.col.test"), minWidth = 125),
+          Item = reactable::colDef(name = tr("common.col.item"), minWidth = 59),
+          Statistic = reactable::colDef(name = tr("stats.mvn.col.statistic"), minWidth = 76,
                                         format = reactable::colFormat(digits = 3, locales = "en-US")),
-          p = reactable::colDef(name = tr("p"), minWidth = 52),
-          `Signif.` = reactable::colDef(name = tr("Signif."), minWidth = 55)),
+          p = reactable::colDef(name = tr("common.col.p"), minWidth = 52),
+          `Signif.` = reactable::colDef(name = tr("stats.mvn.col.signif"), minWidth = 55)),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -208,7 +210,7 @@ mvnServer <- function(id, data, itemCols) {
       req(data(), input$mvnSL)
 
       if (is.null(univariateTable())) {
-        paste(tr("There was an ERROR/WARNING:"), mvnResult()$message) %>%
+        paste(tr("stats.error.prefix"), mvnResult()$message) %>%
           HTML() %>%
           div(style = "color:red")
       }
@@ -219,7 +221,7 @@ mvnServer <- function(id, data, itemCols) {
 
       shinydashboard::box(
         width = 12,
-        title = tr("Multivariate plot:"),
+        title = tr("stats.mvn.plot.title"),
 
         fluidRow(
 
@@ -230,7 +232,7 @@ mvnServer <- function(id, data, itemCols) {
             # untranslated - see the translation report.
             selectInput(
               ns("mvnPlotType"),
-              tr("Choose the type of Plot:"),
+              tr("stats.mvn.plottype.label"),
               choices = c(
                 "Q-Q Plot (all items)" = "qq",
                 "Perspective Plot" = "persp",
@@ -241,7 +243,7 @@ mvnServer <- function(id, data, itemCols) {
               "input.mvnPlotType != 'qq'",
               selectInput(
                 ns("mvnItemX"),
-                tr("Select item on the abscissa:"),
+                tr("stats.select.abscissa"),
                 itemCols()),
               ns = ns)),
           column(
@@ -250,7 +252,7 @@ mvnServer <- function(id, data, itemCols) {
               "input.mvnPlotType != 'qq'",
               selectInput(
                 ns("mvnItemY"),
-                tr("Select item on the ordinate:"),
+                tr("stats.select.ordinate"),
                 itemCols(),
                 selected = itemCols()[2]),
               ns = ns))

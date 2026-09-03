@@ -1,244 +1,71 @@
-## Every piece of text the user reads, in one place, so the app can be shown in German.
+## Every piece of text the user reads goes through tr(). The text itself is not in this
+## file any more - it lives in inst/translations.csv, one row per piece, named by a short
+## key, with one column per language:
 ##
-## The English text is its own key. tr("Raw data:") gives back "Raw data:" while the app is
-## in English, and the German once it is switched over, so the code goes on reading in
-## English and translating means filling in one column of the table below.
+##     key,en,de
+##     common.select,Select,Auswaehlen
+##     subset.items.label,2a. Select the item columns:,
 ##
-## A string that is not in the table, or whose German is still "", comes back in English.
-## A missed one therefore shows in English rather than breaking anything.
+## So the code says tr("common.select") and never holds the English sentence itself. Three
+## reasons that beat writing the English into the code:
+##
+##   1. R CMD check warns about any non-ASCII character in R/, so the sigma-squared of an
+##      error variance cannot be written in an R file - only as the HTML entity for it. A
+##      .csv is not R code, so the real characters are fine there.
+##   2. The long warning sentences made lines of 250 characters.
+##   3. Two rows of the old table held the same sentence, one of them with a <br/> in it.
+##      Markup does not belong in text a translator is handed.
+##
+## Symbols live in the same file under sym.*. They are not translated - a sigma is a sigma
+## in German - but they are text, so they belong outside R/ for reason 1.
 
-## Which language the app is showing. Set by shinyCTTApp(language = "de").
+appLanguages <- c("en", "de")   # the languages on offer; the first one is the fallback
+
+## Read the text into an option. Called once, by .onLoad() in zzz.R.
+##
+## An option rather than a variable of this file, for the same reason the app's other
+## settings are options: it is one place, and nothing that reloads the package's code can
+## quietly leave an empty copy behind.
+loadTranslations <- function(path) {
+  # na.strings = character(0) because one row's text is the word "NA" - the hierarchical
+  # table prints it in a cell when lavaan drops the RMSEA column under FIML. read.csv would
+  # otherwise read that text as a missing value and the key would come back empty on screen.
+  table <- utils::read.csv(path, colClasses = "character", encoding = "UTF-8",
+                           na.strings = character(0))
+
+  # One named vector per language: the names are the keys, the values the text.
+  options(shinyCTT.text = list(
+    en = stats::setNames(table$en, table$key),
+    de = stats::setNames(table$de, table$key)))
+}
+
+## Which language the app is showing. Set by shinyCTTApp(language = "de"); an unknown one
+## falls back to English.
 appLanguage <- function() {
-  getOption("shinyCTT.language", default = "en")
+  language <- getOption("shinyCTT.language", default = appLanguages[1])
+
+  if (isTRUE(language %in% appLanguages)) language else appLanguages[1]
 }
 
-## The German for each piece of text. "" means nobody has translated it yet.
-germanText <- function() {
-  c(
-    "%g%%-CI" = "",
-    "&alpha;<sub>i</sub>" = "",
-    "&chi;&sup2;-comparison table:" = "",
-    "&Delta;df" = "",
-    "&Delta;df, " = "",
-    "&lambda;<sub>i</sub>" = "",
-    "&ni; .05" = "",
-    "&sigma;&sup2;<sub>&epsilon;<sub>i</sub></sub>" = "",
-    "(Full Information) Maximum Likelihood" = "",
-    "* / ** / *** if p < .05 / .01 / .001" = "",
-    "-&chi;&sup2;" = "",
-    "-&Delta;&chi;&sup2;" = "",
-    "-&Delta;&chi;&sup2;:" = "",
-    "1. Data selection" = "",
-    "1a. Choose source of data" = "",
-    "1b. Choose CSV File" = "",
-    "1b. Choose data object from Workspace" = "",
-    "1b. Choose SPSS File" = "",
-    "2. Subset selection" = "",
-    "2a. Select the item columns:" = "",
-    "2b. Select the group column:" = "",
-    "2c. Choose how to handle missing values:" = "",
-    "2c. Select which groups to include" = "",
-    "3. Statistics" = "",
-    "4. Testing Parameters" = "",
-    "5. Model Comparison Tests" = "",
-    "6. Parameter Tables" = "",
-    "7. Factor Scores" = "",
-    "8. Model Code" = "",
-    "< " = "",
-    "< .05" = "",
-    "< .95" = "",
-    "< 0" = "",
-    "= 0" = "",
-    "> .05" = "",
-    "> 0" = "",
-    ">= " = "",
-    ">= .05" = "",
-    ">= .95" = "",
-    ">= .97" = "",
-    "AIC" = "",
-    "AIC, BIC:" = "",
-    "AIC/BIC" = "",
-    "AIC/BIC-comparison table:" = "",
-    "AIC:" = "",
-    "At least one of the hypotheses that Mardia's Skewness statistic or Mardias' Kurtosis statistic matches one of a normal distribution has to be discarded on a significance level of %s. Test result:" = "",
-    "BIC" = "",
-    "BIC:" = "",
-    "CFI" = "",
-    "CFI:" = "",
-    "Choose estimator:" = "",
-    "Choose how to handle missing values:" = "",
-    "Choose models to test and compare:" = "",
-    "Choose the estimator for this test:" = "",
-    "Choose the mean structure parameterization:" = "",
-    "Choose the number of bins:" = "",
-    "Choose the type of Plot:" = "",
-    "CI" = "",
-    "Comma" = "",
-    "Compare" = "",
-    "Complete" = "",
-    "Confidence level of the RMSEA interval:" = "",
-    "Correlation table with confidence intervals:" = "",
-    "Correlational Analysis" = "",
-    "Covariance matrix:" = "",
-    "Data Overview" = "",
-    "Decimal Separator" = "",
-    "Descriptive Statistics" = "",
-    "Descriptive statistics:" = "",
-    "df" = "",
-    "Discrimination Parameters (Factor Loadings)" = "",
-    "Don't test." = "",
-    "Dot" = "",
-    "Double Quote" = "",
-    "Download Factor Scores" = "",
-    "Download Predicted Factor Scores as CSV" = "",
-    "Easiness Parameters (Intercepts)" = "",
-    "else" = "",
-    "Enter a number between 0.001 and 1. The tables still use %s." = "",
-    "Enter a number between 0.5 and 0.999. The tables still use %s." = "",
-    "Enter the significance level for the correlation tests:" = "",
-    "Enter the significance level for the tests:" = "",
-    "Enter the significance level for this test:" = "",
-    "Est." = "",
-    "Estimated parameters" = "",
-    "Excess" = "",
-    "Filename:" = "",
-    "Fit and compare models" = "",
-    "Fit index table" = "",
-    "Fix the first intercept (&alpha;<sub>1</sub> = 0)" = "",
-    "Fix the latent mean (&mu;<sub>&eta;</sub> = 0)" = "",
-    "For all plots and the multivariate normality analyses rows with missing values have been removed." = "",
-    "For all plots and the multivariate normality analyses<br/> rows with missing values have been removed." = "",
-    "For more extensive analyses on multivariate normality, load() the MVN package and open its shiny app via run_mvn_app()!" = "",
-    "For more extensive analyses on multivariate normality,<br/> load() the MVN package and open its shiny app via run_mvn_app()!" = "",
-    "Group-wise" = "",
-    "Group: %s (n = %i)" = "",
-    "Header" = "",
-    "Hierarchical model comparison plot:" = "",
-    "Hierarchical model comparison table:" = "",
-    "Hint:" = "",
-    "Histogram:" = "",
-    "How the models are fitted:" = "",
-    "Include" = "",
-    "Invalid groups found." = "",
-    "It is thus recommended to continue with the <b>Maximum Likelihood (ML)</b> estimator." = "",
-    "It is thus recommended to continue with the <b>Robust Maximum Likelihood (MLR)</b> estimator." = "",
-    "Item" = "",
-    "Lavaan status: %i warnings, %i errors." = "",
-    "Legend:" = "",
-    "Maximum Likelihood" = "",
-    "Mean" = "",
-    "min." = "",
-    "Missing values per column:" = "",
-    "Model code" = "",
-    "Multigroup" = "",
-    "Multivariate plot:" = "",
-    "NA" = "",
-    "NA (FIML, lavaan >= 0.6-21)" = "",
-    "NAs" = "",
-    "No data selected" = "",
-    "No group column selected." = "",
-    "No item selected. No analysis possible." = "",
-    "No numeric columns found" = "",
-    "None" = "",
-    "Normality tests:" = "",
-    "Not sig." = "",
-    "Not testable." = "",
-    "No~Comparison" = "",
-    "Observations per group:" = "",
-    "Observations:" = "",
-    "Only one column found" = "",
-    "Only one item selected. No analysis possible." = "",
-    "Only three items selected. Unable to test the &tau;-kongeneric model." = "",
-    "Only two items selected. Unable to test the &tau;-kongeneric and the ess. &tau;-equivalent model." = "",
-    "Overall" = "",
-    "Overall n = %i" = "",
-    "Overlay a density curve" = "",
-    "p" = "",
-    "p < " = "",
-    "p >= " = "",
-    "p:" = "",
-    "p<sub>.05</sub>" = "",
-    "p<sub>.08</sub>" = "",
-    "p<sub>H0:RMSEA<=.05</sub>" = "",
-    "p<sub>H0:RMSEA>=.08</sub>" = "",
-    "Perform Multigroup Tests" = "",
-    "Please enter a valid significance level" = "",
-    "possible group column(s) found" = "",
-    "possible item column(s) found" = "",
-    "Predicted factor scores (&eta;&#x302;)" = "",
-    "Quote" = "",
-    "R<sub>i</sub>" = "",
-    "Raw data:" = "",
-    "Reliabilities" = "",
-    "Reload" = "",
-    "RMSEA" = "",
-    "RMSEA<sub>D</sub>" = "",
-    "Robust (Full Information) Maximum Likelihood" = "",
-    "Robust Maximum Likelihood" = "",
-    "rows with missing values in this subset" = "",
-    "Scatter plot:" = "",
-    "SD" = "",
-    "Sd" = "",
-    "SE" = "",
-    "Select" = "",
-    "Select all" = "",
-    "Select item on the abscissa:" = "",
-    "Select item on the ordinate:" = "",
-    "Select the groups to include:" = "",
-    "Select the item:" = "",
-    "Semicolon" = "",
-    "Separator" = "",
-    "Show/hide legend" = "",
-    "Sig. neg." = "",
-    "Sig. pos." = "",
-    "Signif." = "",
-    "Significance level:" = "",
-    "Single Group" = "",
-    "Single Quote" = "",
-    "Skew" = "",
-    "SRMR" = "",
-    "Statistic" = "",
-    "Std. Est." = "",
-    "Tab" = "",
-    "Test" = "",
-    "Test on correlative independence:" = "",
-    "Test on Multivariate Normality" = "",
-    "Test on multivariate normality:" = "",
-    "Test result:" = "",
-    "Tested." = "",
-    "Tests on univariate normality:" = "",
-    "The estimator has changed. The results still come from the estimator that was chosen when the models were last fitted. Press <b>Fit and compare models*</b> to fit them again." = "",
-    "The following models produced errors:" = "",
-    "The following models produced warnings:" = "",
-    "The following R code can be used to fit this model with lavaan:" = "",
-    "The hypotheses that Mardia's Skewness statistic and Mardias' Kurtosis statistic match those of a normal distribution can be maintained on a significance level of %s. Test result:" = "",
-    "The hypothesis that all correlations are equal to zero can be maintained on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)." = "",
-    "The hypothesis that all correlations are equal to zero has to be discarded on a significance level of %s (%s-&chi;&sup2; = %.3f, df = %i, p %s)." = "",
-    "The model tests failed:" = "",
-    "The test on multivariate normality recommends %s. See <i>3. Statistics</i> &rarr; <i>Test on Multivariate Normality</i>." = "",
-    "There are groups with only one observation, you might have selected an item as group column." = "",
-    "There was an ERROR/WARNING:" = "",
-    "There was an ERROR:" = "",
-    "These two change the tables only. The models are not fitted again, so both can be changed after a run." = "",
-    "This data set could not be read." = "",
-    "Too few items." = "",
-    "Total" = "",
-    "Unselect all" = "",
-    "Updated estimator based on MVN test result." = "",
-    "Use Full Information Maximum Likelihood (FIML) for all analyses in lavaan" = "",
-    "Use only complete observations" = "",
-    "Use pairwise complete observations" = "",
-    "Variances" = "",
-    "WARNING: Not using FIML in the presence of missing values implies listwise deletion in lavaan. This is only valid if the data are missing completely at random (MCAR) and reduces statistical power." = "",
-    "What the tables show:" = ""
-  )
-}
+## The text to put on the screen, looked up by its short name.
+##
+## An empty German entry gives back the English, so a half-translated file still shows a
+## working app. A name that is not in the file at all comes back as the name itself, which
+## is visible on screen - test-translations.R fails on it long before it gets that far.
+tr <- function(key) {
+  text <- getOption("shinyCTT.text")
 
-## The text to put on the screen.
-tr <- function(text) {
-  if (identical(appLanguage(), "en")) return(text)
+  # Without this the failure would be "argument is of length zero" from the if() below.
+  if (is.null(text))
+    stop("No text has been read yet - .onLoad() reads inst/translations.csv.")
 
-  german <- germanText()[text]
+  english <- text$en[key]
 
-  if (is.na(german) || !nzchar(german)) text else unname(german)
+  if (is.na(english)) return(key)
+
+  if (identical(appLanguage(), "en")) return(unname(english))
+
+  translated <- text[[appLanguage()]][key]
+
+  if (is.na(translated) || !nzchar(translated)) unname(english) else unname(translated)
 }
