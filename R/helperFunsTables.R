@@ -3,7 +3,11 @@
 ## works out a rating - "good", "bad" or "neutral" - and ratingStyle() turns that into a
 ## colour. The hierarchy plot in mod-ctt-results.R reads them from here too.
 cttColors <- function() {
-  list(good = "darkgreen", bad = "darkred", neutral = "grey", text = "white")
+  list(
+    good = "#6B8E23",     # olivedrab: the FU green #99CC00, a little darkened
+    bad = "#B33A2B",      # a brick red of about the same weight
+    neutral = "#767676",  # the grey the dashboard theme already uses
+    text = "#FFFFFF")
 }
 
 ## What a rated cell looks like. Handed to a column's style, which reactable calls once per
