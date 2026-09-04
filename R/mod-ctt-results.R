@@ -206,8 +206,9 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
     ## drawing one comparison table ----
     # `cells` is what compMatrices() gave back for one of the three. `headers` names each
     # column and `minWidths` says how narrow it may be; `groups`, when given, is the band
-    # above them - the combined table puts two columns under each model's name.
-    drawCompTable <- function(cells, headers, minWidths, groups = NULL) {
+    # above them - the combined table puts two columns under each model's name - and
+    # `dividers` names the columns that carry a line down their right edge.
+    drawCompTable <- function(cells, headers, minWidths, groups = NULL, dividers = NULL) {
 
       columns <- lapply(names(headers), function(column) {
         reactable::colDef(
@@ -216,7 +217,8 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
           minWidth = minWidths[[column]],
           style = function(value, index) {
             c(ratingStyle(cells$ratings[index, column]),
-              if (cells$ownFit[index, column]) list(fontStyle = "italic"))
+              if (cells$ownFit[index, column]) list(fontStyle = "italic"),
+              if (column %in% dividers) list(borderRight = "1px solid lightgrey"))
           })
       })
 
@@ -501,7 +503,11 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
       # name in the band above it.
       minWidths <- stats::setNames(rep(c(45, 80), length(models)), colnames(cells$shown))
 
-      drawCompTable(cells, headers, minWidths, groups = unname(groups))
+      # A line down the right edge of every model's pair but the last, whose right edge is
+      # the table's own.
+      dividers <- paste0(models[-length(models)], "Chisq")
+
+      drawCompTable(cells, headers, minWidths, groups = unname(groups), dividers = dividers)
     })
 
     ## AIC/BIC comparison table ----

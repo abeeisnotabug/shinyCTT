@@ -313,9 +313,8 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, modelsAbbrev)
 
   columns <- ratedColumns(headers, ratings, minWidths)
 
-  # The two dividing lines kableExtra::column_spec() drew, after RMSEA and after the second
-  # RMSEA p-value.
-  columns$rmsea$style <- rightBorderAfter(ratings$rmsea)
+  # The two dividing lines: one closing the chi-square block, one closing the RMSEA block.
+  columns$pvalue$style <- rightBorderAfter(ratings$pvalue)
   columns$rmseaNotClose$style <- rightBorderAfter(ratings$rmseaNotClose)
 
   reactable::reactable(
