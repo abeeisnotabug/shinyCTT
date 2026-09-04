@@ -184,6 +184,11 @@ from the previous run on screen. `if (is.null(raw())) return(NULL)` clears it co
 to the same blank the tab starts out with. Use `req()` to keep a render from computing;
 use an explicit `NULL` when the point is to take something off the screen.
 
+**It is not only tables.** The same thing happened to step 1's object chooser on 2026-09-04:
+`req(length(pickableObjects()) > 0)` at the top of its `renderUI()` meant that switching from
+the workspace to a CSV left the workspace's chooser sitting on the page. `if (length(...) == 0)
+return(NULL)` clears it — verified in a browser, the slot's HTML goes empty on the switch.
+
 ---
 
 ### An error inside an observer ends the session
