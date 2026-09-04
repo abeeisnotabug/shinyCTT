@@ -311,6 +311,24 @@ further only moves the wrap into the header.
 `drawCompTable()` and its three call sites; `mod-covmatrix.R`, `mod-descriptives.R`,
 `mod-data-subset.R`, `mod-mvn.R`.
 
+### There is no global switch for resizable columns
+
+`reactable()` reads exactly three options - `reactable.theme`, `reactable.language` and
+`reactable.static` - and `resizable` is not among them. It is an argument of `reactable()` and
+of `colDef()`, and passing it `NULL` is an error ("`resizable` must be TRUE or FALSE"), so it
+cannot be left to a `getOption()` that might be unset.
+
+`shinyCTT.resizable` stands in for the option reactable does not have. `.onLoad()` sets it in
+the guarded list beside the two `knitr` ones, so it is always defined - tests included - and
+every `reactable()` call in the package reads it. One place to switch column dragging on or
+off for all twelve tables.
+
+Dragging a column wider grows the table until the theme's `max-width: 100%` stops it at the
+box, and `.rt-table`'s `overflow-x` then scrolls it - the same behaviour a table too wide for
+its box already had.
+
+*Where:* `zzz.R`, `.onLoad()`; every `reactable::reactable()` call.
+
 ### `colFormat()` rounds in the *reader's* language
 
 `reactable::colFormat(digits = 3)` does its formatting in the browser, with

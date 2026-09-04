@@ -230,6 +230,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
             name = "", html = TRUE, style = list(fontWeight = "bold"))),
           stats::setNames(columns, names(headers))),
         columnGroups = groups,
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)

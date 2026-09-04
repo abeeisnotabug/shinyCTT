@@ -41,6 +41,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
           format = reactable::colFormat(digits = 3, locales = "en-US")),
         columns = list(
           .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold"))),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)

@@ -116,6 +116,7 @@ drawCorrTable <- function(corrTable, itemCols) {
     columns = c(
       list(rowLabel = reactable::colDef(name = "", style = list(fontWeight = "bold"))),
       stats::setNames(itemColumns, itemCols)),
+    resizable = getOption("shinyCTT.resizable"),
     sortable = FALSE,
     pagination = FALSE,
     compact = TRUE)
@@ -226,6 +227,7 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, modelsAbbrev) 
     # The baseline model's own row was greyed by kableExtra::row_spec(); its cells carry no
     # rating, so the shading goes on the row itself.
     rowStyle = function(index) if (index == firstRow) list(background = "lightgrey"),
+    resizable = getOption("shinyCTT.resizable"),
     sortable = FALSE,
     pagination = FALSE,
     compact = TRUE)
@@ -324,6 +326,7 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, modelsAbbrev)
       list(.rownames = reactable::colDef(
         name = "", html = TRUE, style = list(fontWeight = "bold"))),
       columns),
+    resizable = getOption("shinyCTT.resizable"),
     sortable = FALSE,
     pagination = FALSE,
     compact = TRUE)
@@ -427,6 +430,7 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, grou
 
     # The last row is the group's own variance and reliability rather than an item's.
     rowStyle = function(index) if (index == rowsPerGroup) list(fontWeight = "bold"),
+    resizable = getOption("shinyCTT.resizable"),
     sortable = FALSE,
     pagination = FALSE,
     compact = TRUE)

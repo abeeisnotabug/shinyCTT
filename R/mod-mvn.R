@@ -168,6 +168,7 @@ mvnServer <- function(id, data, itemCols) {
                                         format = reactable::colFormat(digits = 3, locales = "en-US")),
           p = reactable::colDef(name = tr("common.col.p"), minWidth = 64),
           `Signif.` = reactable::colDef(name = tr("stats.mvn.col.signif"), minWidth = 55)),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -201,6 +202,7 @@ mvnServer <- function(id, data, itemCols) {
                                         format = reactable::colFormat(digits = 3, locales = "en-US")),
           p = reactable::colDef(name = tr("common.col.p"), minWidth = 52),
           `Signif.` = reactable::colDef(name = tr("stats.mvn.col.signif"), minWidth = 55)),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)

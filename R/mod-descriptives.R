@@ -74,6 +74,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
           SD = reactable::colDef(name = tr("stats.desc.sd")),
           Skew = reactable::colDef(name = tr("stats.desc.skew")),
           Excess = reactable::colDef(name = tr("stats.desc.excess"))),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)

@@ -359,6 +359,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
         columns = list(
           .rownames = reactable::colDef(name = "", minWidth = 80),
           NAs = reactable::colDef(name = tr("subset.na.col.header"), minWidth = 60)),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -372,6 +373,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
         columns = list(
           Total = reactable::colDef(name = tr("common.total"), minWidth = 68),
           Complete = reactable::colDef(name = tr("subset.obs.complete"), minWidth = 90)),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -395,6 +397,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
 
         # One column per group value, all of them holding a count.
         defaultColDef = reactable::colDef(minWidth = 60),
+        resizable = getOption("shinyCTT.resizable"),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)

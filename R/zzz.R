@@ -8,7 +8,12 @@
 .onLoad <- function(libname, pkgname) {
   op <- options()
   opShinyCTT <- list(knitr.kable.NA = "",
-                     knitr.table.format = "html")
+                     knitr.table.format = "html",
+
+                     # Whether the reader can drag a table's column borders. Every
+                     # reactable() call in the package reads it, so this is the one place
+                     # to switch column resizing on or off.
+                     shinyCTT.resizable = TRUE)
 
   toSet <- !(names(opShinyCTT) %in% names(op))
   if (any(toSet)) options(opShinyCTT[toSet])
