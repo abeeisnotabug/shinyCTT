@@ -7,19 +7,29 @@
 #'   tr(), out of the visitor's own session (see R/translations.R). So two people can have
 #'   the app open in different languages at once, whatever this was set to.
 #'
-#'   Stored as options(shinyCTT.language = language) while the app runs. The three options
+#'   Stored as options(shinyCTT.language = language) while the app runs. The four options
 #'   the app sets are put back the way they were when it closes.
+#' @param workspace Whether to offer the objects lying around in R as a data source.
+#'
+#'   The default is TRUE when the app is started from somebody's own console and FALSE
+#'   otherwise, which is what a hosted app is: there globalenv() holds whatever was left
+#'   there by whoever put the app up, and nothing of the visitor's. Set it by hand when the
+#'   test gets it wrong, as it does for R -e 'shinyCTT::shinyCTTApp()'.
+#'
+#'   Uploading a .RData, .rda or .rds file is offered either way, and is the way in when
+#'   the workspace is not on offer.
 #' @examples
 #' if (interactive()) shinyCTTApp()
 #' if (interactive()) shinyCTTApp(language = "de")
+#' if (interactive()) shinyCTTApp(workspace = FALSE)
 #' @returns None. This function is called for its side effect of launching the Shiny app.
 #' @export
-shinyCTTApp <- function(language = systemLanguage()) {
+shinyCTTApp <- function(language = systemLanguage(), workspace = interactive()) {
   shiny::shinyApp(
     ui = ui,
     server = server,
 
-    # The two settings the app needs while it runs, set when it starts and put back when it
+    # The settings the app needs while it runs, set when it starts and put back when it
     # stops. options() hands back what each one was before, and feeding that list to
     # options() again restores it - including removing one that was not set at all.
     #
@@ -28,6 +38,9 @@ shinyCTTApp <- function(language = systemLanguage()) {
     onStart = function() {
       previousOptions <- options(
         shinyCTT.language = language,
+
+        # Read by dataSourceUI(), to decide whether the source list offers the workspace.
+        shinyCTT.workspace = workspace,
 
         # Without this, DT leaves a missing value as an empty cell rather than printing NA.
         htmlwidgets.TOJSON_ARGS = list(na = "string"),

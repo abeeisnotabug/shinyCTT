@@ -42,30 +42,40 @@ makeRCode <- function(dataSource, groupCol, groups, modelCode, estimator, missin
                       isSubset, model, isMg) {
   head <- "library(lavaan)"
 
-  dataInput <- sprintf(
-    "rawData <- %s",
-    switch(
-      dataSource$type,
+  # Each branch writes the whole of its own step, because an .RData takes two lines: load()
+  # puts the file's objects into the workspace under their own names, and the one the user
+  # picked in the app is then the data.
+  dataInput <- switch(
+    dataSource$type,
 
-      "Workspace" = dataSource$object,
+    "Workspace" = sprintf("rawData <- %s", dataSource$object),
 
-      "CSV" = sprintf(
-"read.csv(
+    "CSV" = sprintf(
+"rawData <- read.csv(
   file = \"%s\",
   header = %s,
   sep = \"%s\",
   quote = \"%s\",
   stringsAsFactors = FALSE)",
-        dataSource$name, # file =
-        dataSource$header, # header =
-        dataSource$sep, # sep =
-        ifelse(dataSource$quote == "\"", "\\\"", dataSource$quote)), # quote =
+      dataSource$name, # file =
+      dataSource$header, # header =
+      dataSource$sep, # sep =
+      ifelse(dataSource$quote == "\"", "\\\"", dataSource$quote)), # quote =
 
-      "SPSS" = sprintf(
-        "haven::read_spss(file = \"%s\")",
-        dataSource$name)
-    ) # switch(
-  ) # sprintf(
+    "SPSS" = sprintf(
+      "rawData <- haven::read_spss(file = \"%s\")",
+      dataSource$name),
+
+    "RDS" = sprintf(
+      "rawData <- readRDS(\"%s\")",
+      dataSource$name),
+
+    "RData" = sprintf(
+"load(\"%s\")
+rawData <- %s",
+      dataSource$name, # load(
+      dataSource$object) # rawData <-
+  ) # switch(
 
   if (isSubset)
     subsetData <- sprintf(

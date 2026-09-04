@@ -44,12 +44,15 @@ test_that("scores depend only on the fit, so the table and the download agree", 
 
 ## makeRCode() takes an explicit dataSource descriptor rather than the `input` object,
 ## because inside a module `input` sees only its own namespace and every read would come
-## back NULL with no error. These helpers build the three descriptor shapes.
+## back NULL with no error. These helpers build the five descriptor shapes.
 
-wsSource   <- function() list(type = "Workspace", object = "rtdata")
-csvSource  <- function(name = "mydata.csv") list(type = "CSV", name = name, header = TRUE,
-                                                 sep = ",", quote = "\"")
-spssSource <- function(name = "mydata.sav") list(type = "SPSS", name = name)
+wsSource    <- function() list(type = "Workspace", object = "rtdata")
+csvSource   <- function(name = "mydata.csv") list(type = "CSV", name = name, header = TRUE,
+                                                  sep = ",", quote = "\"")
+spssSource  <- function(name = "mydata.sav") list(type = "SPSS", name = name)
+rdsSource   <- function(name = "mydata.rds") list(type = "RDS", name = name)
+rdataSource <- function(name = "mydata.RData") list(type = "RData", name = name,
+                                                    object = "rtdata")
 
 ## Positional order: dataSource, groupCol, groups, modelCode, estimator, missingMethod,
 ## isSubset, model, isMg.
@@ -103,13 +106,23 @@ test_that("each data source produces its own loading call", {
   # The filename must be quoted, or the generated script treats it as a symbol and fails
   # at runtime - and does not even parse when the name contains a space.
   expect_match(sav, 'read_spss(file = "mydata.sav")', fixed = TRUE)
+
+  expect_match(rcode(rdsSource()), 'rawData <- readRDS("mydata.rds")', fixed = TRUE)
+
+  # An .RData takes two lines: load() puts its objects into the workspace under their own
+  # names, and the one the user picked is then the data.
+  rdata <- rcode(rdataSource())
+  expect_match(rdata, 'load("mydata.RData")', fixed = TRUE)
+  expect_match(rdata, "rawData <- rtdata", fixed = TRUE)
 })
 
 test_that("the generated script parses as valid R, from every source", {
   # The whole point of the Model code tab is that the user can paste it and run it. The
   # source loop matters: the SPSS branch used to emit an unquoted filename, which parses
   # only by accident and breaks outright on a name containing a space.
-  for (src in list(wsSource(), csvSource(), spssSource(), spssSource("my data.sav"))) {
+  for (src in list(wsSource(), csvSource(), spssSource(), spssSource("my data.sav"),
+                   rdsSource(), rdsSource("my data.rds"),
+                   rdataSource(), rdataSource("my data.RData"))) {
     for (isMg in c(FALSE, TRUE)) {
       for (isSubset in c(FALSE, TRUE)) {
         code <- rcode(src, isSubset = isSubset, isMg = isMg)

@@ -5,12 +5,12 @@
 ## numeric columns are found once into the possibleItemColumns() reactive. Nothing here
 ## needs a browser: every module is *Server(id, <plain reactives>), which testServer drives.
 
-## Step 1 reads from all three sources ----
-## The three names in the switch() are the three the source dropdown offers. A name that
+## Step 1 reads from all four sources ----
+## The four names in the switch() are the four the source dropdown offers. A name that
 ## reached the switch() without being one of them would give NULL, and data.frame(NULL)
 ## succeeds - so raw() would fill with an empty table and nothing would say the read had
-## failed. The req() above the switch() is what stops that, and these three pin that each
-## name really does reach a reader.
+## failed. The req() above the switch() is what stops that, and these pin that each name
+## really does reach a reader.
 
 test_that("a data set is read from the workspace", {
   assign("workspaceData", rtdata, envir = globalenv())
@@ -21,7 +21,7 @@ test_that("a data set is read from the workspace", {
     args = list(notifications = shiny::reactiveValues(notList = list()),
                 frozen = shiny::reactiveVal(FALSE)),
     {
-      session$setInputs(source = "Workspace", objectFromWorkspace = "workspaceData")
+      session$setInputs(source = "Workspace", chosenObject = "workspaceData")
 
       expect_equal(nrow(raw()), nrow(rtdata))
       expect_equal(colnames(raw()), colnames(rtdata))
@@ -67,6 +67,173 @@ test_that("a data set is read from an SPSS file", {
     })
 })
 
+## An uploaded R data file ----
+## The two kinds are read differently: .RData holds any number of objects and gives their
+## names, so one has to be picked; .rds holds one and has no name for it.
+
+test_that("an object is picked out of an uploaded .RData", {
+  rdataPath <- tempfile(fileext = ".RData")
+  on.exit(unlink(rdataPath))
+
+  first <- rtdata
+  second <- rtdata[1:10, ]
+  save(first, second, file = rdataPath)
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = shiny::reactiveValues(notList = list()),
+                frozen = shiny::reactiveVal(FALSE)),
+    {
+      session$setInputs(
+        source = "RData",
+        RDataFile = list(name = "twoObjects.RData", datapath = rdataPath),
+        chosenObject = "second")
+
+      expect_equal(nrow(raw()), 10)
+      expect_equal(colnames(raw()), colnames(rtdata))
+
+      # The name the factor score files are called after, and what makeRCode() writes.
+      expect_equal(session$returned$name(), "second")
+      expect_equal(session$returned$descriptor()$type, "RData")
+      expect_equal(session$returned$descriptor()$object, "second")
+
+      # Picking the other one must not read the file again from scratch and lose the pick.
+      session$setInputs(chosenObject = "first")
+      expect_equal(nrow(raw()), nrow(rtdata))
+    })
+})
+
+test_that("an uploaded .rds is the data itself, with no object to pick", {
+  rdsPath <- tempfile(fileext = ".rds")
+  on.exit(unlink(rdsPath))
+
+  saveRDS(rtdata, rdsPath)
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = shiny::reactiveValues(notList = list()),
+                frozen = shiny::reactiveVal(FALSE)),
+    {
+      session$setInputs(
+        source = "RData",
+        RDataFile = list(name = "myScores.rds", datapath = rdsPath))
+
+      expect_equal(nrow(raw()), nrow(rtdata))
+      expect_equal(colnames(raw()), colnames(rtdata))
+
+      # No name for what an .rds holds, so the file's own name stands in.
+      expect_equal(session$returned$name(), "myScores")
+      expect_equal(session$returned$descriptor()$type, "RDS")
+      expect_equal(session$returned$descriptor()$name, "myScores.rds")
+    })
+})
+
+test_that("an R data file holding no data set says so", {
+  nothingUsable <- tempfile(fileext = ".RData")
+  aTable <- tempfile(fileext = ".RData")
+  on.exit(unlink(c(nothingUsable, aTable)))
+
+  notes <- "hello"
+  lookup <- list(a = 1, b = 2)
+  save(notes, lookup, file = nothingUsable)
+
+  alpha <- data.frame(item_1 = c(1, 2, 3), item_2 = c(4, 5, 6))
+  save(alpha, file = aTable)
+
+  notifications <- shiny::reactiveValues(notList = list())
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = notifications, frozen = shiny::reactiveVal(FALSE)),
+    {
+      # The file reads fine - there is simply nothing in it the chooser could offer, which
+      # used to leave the user with a file they had just picked and nothing on the screen.
+      session$setInputs(
+        source = "RData",
+        RDataFile = list(name = "nothing.RData", datapath = nothingUsable))
+
+      expect_null(raw())
+      expect_false(is.null(notifications$notList$noDataset))
+
+      # A file that does hold one clears the message again.
+      session$setInputs(
+        RDataFile = list(name = "alpha.RData", datapath = aTable),
+        chosenObject = "alpha")
+
+      expect_null(notifications$notList$noDataset)
+      expect_equal(nrow(raw()), 3)
+    })
+})
+
+test_that("an R data file that cannot be read is reported, not fatal", {
+  notARDataFile <- tempfile(fileext = ".RData")
+  on.exit(unlink(notARDataFile))
+  writeLines("this is not an R data file", notARDataFile)
+
+  notifications <- shiny::reactiveValues(notList = list())
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = notifications, frozen = shiny::reactiveVal(FALSE)),
+    {
+      # load() warns about the magic number before it gives up, and that warning reaches
+      # the console rather than the user.
+      suppressWarnings(session$setInputs(
+        source = "RData",
+        RDataFile = list(name = "broken.RData", datapath = notARDataFile),
+        chosenObject = "anything"))
+
+      expect_null(raw())
+      expect_false(is.null(notifications$notList$unreadable))
+    })
+})
+
+## Hosting: the workspace is only offered when there is a console behind the app ----
+## globalenv() is the visitor's own only when the app was started from their console. On a
+## server it holds whatever the person who put the app up left there, so both halves of
+## step 1 have to stop offering it - the source list, and the reader behind it.
+
+test_that("the source list drops the workspace when it is not on offer", {
+  previous <- options(shinyCTT.workspace = FALSE)
+  on.exit(options(previous))
+
+  hosted <- as.character(dataSourceUI("dataSource"))
+
+  options(shinyCTT.workspace = TRUE)
+  local <- as.character(dataSourceUI("dataSource"))
+
+  expect_false(grepl("Workspace", hosted, fixed = TRUE))
+  expect_true(grepl("Workspace", local, fixed = TRUE))
+
+  # The R data file upload is there either way - it is the way in when the workspace is not.
+  expect_true(grepl("dataSource-RDataFile", hosted, fixed = TRUE))
+  expect_true(grepl("dataSource-RDataFile", local, fixed = TRUE))
+})
+
+test_that("nothing is read from the workspace when it is not on offer", {
+  previous <- options(shinyCTT.workspace = FALSE)
+  assign("workspaceData", rtdata, envir = globalenv())
+  on.exit({
+    options(previous)
+    rm("workspaceData", envir = globalenv())
+  })
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = shiny::reactiveValues(notList = list()),
+                frozen = shiny::reactiveVal(FALSE)),
+    {
+      # What a hand-made request could send: the name is not in the dropdown any more, but
+      # the input still reaches the server.
+      session$setInputs(source = "Workspace", chosenObject = "workspaceData")
+
+      expect_null(raw())
+
+      chooser <- paste(as.character(output$objectChooser), collapse = "")
+      expect_false(grepl("workspaceData", chooser, fixed = TRUE))
+    })
+})
+
 ## Factor columns become text ----
 
 test_that("a factor column arrives as text, and the numbers beside it are untouched", {
@@ -83,7 +250,7 @@ test_that("a factor column arrives as text, and the numbers beside it are untouc
     args = list(notifications = shiny::reactiveValues(notList = list()),
                 frozen = shiny::reactiveVal(FALSE)),
     {
-      session$setInputs(source = "Workspace", objectFromWorkspace = "withFactor")
+      session$setInputs(source = "Workspace", chosenObject = "withFactor")
 
       expect_type(raw()$grp, "character")
       expect_equal(raw()$grp, c("A", "B", "A", "B"))
@@ -100,7 +267,7 @@ test_that("a data set with no factor column comes through unchanged", {
     args = list(notifications = shiny::reactiveValues(notList = list()),
                 frozen = shiny::reactiveVal(FALSE)),
     {
-      session$setInputs(source = "Workspace", objectFromWorkspace = "noFactors")
+      session$setInputs(source = "Workspace", chosenObject = "noFactors")
 
       expect_equal(raw()$item_1, rtdata$item_1)
     })

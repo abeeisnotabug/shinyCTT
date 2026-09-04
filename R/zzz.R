@@ -13,7 +13,12 @@
                      # Whether the reader can drag a table's column borders. Every
                      # reactable() call in the package reads it, so this is the one place
                      # to switch column resizing on or off.
-                     shinyCTT.resizable = TRUE)
+                     shinyCTT.resizable = TRUE,
+
+                     # Whether step 1 offers the objects lying around in R as a data
+                     # source. shinyCTTApp(workspace = ) sets it for the app it starts;
+                     # this is what dataSourceUI() reads when called outside one.
+                     shinyCTT.workspace = interactive())
 
   toSet <- !(names(opShinyCTT) %in% names(op))
   if (any(toSet)) options(opShinyCTT[toSet])

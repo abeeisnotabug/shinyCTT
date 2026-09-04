@@ -7,27 +7,32 @@
 dataSourceUI <- function(id) {
   ns <- NS(id)
 
+  # The names are what the user reads, the values what input$source is compared
+  # against - so only the names are translated.
+  sources <- stats::setNames(
+    c("Workspace", "CSV", "SPSS", "RData"),
+    c(tr("data.source.type.workspace"),
+      tr("data.source.type.csv"),
+      tr("data.source.type.spss"),
+      tr("data.source.type.rdata")))
+
+  # globalenv() is somebody's own workspace only when a person is sitting at the console
+  # the app was started from. Hosted, it holds whatever was left there by whoever put the
+  # app up -> drop the entry, and the R data file upload is the way in.
+  # shinyCTTApp(workspace = ) decides, and defaults to interactive().
+  if (!isTRUE(getOption("shinyCTT.workspace")))
+    sources <- sources[sources != "Workspace"]
+
   fluidRow(
     column(
       width = 3,
 
       shinydashboard::box(
         width = NULL,
-        # The names are what the user reads, the values what input$source is compared
-        # against - so only the names are translated.
-        selectInput(ns("source"), tr("data.source.label"),
-                    choices = stats::setNames(
-                      c("Workspace", "CSV", "SPSS"),
-                      c(tr("data.source.type.workspace"),
-                        tr("data.source.type.csv"),
-                        tr("data.source.type.spss"))))),
+        selectInput(ns("source"), tr("data.source.label"), choices = sources)),
 
       shinydashboard::box(
         width = NULL,
-        conditionalPanel(
-          condition = "input.source == 'Workspace'",
-          uiOutput(ns("objectsInWorkspace")),
-          ns = ns),
         conditionalPanel(
           condition = "input.source == 'CSV'",
           fileInput(ns("CSVFile"), tr("data.source.csv"),
@@ -50,7 +55,18 @@ dataSourceUI <- function(id) {
           fileInput(ns("SPSSFile"), tr("data.source.spss"),
                     multiple = FALSE,
                     accept = c(".sav", ".zsav", ".por")),
-          ns = ns)),
+          ns = ns),
+        conditionalPanel(
+          condition = "input.source == 'RData'",
+          fileInput(ns("RDataFile"), tr("data.source.rdata"),
+                    multiple = FALSE,
+                    accept = c(".RData", ".rda", ".rds")),
+          ns = ns),
+
+        # Two of the sources hold several objects to pick between - the workspace and an
+        # .RData - so the chooser sits outside the panels above and draws nothing for the
+        # rest.
+        uiOutput(ns("objectChooser"))),
 
       shinydashboard::box(
         width = NULL,
@@ -84,22 +100,91 @@ dataSourceServer <- function(id, notifications, frozen) {
     raw <- reactiveVal()
     chosen <- reactiveVal()
 
-    ## the data objects that are lying around in R ----
-    output$objectsInWorkspace <- renderUI({
-      selectInput(
-        ns("objectFromWorkspace"),
-        tr("data.source.workspace"),
-        Filter(
-          function(object) !is.null(dim(get(object))) && typeof(get(object)) != "character",
-          ls(envir = globalenv())))
+    # Whether the workspace is on offer at all - the same setting the source list is built
+    # from. It cannot change while the app runs, so it is read once.
+    workspaceOffered <- isTRUE(getOption("shinyCTT.workspace"))
+
+    ## which kind of R data file was uploaded ----
+    # An .rds holds one object and no name for it; an .RData (or .rda) holds any number of
+    # them and gives their names.
+    isRds <- reactive({
+      req(input$RDataFile)
+
+      grepl("\\.rds$", input$RDataFile$name, ignore.case = TRUE)
+    })
+
+    ## what an uploaded .RData holds ----
+    # A reactive of its own, so the file is read once per upload rather than once per pick:
+    # read inside the observer below, it would be read again every time the user chose
+    # another object out of it, and the rebuilt chooser would snap back to the first name.
+    #
+    # The objects go into an environment of their own, never into the app's own workspace,
+    # which one R process shares between every visitor. Nothing points at that environment
+    # once the visit ends, so R frees it.
+    uploadedObjects <- reactive({
+      req(input$RDataFile, !isRds())
+
+      objects <- new.env()
+      load(input$RDataFile$datapath, envir = objects)
+
+      objects
+    })
+
+    ## the data objects there are to pick from ----
+    # Three answers, and the difference between the last two is what the observer below
+    # reports on: NULL when this source has no objects to pick between at all - a CSV, an
+    # SPSS file, an .rds - an empty vector when it has objects but none of them could be a
+    # table, and the names otherwise.
+    pickableObjects <- reactive({
+
+      # The console's workspace, or what an uploaded .RData holds.
+      objects <- if (identical(input$source, "Workspace") && workspaceOffered) {
+        globalenv()
+
+      } else if (identical(input$source, "RData") && !isRds()) {
+        # A file that cannot be read is reported by the observer below; here it only means
+        # there is nothing to list.
+        tryCatch(uploadedObjects(), error = function(e) NULL)
+
+      } else {
+        NULL
+      }
+
+      if (is.null(objects)) return(NULL)
+
+      Filter(
+        function(objectName) {
+          object <- get(objectName, envir = objects)
+
+          !is.null(dim(object)) && typeof(object) != "character"
+        },
+        ls(envir = objects))
+    })
+
+    output$objectChooser <- renderUI({
+
+      # NULL and not req(): a stopped render leaves what it drew last time on the screen,
+      # so switching from the workspace to a CSV would keep the workspace's chooser.
+      if (length(pickableObjects()) == 0) return(NULL)
+
+      # The workspace is picked from straight away, an uploaded .RData after the file, so
+      # the two labels number themselves 1b. and 1c.
+      label <- if (identical(input$source, "Workspace")) {
+        tr("data.source.workspace")
+      } else {
+        tr("data.source.rdata.object")
+      }
+
+      selectInput(ns("chosenObject"), label, pickableObjects())
     })
 
     ## load the data and check it ----
     observeEvent(
       list(input$source,
-           input$objectFromWorkspace,
+           input$chosenObject,
            input$CSVFile,
            input$SPSSFile,
+           input$RDataFile,
            input$header,
            input$sep,
            input$quote), {
@@ -114,24 +199,54 @@ dataSourceServer <- function(id, notifications, frozen) {
         icon = icon("times"),
         status = "danger")
 
+      ### an R data file holding no data set ----
+      # The chooser above draws nothing when a file holds no table, so without this the
+      # user would be left with a file they had just chosen and no sign of what was wrong
+      # with it. Only for an uploaded file: a workspace with nothing in it is not something
+      # the user has just done, and this runs at startup.
+      if (identical(input$source, "RData") &&
+          identical(pickableObjects(), character(0))) {
+
+        notifications$notList$noDataset <- shinydashboard::notificationItem(
+          text = tr("data.error.no.dataset"),
+          icon = icon("times"),
+          status = "danger")
+        showNotification(
+          tr("data.error.no.dataset"),
+          duration = 10,
+          id = "noDatasetNot",
+          type = "error")
+
+        return()
+      }
+
+      notifications$notList$noDataset <- NULL
+      removeNotification("noDatasetNot")
+
       ### choose data source ----
       # Nothing to read until the control that goes with the chosen source has something in
       # it. This stays outside the tryCatch below, because req() stops the observer by
       # raising an error of its own and would otherwise be reported as a failed read.
+      #
+      # An .rds is the one object it holds, so the file is enough; an .RData needs a pick
+      # as well. So does the workspace, which is not readable at all when the app is not
+      # offering it.
       req(switch(
         input$source,
         "CSV" = input$CSVFile,
         "SPSS" = input$SPSSFile,
-        "Workspace" = input$objectFromWorkspace))
+        "RData" = if (isRds()) input$RDataFile else input$chosenObject,
+        "Workspace" = if (workspaceOffered) input$chosenObject))
 
       # Reading is caught, because it fails on plenty of things a user can point at: a
-      # malformed CSV, a corrupt SPSS file, or a workspace object that gets past the
-      # chooser's filter without being something data.frame() can make a table of - a sparse
-      # Matrix, for one. An error let out of an observer ends the session on the spot, so
-      # the user would lose the app rather than be told the data set is unusable.
+      # malformed CSV, a corrupt SPSS file, an R data file that is neither, or a workspace
+      # object that gets past the chooser's filter without being something data.frame() can
+      # make a table of - a sparse Matrix, for one. An error let out of an observer ends
+      # the session on the spot, so the user would lose the app rather than be told the
+      # data set is unusable.
       loadedData <- tryCatch({
 
-        # The same three names the req() above tests, so input$source is always one of
+        # The same four names the req() above tests, so input$source is always one of
         # them by the time this runs.
         userDataTmp <- switch(
           input$source,
@@ -142,7 +257,9 @@ dataSourceServer <- function(id, notifications, frozen) {
             quote = input$quote,
             stringsAsFactors = FALSE),
           "SPSS" = haven::read_spss(file = input$SPSSFile$datapath),
-          "Workspace" = get(input$objectFromWorkspace))
+          "RData" = if (isRds()) readRDS(input$RDataFile$datapath)
+                    else get(input$chosenObject, envir = uploadedObjects()),
+          "Workspace" = get(input$chosenObject, envir = globalenv()))
 
         # TRUE for every column that arrived as a factor -> those become plain text.
         factorColumns <- vapply(userDataTmp, is.factor, logical(1))
@@ -255,8 +372,8 @@ dataSourceServer <- function(id, notifications, frozen) {
       req(frozen())
 
       # shinyjs adds this box's name to the id itself (see GOTCHAS.md), so these are plain.
-      for (controlId in c("source", "CSVFile", "header", "sep", "quote",
-                          "objectFromWorkspace", "dataSelectButton"))
+      for (controlId in c("source", "CSVFile", "header", "sep", "quote", "SPSSFile",
+                          "RDataFile", "chosenObject", "dataSelectButton"))
         shinyjs::disable(controlId)
     })
 
@@ -267,21 +384,34 @@ dataSourceServer <- function(id, notifications, frozen) {
       chosen = chosen,
 
       # Where the data came from, so makeRCode() can write the matching
-      # read.csv() / read_spss() / workspace line into the exported script.
+      # read.csv() / read_spss() / readRDS() / load() line into the exported script. An
+      # .rds is read straight into one object and an .RData is loaded and one of its
+      # objects taken, so the two are told apart here rather than in makeRCode().
       descriptor = reactive(switch(
         input$source,
-        "Workspace" = list(type = "Workspace", object = input$objectFromWorkspace),
+        "Workspace" = list(type = "Workspace", object = input$chosenObject),
         "CSV" = list(type = "CSV",
                      name = input$CSVFile$name,
                      header = input$header,
                      sep = input$sep,
                      quote = input$quote),
-        "SPSS" = list(type = "SPSS", name = input$SPSSFile$name))),
+        "SPSS" = list(type = "SPSS", name = input$SPSSFile$name),
+        "RData" = if (isRds()) {
+          list(type = "RDS", name = input$RDataFile$name)
+        } else {
+          list(type = "RData", name = input$RDataFile$name, object = input$chosenObject)
+        })),
 
+      # An .rds has no name for what it holds, so the file's own name stands in.
       name = reactive(switch(
         input$source,
-        "Workspace" = input$objectFromWorkspace,
+        "Workspace" = input$chosenObject,
         "CSV" = gsub("\\.csv", "", input$CSVFile$name),
-        "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name))))
+        "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name),
+        "RData" = if (isRds()) {
+          sub("\\.rds$", "", input$RDataFile$name, ignore.case = TRUE)
+        } else {
+          input$chosenObject
+        })))
   })
 }

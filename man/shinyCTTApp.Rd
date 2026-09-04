@@ -4,7 +4,7 @@
 \alias{shinyCTTApp}
 \title{A wrapper function for the Shiny App. This is the function that should be called to run the app.}
 \usage{
-shinyCTTApp(language = systemLanguage())
+shinyCTTApp(language = systemLanguage(), workspace = interactive())
 }
 \arguments{
 \item{language}{Which language to start the app in: "en", "de" or "fr". Defaults to the
@@ -15,8 +15,18 @@ shinyCTTApp(language = systemLanguage())
   tr(), out of the visitor's own session (see R/translations.R). So two people can have
   the app open in different languages at once, whatever this was set to.
 
-  Stored as options(shinyCTT.language = language) while the app runs. The three options
+  Stored as options(shinyCTT.language = language) while the app runs. The four options
   the app sets are put back the way they were when it closes.}
+
+\item{workspace}{Whether to offer the objects lying around in R as a data source.
+
+  The default is TRUE when the app is started from somebody's own console and FALSE
+  otherwise, which is what a hosted app is: there globalenv() holds whatever was left
+  there by whoever put the app up, and nothing of the visitor's. Set it by hand when the
+  test gets it wrong, as it does for R -e 'shinyCTT::shinyCTTApp()'.
+
+  Uploading a .RData, .rda or .rds file is offered either way, and is the way in when
+  the workspace is not on offer.}
 }
 \value{
 None. This function is called for its side effect of launching the Shiny app.
@@ -27,4 +37,5 @@ A wrapper function for the Shiny App. This is the function that should be called
 \examples{
 if (interactive()) shinyCTTApp()
 if (interactive()) shinyCTTApp(language = "de")
+if (interactive()) shinyCTTApp(workspace = FALSE)
 }
