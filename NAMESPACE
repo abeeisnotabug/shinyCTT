@@ -2,5 +2,4 @@
 
 export(shinyCTTApp)
 import(shiny)
-importFrom(magrittr,"%>%")
 importFrom(rlang,.data)

@@ -108,7 +108,7 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
       ggplot2::ggplot(
           data.frame(
               itemX = data()[, input$scatterItemX],
-              itemY = data()[, input$scatterItemY]) %>%
+              itemY = data()[, input$scatterItemY]) |>
             stats::na.omit(),
           ggplot2::aes(x = .data$itemX, y = .data$itemY)) +
 
@@ -127,8 +127,8 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
         subset(
           data(),
           subset = data()[, groupCol()] %in% input$scatterGroupGroups,
-          select = c(groupCol(), input$scatterItemXGroup, input$scatterItemYGroup)) %>%
-          stats::na.omit() %>%
+          select = c(groupCol(), input$scatterItemXGroup, input$scatterItemYGroup)) |>
+          stats::na.omit() |>
           stats::setNames(nm = c("group", "itemX", "itemY")),
         ggplot2::aes(x = .data$itemX, y = .data$itemY, color = .data$group)) +
 

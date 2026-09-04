@@ -603,7 +603,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
 
               downloadButton(
                 ns(paste0(thisModel, "ScoresDownload")),
-                tr("results.scores.download.button")) %>%
+                tr("results.scores.download.button")) |>
 
                 div(align = "center"),
 

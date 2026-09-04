@@ -140,8 +140,8 @@ mvnServer <- function(id, data, itemCols) {
 
       ### if the test did not run ----
       if (is.null(multivariateTable())) {
-        paste(tr("stats.error.prefix"), mvnResult()$message) %>%
-          HTML() %>%
+        paste(tr("stats.error.prefix"), mvnResult()$message) |>
+          HTML() |>
           div(style = "color:red")
 
       ### if it did ----
@@ -212,8 +212,8 @@ mvnServer <- function(id, data, itemCols) {
       req(data(), input$mvnSL)
 
       if (is.null(univariateTable())) {
-        paste(tr("stats.error.prefix"), mvnResult()$message) %>%
-          HTML() %>%
+        paste(tr("stats.error.prefix"), mvnResult()$message) |>
+          HTML() |>
           div(style = "color:red")
       }
     })

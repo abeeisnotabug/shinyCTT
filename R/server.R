@@ -79,14 +79,14 @@ server <- function(input, output, session) {
   output$sigLvlNote <- renderUI({
     if (sigLvlUsable()) return(NULL)
 
-    sprintf(tr("params.siglvl.hint"), sigLvlRV()) %>%
+    sprintf(tr("params.siglvl.hint"), sigLvlRV()) |>
       div(style = "color:red")
   })
 
   output$rmseaCiLvlNote <- renderUI({
     if (rmseaCiLvlUsable()) return(NULL)
 
-    sprintf(tr("params.rmsea.ci.hint"), rmseaCiLvlRV()) %>%
+    sprintf(tr("params.rmsea.ci.hint"), rmseaCiLvlRV()) |>
       div(style = "color:red")
   })
 
@@ -321,8 +321,8 @@ server <- function(input, output, session) {
     tagList(
       br(),
       sprintf(tr("params.refit.pending"),
-              paste0("<b>", tr("params.go.button"), "*</b>")) %>%
-        HTML() %>%
+              paste0("<b>", tr("params.go.button"), "*</b>")) |>
+        HTML() |>
         div(style = "color:orange"))
   })
 
@@ -369,8 +369,8 @@ server <- function(input, output, session) {
     sprintf(tr("params.estimator.mvn.note"),
             estimatorLongName,
             paste0("<i>", tr("stats.nav"), "</i>"),
-            paste0("<i>", tr("stats.mvn.title"), "</i>")) %>%
-      HTML() %>%
+            paste0("<i>", tr("stats.mvn.title"), "</i>")) |>
+      HTML() |>
       div(style = "color:orange; font-size: 90%")
   })
 
@@ -550,8 +550,8 @@ server <- function(input, output, session) {
       tagList(
         br(),
         strong(tr("params.error.tests.failed")),
-        paste(tr("params.error.prefix"), conditionMessage(e)) %>%
-          HTML() %>%
+        paste(tr("params.error.prefix"), conditionMessage(e)) |>
+          HTML() |>
           div(style = "color:red")))
   })) # observeEvent(input$goModels, {
 

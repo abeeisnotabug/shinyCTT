@@ -20,7 +20,7 @@ Description: The package provides a Shiny App to analyze datasets in the
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-Depends: R (>= 3.5.1),
+Depends: R (>= 4.1.0),
     shiny (>= 1.5.0)
 Imports: 
     shinydashboard (>= 0.7.1),
@@ -33,7 +33,6 @@ Imports:
     lavaan (>= 0.6-21),
     DT (>= 0.11),
     MASS (>= 7.3-46),
-    magrittr (>= 1.5),
     rlang (>= 1.2.0)
 Suggests: 
     testthat (>= 3.0.0),

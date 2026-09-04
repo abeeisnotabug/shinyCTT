@@ -85,15 +85,15 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
               paste0(if (useFIML()) "FI", input$corrIndEst), # %s
               corrInd[1], # %.3f
               corrInd[2], # %i
-              ifelse(corrInd[3] < 0.001, "< 0.001", sprintf("= %.3f", corrInd[3]))) %>%
+              ifelse(corrInd[3] < 0.001, "< 0.001", sprintf("= %.3f", corrInd[3]))) |>
 
-              HTML() %>%
+              HTML() |>
               p()
 
           ) # tagList
 
         } else {
-          HTML(tr("stats.corrind.siglvl.invalid")) %>%
+          HTML(tr("stats.corrind.siglvl.invalid")) |>
             div(style = "color:red")
         }
 
@@ -101,8 +101,8 @@ corrIndependenceServer <- function(id, data, itemCols, useFIML) {
       else {
         tagList(
           strong(tr("stats.test.result")),
-          paste(tr("stats.error.prefix"), corrIndRaw$message) %>%
-            HTML() %>%
+          paste(tr("stats.error.prefix"), corrIndRaw$message) |>
+            HTML() |>
             div(style = "color:red"))
       }
     })

@@ -240,8 +240,8 @@ dataSourceServer <- function(id, notifications, frozen) {
           rownames = FALSE,
           options = list(dom = "t")))
 
-      raw() %>%
-        DT::datatable(options = list(language = dtLanguage())) %>%
+      raw() |>
+        DT::datatable(options = list(language = dtLanguage())) |>
         DT::formatRound(
           columns = seq_along(raw())[vapply(raw(), is.numeric, logical(1))],
           digits = 3)

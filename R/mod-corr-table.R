@@ -129,8 +129,8 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
 
       } else {
         singleCorrTable <-
-          paste(tr("stats.error.prefix"), corrTableWithCIsRaw$test) %>%
-          HTML() %>%
+          paste(tr("stats.error.prefix"), corrTableWithCIsRaw$test) |>
+          HTML() |>
           div(style = "color:red")
       }
 

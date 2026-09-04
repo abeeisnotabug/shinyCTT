@@ -137,8 +137,8 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
         subset(
           data(),
           subset = data()[, groupCol()] %in% input$histGroupGroups,
-          select = c(groupCol(), input$histItemGroup)) %>%
-          stats::na.omit() %>%
+          select = c(groupCol(), input$histItemGroup)) |>
+          stats::na.omit() |>
           stats::setNames(nm = c("group", "item")),
         ggplot2::aes(x = .data$item, fill = .data$group)) +
 
