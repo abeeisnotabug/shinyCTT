@@ -1,14 +1,20 @@
 #' A wrapper function for the Shiny App. This is the function that should be called to run the app.
-#' @param language Which language to show the app in: "en" (the default) or "de". Stored as
-#'   options(shinyCTT.language = language) while the app runs, which every screen reads
-#'   through tr() (see R/translations.R). The three options the app sets are put back the way
-#'   they were when it closes.
+#' @param language Which language to start the app in: "en", "de" or "fr". Defaults to the
+#'   language R itself is running in, when the app has been translated into it.
+#'
+#'   This is only the starting point. Each visitor picks their own from the chooser in the
+#'   header, which puts ?lang= into the address; that is what every screen reads through
+#'   tr(), out of the visitor's own session (see R/translations.R). So two people can have
+#'   the app open in different languages at once, whatever this was set to.
+#'
+#'   Stored as options(shinyCTT.language = language) while the app runs. The three options
+#'   the app sets are put back the way they were when it closes.
 #' @examples
 #' if (interactive()) shinyCTTApp()
 #' if (interactive()) shinyCTTApp(language = "de")
 #' @returns None. This function is called for its side effect of launching the Shiny app.
 #' @export
-shinyCTTApp <- function(language = "en") {
+shinyCTTApp <- function(language = systemLanguage()) {
   shiny::shinyApp(
     ui = ui,
     server = server,

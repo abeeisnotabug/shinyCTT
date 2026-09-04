@@ -136,8 +136,39 @@ test_that("an unknown key comes back as itself, in both languages", {
 test_that("an unknown language falls back to English", {
   someKey <- readTranslationFile()$key[1]
 
-  withLanguage("fr",
+  # Not "fr", which is a language the app has: this test reads the first row, whose French
+  # happens to be the same word as its English, so it passed either way.
+  withLanguage("xx",
     expect_equal(tr(someKey), unname(getOption("shinyCTT.text")$en[someKey])))
+})
+
+## which language wins ----
+
+test_that("the language R is running in is read out of the locale", {
+  # "de_DE" -> "de". LANGUAGE can hold a list like "de:en", so only the part before the
+  # colon counts; a language the app does not have falls back to the first one.
+  previous <- Sys.getenv("LANGUAGE")
+  on.exit(Sys.setenv(LANGUAGE = previous))
+
+  Sys.setenv(LANGUAGE = "de_DE.UTF-8"); expect_equal(systemLanguage(), "de")
+  Sys.setenv(LANGUAGE = "fr:en");       expect_equal(systemLanguage(), "fr")
+  Sys.setenv(LANGUAGE = "pt_BR.UTF-8"); expect_equal(systemLanguage(), "en")
+})
+
+test_that("the address beats shinyCTTApp(language =), which beats R's own locale", {
+  previous <- Sys.getenv("LANGUAGE")
+  on.exit(Sys.setenv(LANGUAGE = previous))
+  Sys.setenv(LANGUAGE = "fr_FR.UTF-8")
+
+  # Nothing set anywhere: R's locale decides, which is what puts the startup message in
+  # the reader's language before there is an app at all.
+  withLanguage(NULL, expect_equal(resolveLanguage(NULL), "fr"))
+
+  # shinyCTTApp(language = "de") was given: that beats the locale...
+  withLanguage("de", expect_equal(resolveLanguage(NULL), "de"))
+
+  # ...and ?lang=en in the address beats both.
+  withLanguage("de", expect_equal(resolveLanguage("en"), "en"))
 })
 
 test_that("tr() says so when no text has been read", {

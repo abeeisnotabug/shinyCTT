@@ -56,13 +56,31 @@ loadTranslations <- function(path) {
     appLanguages))
 }
 
+## The language R itself is running in, when the app has been translated into it, and the
+## first language on the list otherwise. "de_DE" gives "de".
+##
+## LANGUAGE is what R checks first for its own messages and can hold a list like "de:en", so
+## only the part before the colon is read; LC_MESSAGES is the locale proper.
+systemLanguage <- function() {
+  asked <- Sys.getenv("LANGUAGE")
+
+  if (!nzchar(asked)) asked <- Sys.getlocale("LC_MESSAGES")
+
+  code <- substr(sub(":.*", "", asked), 1, 2)
+
+  if (isTRUE(code %in% appLanguages)) code else appLanguages[1]
+}
+
 ## Which language to show, given whatever the address asked for. Anything unknown - or
 ## nothing at all - falls back to what shinyCTTApp(language = ) was given, and that to the
-## first language on the list.
+## language R itself is running in.
+##
+## That last step is what puts the startup message in German on a German machine: .onAttach()
+## runs before there is an app, let alone a visitor, so neither of the two above it is set.
 resolveLanguage <- function(asked) {
   if (isTRUE(asked %in% appLanguages)) return(asked)
 
-  fallback <- getOption("shinyCTT.language", default = appLanguages[1])
+  fallback <- getOption("shinyCTT.language", default = systemLanguage())
 
   if (isTRUE(fallback %in% appLanguages)) fallback else appLanguages[1]
 }

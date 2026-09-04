@@ -1,5 +1,8 @@
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("Welcome to the shinyCTT package! Start the shiny app by calling the shinyCTTApp() function.")
+  # .onLoad() has already read the text file, so this can be looked up like any other piece
+  # of text. There is no app and no visitor yet, so it comes out in the language R itself is
+  # running in.
+  packageStartupMessage(tr("startup.message"))
 }
 
 .onLoad <- function(libname, pkgname) {
