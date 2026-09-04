@@ -62,34 +62,28 @@ mvnServer <- function(id, data, itemCols) {
 
     ## the test ----
     # A plain reactive, so the tab's three outputs share one run of it, and so server.R can
-    # read the recommendation below without the tab ever having been opened.
+    # read the recommendation below without the tab ever having been opened. Both tests run
+    # together, so one failure leaves one condition object for all three outputs to report.
     mvnResult <- reactive({
       req(data(), itemCols())
 
+      items <- stats::na.omit(data()[, itemCols()])
+
       tryCatch(
-        MVN::mvn(stats::na.omit(data()[, itemCols()]),
-                 mvn_test = "mardia"),
+        list(multivariate = mardiaTests(items),
+             univariate = andersonDarlingTests(items)),
         warning = function(w) w,
         error = function(e) e)
     })
 
     ## what the test points to ----
-    # MVN reports a p-value either as a number or as the string "<0.001", so both have to be
-    # read. Either Mardia statistic coming out significant -> the robust estimator.
+    # Either Mardia statistic coming out significant -> the robust estimator.
     recommendedEstimator <- reactive({
       req(input$mvnSL)
 
-      if (!is.data.frame(mvnResult()$multivariate_normality)) return(NULL)
+      if (!is.data.frame(mvnResult()$multivariate)) return(NULL)
 
-      pValues <- mvnResult()$multivariate_normality[, "p.value"]
-
-      notNormal <- if (is.numeric(pValues)) {
-        any(pValues < input$mvnSL)
-      } else {
-        any(pValues == "<0.001")
-      }
-
-      if (notNormal) "MLR" else "ML"
+      if (any(mvnResult()$multivariate$p < input$mvnSL)) "MLR" else "ML"
     })
 
     ## the two result tables ----
@@ -101,14 +95,9 @@ mvnServer <- function(id, data, itemCols) {
     multivariateTable <- reactive({
       req(input$mvnSL)
 
-      if (!is.data.frame(mvnResult()$multivariate_normality)) return(NULL)
+      if (!is.data.frame(mvnResult()$multivariate)) return(NULL)
 
-      mvnMV <- data.frame(Test = mvnResult()$multivariate_normality$Test,
-                          Statistic = mvnResult()$multivariate_normality$Statistic,
-                          p = suppressWarnings(as.numeric(mvnResult()$multivariate_normality$p.value)),
-                          stringsAsFactors = FALSE)
-
-      mvnMV$p[is.na(mvnMV$p)] <- 0
+      mvnMV <- mvnResult()$multivariate
       mvnMV$Signif. <- ifelse(mvnMV$p < input$mvnSL, "*", "")
       mvnMV$p <- ifelse(mvnMV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnMV$p, 3)))
       mvnMV
@@ -117,15 +106,9 @@ mvnServer <- function(id, data, itemCols) {
     univariateTable <- reactive({
       req(input$mvnSL)
 
-      if (!identical(class(mvnResult())[1], "mvn")) return(NULL)
+      if (!is.data.frame(mvnResult()$univariate)) return(NULL)
 
-      mvnUV <- data.frame(Test = mvnResult()$univariate_normality$Test,
-                          Item = mvnResult()$univariate_normality$Variable,
-                          Statistic = mvnResult()$univariate_normality$Statistic,
-                          p = suppressWarnings(as.numeric(mvnResult()$univariate_normality$p.value)),
-                          stringsAsFactors = FALSE)
-
-      mvnUV$p[is.na(mvnUV$p)] <- 0
+      mvnUV <- mvnResult()$univariate
       mvnUV$Signif. <- ifelse(mvnUV$p < input$mvnSL, "*", "")
       mvnUV$p <- ifelse(mvnUV$p < 0.001, "< 0.001", sprintf("%.3f", round(mvnUV$p, 3)))
       mvnUV
@@ -271,9 +254,17 @@ mvnServer <- function(id, data, itemCols) {
       userDataNAOmit <- stats::na.omit(data())
 
       if (input$mvnPlotType == "qq") {
-        MVN::multivariate_diagnostic_plot(
-          stats::na.omit(userDataNAOmit[, itemCols()]),
-          type = "qq")
+        items <- stats::na.omit(userDataNAOmit[, itemCols()])
+        # each case's distance from the mean, against where that distance would fall if the
+        # items really were multivariate normal
+        distances <- sort(stats::mahalanobis(items, colMeans(items), stats::cov(items)))
+        expected <- stats::qchisq(stats::ppoints(nrow(items)), df = ncol(items))
+
+        graphics::plot(expected, distances,
+                       xlab = tr("stats.mvn.qq.abscissa"),
+                       ylab = tr("stats.mvn.qq.ordinate"),
+                       pch = 16, col = fuColors()$mark)
+        graphics::abline(a = 0, b = 1)
 
       } else if (input$mvnPlotType == "persp") {
         graphics::persp(x = MASS::kde2d(userDataNAOmit[, input$mvnItemX],
