@@ -337,6 +337,50 @@ row. A `useNA = "ifany"` column also arrives named `NA` and needs a printable he
 
 ---
 
+## The language
+
+### Store the language you resolved, not the one the address asked for
+
+The chooser in the header reports its value the moment the page loads. The observer that acts
+on it compares that value against `session$userData$lang` and reloads when they differ — so
+whatever is in the session has to be the *same shape* as what the chooser reports, or every
+first visit reloads itself once.
+
+An address with no `?lang=` gives `NULL`. Storing that `NULL` and then having the chooser
+report `"en"` is exactly the mismatch: the page would reload, arrive with `?lang=en`, and only
+then settle. So `server()` stores `resolveLanguage(...)`, never the raw query value.
+
+*Where:* `server.R`, the "Language" block at the top.
+
+### `tr()` needs both halves, because the page and the server are different moments
+
+`ui()` builds the page once per visit, and there is no session while it runs — so it puts the
+language it resolved into an option, and `tr()` reads that when
+`shiny::getDefaultReactiveDomain()` gives `NULL`. Everything rendered afterwards *does* have a
+session, and takes the language out of `session$userData`.
+
+An option is safe for the first half only because R runs one thing at a time: `ui()` is
+called, builds the page and returns before the next visitor's `ui()` starts. It would not be
+safe for the second, which is the whole reason the language moved out of
+`options(shinyCTT.language)` — on a server, one visitor switching used to switch everyone.
+
+### A test that calls `tr()` depends on the machine unless it says otherwise
+
+The app starts in whatever language R is running in, so on a German machine `tr()` gives back
+German. Tests are written against the English words — `test-modelVocabulary.R` asserts
+`"kongeneric"`, which German spells `kongenerisch`. `tests/testthat/helper-language.R` pins
+English for the run. Check any change to the language code under `LANGUAGE=fr_FR.UTF-8` as
+well as unset.
+
+### selectize hides the options you are looking for
+
+Debugging the chooser in a browser console, `document.querySelector("#language").options`
+shows one entry, not three: selectize.js takes the options out of the original `<select>` and
+builds its own list. Click the control and read the page instead of trusting that query — the
+same mistake as reading state instead of looking at the screen.
+
+---
+
 ## This package
 
 ### Helpers must never take `input`
