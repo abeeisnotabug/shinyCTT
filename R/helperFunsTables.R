@@ -44,6 +44,61 @@ formatBounded <- function(x, digits = 3) {
   sub("^(-?)0\\.", "\\1.", sprintf(paste0("%.", digits, "f"), x))
 }
 
+## The descriptives table: one row per item, the four numbers itemMoments() worked out. How
+## many rows went into it is said in the heading above it, the same way every other table on
+## that page says it.
+##
+## locales = "en-US" pins the decimal point - without it reactable rounds in the reader's
+## own language and a German browser prints 1,504 (see GOTCHAS.md).
+momentsTable <- function(moments) {
+  reactable::reactable(
+    as.data.frame(moments),
+    rownames = TRUE,
+    defaultColDef = reactable::colDef(
+      # Wide enough for the longest of the four headers in any language, "Mittelwert".
+      minWidth = 84,
+      format = reactable::colFormat(digits = 3, locales = "en-US")),
+    columns = list(
+      .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold")),
+      Mean = reactable::colDef(name = tr("stats.desc.mean")),
+      SD = reactable::colDef(name = tr("stats.desc.sd")),
+      Skew = reactable::colDef(name = tr("stats.desc.skew")),
+      Excess = reactable::colDef(name = tr("stats.desc.excess"))),
+    resizable = getOption("shinyCTT.resizable"),
+    sortable = FALSE,
+    pagination = FALSE,
+    compact = TRUE)
+}
+
+
+## The covariance matrix of whichever rows are handed in, as a table. Only the lower
+## triangle is filled: the upper one repeats it, so it is blanked and shown empty.
+##
+## locales = "en-US" pins the decimal point - without it reactable rounds in the reader's
+## own language and a German browser prints 0,129 (see GOTCHAS.md).
+covarianceTable <- function(rows) {
+  covariances <- stats::cov(rows, use = "pairwise.complete.obs")
+  covariances[upper.tri(covariances)] <- NA
+
+  reactable::reactable(
+    as.data.frame(covariances),
+    rownames = TRUE,
+    defaultColDef = reactable::colDef(
+      # Wide enough for a covariance at three decimal places, and for an item name of
+      # ordinary length above it. One number for every column, because a matrix has as
+      # many of them as there are items.
+      minWidth = 66,
+      na = "",
+      format = reactable::colFormat(digits = 3, locales = "en-US")),
+    columns = list(
+      .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold"))),
+    resizable = getOption("shinyCTT.resizable"),
+    sortable = FALSE,
+    pagination = FALSE,
+    compact = TRUE)
+}
+
+
 ## The correlation table: every pair's correlation with its confidence interval on the row
 ## underneath it, lower triangle only - the upper one repeats it.
 ##
@@ -332,6 +387,40 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, modelsAbbrev)
     compact = TRUE)
 }
 
+## Draws one of the three pairwise model comparison tables. `cells` is what compMatrices()
+## gave back for one of them; `headers` names each column and `minWidths` says how narrow it
+## may be; `groups`, when given, is the band above them - the combined table puts two columns
+## under each model's name - and `dividers` names the columns that carry a line down their
+## right edge.
+drawCompTable <- function(cells, headers, minWidths, groups = NULL, dividers = NULL) {
+
+  columns <- lapply(names(headers), function(column) {
+    reactable::colDef(
+      name = headers[[column]],
+      html = TRUE,
+      minWidth = minWidths[[column]],
+      style = function(value, index) {
+        c(ratingStyle(cells$ratings[index, column]),
+          if (cells$ownFit[index, column]) list(fontStyle = "italic"),
+          if (column %in% dividers) list(borderRight = "1px solid lightgrey"))
+      })
+  })
+
+  reactable::reactable(
+    as.data.frame(cells$shown, stringsAsFactors = FALSE),
+    rownames = TRUE,
+    columns = c(
+      list(.rownames = reactable::colDef(
+        name = "", html = TRUE, style = list(fontWeight = "bold"))),
+      stats::setNames(columns, names(headers))),
+    columnGroups = groups,
+    resizable = getOption("shinyCTT.resizable"),
+    sortable = FALSE,
+    pagination = FALSE,
+    compact = TRUE)
+}
+
+
 ## A rated column that also closes a group of columns, so it carries a line down its right
 ## edge.
 rightBorderAfter <- function(rating) {
@@ -562,3 +651,18 @@ makeLegend <- function(whichLegend, estimatorName, sigLvl, rmseaCiLvl = 0.90) {
 
     stop(sprintf("No legend available for table %s.", whichLegend)))
 }
+
+## What lavaan said about a model, for the orange and the red box above the results: one row
+## per model, its name and the message.
+messageTable <- function(modelNames, messages) {
+  tags$table(
+    class = "table table-condensed",
+    style = "width: auto;",
+
+    tags$tbody(Map(function(modelName, message) {
+      tags$tr(
+        tags$td(HTML(paste0(modelName, ":&emsp;")), style = "font-weight: bold;"),
+        tags$td(message))
+    }, modelNames, messages)))
+}
+

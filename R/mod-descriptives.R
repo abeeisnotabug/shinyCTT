@@ -19,32 +19,6 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
 
     ns <- session$ns
 
-    ## one descriptives table ----
-    # How many rows went into it is said in the heading above it, the same way every other
-    # table on this page says it.
-    #
-    # locales = "en-US" pins the decimal point - without it reactable rounds in the
-    # reader's own language and a German browser prints 1,504 (see GOTCHAS.md).
-    momentsTable <- function(moments) {
-      reactable::reactable(
-        as.data.frame(moments),
-        rownames = TRUE,
-        defaultColDef = reactable::colDef(
-          # Wide enough for the longest of the four headers in any language, "Mittelwert".
-          minWidth = 84,
-          format = reactable::colFormat(digits = 3, locales = "en-US")),
-        columns = list(
-          .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold")),
-          Mean = reactable::colDef(name = tr("stats.desc.mean")),
-          SD = reactable::colDef(name = tr("stats.desc.sd")),
-          Skew = reactable::colDef(name = tr("stats.desc.skew")),
-          Excess = reactable::colDef(name = tr("stats.desc.excess"))),
-        resizable = getOption("shinyCTT.resizable"),
-        sortable = FALSE,
-        pagination = FALSE,
-        compact = TRUE)
-    }
-
     ## the box ----
     output$box <- renderUI({
       req(data())

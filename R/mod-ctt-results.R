@@ -203,54 +203,6 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
           ownFit = squareMatrix(ownFit)))
     })
 
-    ## drawing one comparison table ----
-    # `cells` is what compMatrices() gave back for one of the three. `headers` names each
-    # column and `minWidths` says how narrow it may be; `groups`, when given, is the band
-    # above them - the combined table puts two columns under each model's name - and
-    # `dividers` names the columns that carry a line down their right edge.
-    drawCompTable <- function(cells, headers, minWidths, groups = NULL, dividers = NULL) {
-
-      columns <- lapply(names(headers), function(column) {
-        reactable::colDef(
-          name = headers[[column]],
-          html = TRUE,
-          minWidth = minWidths[[column]],
-          style = function(value, index) {
-            c(ratingStyle(cells$ratings[index, column]),
-              if (cells$ownFit[index, column]) list(fontStyle = "italic"),
-              if (column %in% dividers) list(borderRight = "1px solid lightgrey"))
-          })
-      })
-
-      reactable::reactable(
-        as.data.frame(cells$shown, stringsAsFactors = FALSE),
-        rownames = TRUE,
-        columns = c(
-          list(.rownames = reactable::colDef(
-            name = "", html = TRUE, style = list(fontWeight = "bold"))),
-          stats::setNames(columns, names(headers))),
-        columnGroups = groups,
-        resizable = getOption("shinyCTT.resizable"),
-        sortable = FALSE,
-        pagination = FALSE,
-        compact = TRUE)
-    }
-
-    ## what lavaan said about a model ----
-    # The orange and the red box above the results: one row per model, its name and what
-    # lavaan said about it.
-    messageTable <- function(modelNames, messages) {
-      tags$table(
-        class = "table table-condensed",
-        style = "width: auto;",
-
-        tags$tbody(Map(function(modelName, message) {
-          tags$tr(
-            tags$td(HTML(paste0(modelName, ":&emsp;")), style = "font-weight: bold;"),
-            tags$td(message))
-        }, modelNames, messages)))
-    }
-
     ## the page holding the comparison of all models ----
     # Only the boxes and their headings. Each table is an output of its own below, so
     # changing the significance level redraws the table without rebuilding the page - which
