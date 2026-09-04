@@ -65,6 +65,8 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         as.data.frame(moments),
         rownames = TRUE,
         defaultColDef = reactable::colDef(
+          # Wide enough for the longest of the four headers in any language, "Mittelwert".
+          minWidth = 84,
           format = reactable::colFormat(digits = 3, locales = "en-US")),
         columns = list(
           .rownames = reactable::colDef(name = "", style = list(fontWeight = "bold")),

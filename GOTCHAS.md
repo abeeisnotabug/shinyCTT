@@ -274,9 +274,42 @@ needed; either one alone is wrong.
 
 Columns do not size themselves to their contents either - each is `colDef(minWidth = )` wide,
 100px by default. A table of N columns is therefore N x 100px, which is what "as wide as it
-needs" means here.
+needs" means here. A column holding `+5` or `.194` under a two-letter symbol is then two to
+three times wider than anything in it, and the table as a whole outgrows the box it was going
+to fit in: the hierarchical table's eight columns came to 800px inside a 550px half-width box,
+so it scrolled sideways for numbers that need 500px in total.
 
-*Where:* `shinyCTTApp.R`, the `reactable.theme` in `onStart`.
+A column narrower than its widest content wraps that content onto a second line rather than
+growing back, so one number for the whole table does not work: 60px everywhere fits the
+numbers but breaks FIMLR-Δχ² and RMSEA_D over two lines, and the 85px those need would put
+every other column back where it started.
+
+**A table whose columns hold different things names each one; a table whose columns all hold
+the same thing names one number.** The first kind gets a `minWidths` vector keyed the same way
+as its `headers`, the second a `defaultColDef(minWidth = )` - which is also the only one that
+survives a change in the number of items or groups, so a covariance matrix or a correlation
+table must never be given a per-column vector.
+
+The numbers were measured, not guessed: the text of every header and every cell drawn on a
+canvas at the table's own 14px Arial, plus the 12px of padding a compact cell adds. Where a
+header is translated the widest of the three languages sets the width - "Mittelwert" in the
+descriptives table, "Std. Schätzer" in the parameter tables. Anything longer than what was
+measured wraps, which is the right way round for a value nobody expects.
+
+What each table came to, in an 1180px page: hierarchical 800 → 523, fit index 1000 → 789,
+χ²-comparison 1100 → 725, parameter tables 2000 → 1540, covariance 700 → 462, descriptives
+500 → 420, the two subset tables 200 → 158 and 140. The correlation table was already at its
+content width, because an interval like `[.123, .456]` needs the whole 100px.
+
+**The two AIC/BIC comparison tables cannot be made to fit.** Six columns headed by model names,
+in half of an 1180px page: 95px is what "ess. τ-equiv." needs, so the table is 575px in a 550px
+box and scrolls sideways at a 1440px window, though not at 1500 or wider. Narrowing them
+further only moves the wrap into the header.
+
+*Where:* `shinyCTTApp.R`, the `reactable.theme` in `onStart`; `helperFunsTables.R`,
+`makeHierTable()`, `makeFitsTable()` and `makeParTableWithCIs()`; `mod-ctt-results.R`,
+`drawCompTable()` and its three call sites; `mod-covmatrix.R`, `mod-descriptives.R`,
+`mod-data-subset.R`, `mod-mvn.R`.
 
 ### `colFormat()` rounds in the *reader's* language
 

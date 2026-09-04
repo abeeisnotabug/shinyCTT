@@ -33,6 +33,10 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         as.data.frame(covariances),
         rownames = TRUE,
         defaultColDef = reactable::colDef(
+          # Wide enough for a covariance at three decimal places, and for an item name of
+          # ordinary length above it. One number for every column, because a matrix has as
+          # many of them as there are items.
+          minWidth = 66,
           na = "",
           format = reactable::colFormat(digits = 3, locales = "en-US")),
         columns = list(

@@ -205,14 +205,15 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
 
     ## drawing one comparison table ----
     # `cells` is what compMatrices() gave back for one of the three. `headers` names each
-    # column; `groups`, when given, is the band above them - the combined table puts two
-    # columns under each model's name.
-    drawCompTable <- function(cells, headers, groups = NULL) {
+    # column and `minWidths` says how narrow it may be; `groups`, when given, is the band
+    # above them - the combined table puts two columns under each model's name.
+    drawCompTable <- function(cells, headers, minWidths, groups = NULL) {
 
       columns <- lapply(names(headers), function(column) {
         reactable::colDef(
           name = headers[[column]],
           html = TRUE,
+          minWidth = minWidths[[column]],
           style = function(value, index) {
             c(ratingStyle(cells$ratings[index, column]),
               if (cells$ownFit[index, column]) list(fontStyle = "italic"))
@@ -496,7 +497,11 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
           columns = paste0(model, c("Df", "Chisq")))
       })
 
-      drawCompTable(cells, headers, unname(groups))
+      # A narrow column and a wide one per model, the pair together wider than the model
+      # name in the band above it.
+      minWidths <- stats::setNames(rep(c(45, 80), length(models)), colnames(cells$shown))
+
+      drawCompTable(cells, headers, minWidths, groups = unname(groups))
     })
 
     ## AIC/BIC comparison table ----
@@ -506,15 +511,19 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
 
       headers <- stats::setNames(modelsAbbrev[models], models)
 
+      # One column per model, each as wide as the longest model name, which is wider than
+      # any of the numbers underneath.
+      minWidths <- stats::setNames(rep(95, length(models)), models)
+
       fluidRow(
         column(
           width = 6,
           h5(paste0(tr("results.col.aic"), ":")),
-          drawCompTable(compMatrices()$aic, headers)),
+          drawCompTable(compMatrices()$aic, headers, minWidths)),
         column(
           width = 6,
           h5(paste0(tr("results.col.bic"), ":")),
-          drawCompTable(compMatrices()$bic, headers)))
+          drawCompTable(compMatrices()$bic, headers, minWidths)))
     })
 
     ## the four legends ----

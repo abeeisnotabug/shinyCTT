@@ -202,13 +202,26 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, modelsAbbrev) 
     aic = tr("results.col.aic"),
     bic = tr("results.col.bic"))
 
+  # How narrow each column may be, in pixels: enough for the widest thing it can hold, at
+  # the 14px Arial the tables are drawn in. Without these every column is reactable's own
+  # 100px, and eight of those do not fit beside a second copy of the table (see GOTCHAS.md).
+  # The header is the widest thing in the first four; the number is, in the last three.
+  minWidths <- c(
+    deltaDf = 46,      # three digits and the plus sign
+    deltaChisq = 85,   # the header at its longest estimator name, FIML with robust errors
+    p = 42,
+    rmseaD = 76,
+    cfi = 50,
+    aic = 62,          # seven characters: 12345.6, or -1234.5
+    bic = 62)
+
   reactable::reactable(
     shown,
     rownames = TRUE,
     columns = c(
       list(.rownames = reactable::colDef(
         name = "", html = TRUE, style = list(fontWeight = "bold"))),
-      ratedColumns(headers, ratings)),
+      ratedColumns(headers, ratings, minWidths)),
 
     # The baseline model's own row was greyed by kableExtra::row_spec(); its cells carry no
     # rating, so the shading goes on the row itself.
@@ -219,12 +232,15 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, modelsAbbrev) 
 }
 
 ## One reactable column per rated column: `headers` gives each its title, `ratings` the
-## rating of every row in it. Both are keyed by the column's name in the data.
-ratedColumns <- function(headers, ratings) {
+## rating of every row in it, `minWidths` how narrow it may be. All three are keyed by the
+## column's name in the data. NULL[["x"]] is NULL, so leaving minWidths out leaves every
+## column at reactable's own 100px.
+ratedColumns <- function(headers, ratings, minWidths = NULL) {
   columns <- lapply(names(headers), function(column) {
     reactable::colDef(
       name = headers[[column]],
       html = TRUE,
+      minWidth = minWidths[[column]],
       style = function(value, index) ratingStyle(ratings[[column]][index]))
   })
 
@@ -281,7 +297,21 @@ makeFitsTable <- function(fits, estimatorName, sigLvl, rmseaCiLvl, modelsAbbrev)
     cfi = tr("results.col.cfi"),
     srmr = tr("results.col.srmr"))
 
-  columns <- ratedColumns(headers, ratings)
+  # How narrow each column may be, in pixels: enough for the widest thing it can hold, at
+  # the 14px Arial the tables are drawn in (see GOTCHAS.md). The header is the widest thing
+  # in every column here, and the two RMSEA p-values have the longest headers in the app.
+  minWidths <- c(
+    df = 40,
+    chisq = 76,        # the header at its longest estimator name, FIML with robust errors
+    pvalue = 45,
+    rmsea = 66,
+    rmseaCi = 86,
+    rmseaP = 133,
+    rmseaNotClose = 133,
+    cfi = 52,
+    srmr = 58)
+
+  columns <- ratedColumns(headers, ratings, minWidths)
 
   # The two dividing lines kableExtra::column_spec() drew, after RMSEA and after the second
   # RMSEA p-value.
@@ -356,10 +386,23 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, grou
   roundedColumns <- c("lambdaEst", "lambdaSe", "stdEst", "stdSe", "alphaEst", "alphaSe",
                       "errorEst", "errorSe", "relEst", "relSe")
 
+  # How narrow each column may be, in pixels. The four blocks have the same shape, so the
+  # widths repeat: a symbol, an estimate, a standard error, an interval. Sized for the
+  # longest the header gets in any of the three languages - "Std. Schaetzer" in German is
+  # the widest one in the table, and an interval is the widest cell.
+  minWidths <- c(
+    item = 60,
+    lambdaLabel = 45, lambdaEst = 74, lambdaSe = 77, lambdaCi = 103,
+    stdEst = 104, stdSe = 77, stdCi = 103,
+    alphaLabel = 45, alphaEst = 74, alphaSe = 77, alphaCi = 103,
+    errorLabel = 45, errorEst = 74, errorSe = 77, errorCi = 103,
+    relLabel = 45, relEst = 74, relSe = 77, relCi = 103)
+
   columns <- lapply(names(displayNames), function(column) {
     reactable::colDef(
       name = displayNames[[column]],
       html = TRUE,
+      minWidth = minWidths[[column]],
       format = if (column %in% roundedColumns)
         reactable::colFormat(digits = 3, locales = "en-US"))
   })

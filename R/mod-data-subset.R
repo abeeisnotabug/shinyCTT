@@ -357,8 +357,8 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
         data.frame(NAs = colSums(is.na(chosenData()))),
         rownames = TRUE,
         columns = list(
-          .rownames = reactable::colDef(name = ""),
-          NAs = reactable::colDef(name = tr("subset.na.col.header"))),
+          .rownames = reactable::colDef(name = "", minWidth = 80),
+          NAs = reactable::colDef(name = tr("subset.na.col.header"), minWidth = 60)),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -370,8 +370,8 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
       reactable::reactable(
         data.frame(Total = nrow(dataWithNAs()), Complete = sum(!incompleteCases())),
         columns = list(
-          Total = reactable::colDef(name = tr("common.total")),
-          Complete = reactable::colDef(name = tr("subset.obs.complete"))),
+          Total = reactable::colDef(name = tr("common.total"), minWidth = 68),
+          Complete = reactable::colDef(name = tr("subset.obs.complete"), minWidth = 90)),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
@@ -392,6 +392,9 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
 
       reactable::reactable(
         groupSizes,
+
+        # One column per group value, all of them holding a count.
+        defaultColDef = reactable::colDef(minWidth = 60),
         sortable = FALSE,
         pagination = FALSE,
         compact = TRUE)
