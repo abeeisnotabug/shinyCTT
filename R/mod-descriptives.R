@@ -3,26 +3,6 @@
 ## With a group column it is a tabBox with an "Overall" and a "Group-wise" tab; without one
 ## it is a plain box holding the "Overall" table on its own.
 
-## Skewness and kurtosis of one item, as the moments package computed them: the third and
-## fourth central moments divided by the second, with no small-sample correction. Missing
-## values are dropped first.
-##
-## The excess kurtosis of a normal distribution is 0, so the table subtracts 3 from
-## itemKurtosis() rather than these functions doing it.
-itemSkewness <- function(x) {
-  x <- x[!is.na(x)]
-  n <- length(x)
-
-  (sum((x - mean(x))^3) / n) / (sum((x - mean(x))^2) / n)^(3 / 2)
-}
-
-itemKurtosis <- function(x) {
-  x <- x[!is.na(x)]
-  n <- length(x)
-
-  n * sum((x - mean(x))^4) / sum((x - mean(x))^2)^2
-}
-
 descriptivesUI <- function(id) {
   ns <- NS(id)
 
@@ -38,21 +18,6 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
   moduleServer(id, function(input, output, session) {
 
     ns <- session$ns
-
-    ## the four numbers per item ----
-    # Mean, standard deviation, skewness and excess kurtosis of every chosen item, for
-    # whichever rows are handed in.
-    itemMoments <- function(rows) {
-      t(apply(
-        rows,
-        MARGIN = 2,
-        FUN = function(col) {
-          c(Mean = mean(col, na.rm = TRUE),
-            SD = stats::sd(col, na.rm = TRUE),
-            Skew = itemSkewness(col),
-            Excess = itemKurtosis(col) - 3)
-        }))
-    }
 
     ## one descriptives table ----
     # How many rows went into it is said in the heading above it, the same way every other

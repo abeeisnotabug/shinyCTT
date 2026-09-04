@@ -1,7 +1,75 @@
 ## The statistics the app works out itself, rather than taking them from a package.
 ##
-## The two normality tests the "Test on multivariate normality" tab shows. Both are pinned
-## against the numbers MVN gave, in tests/testthat/test-mvnTests.R.
+## In the order the Statistics tab shows them: the descriptives, the correlation tests, and
+## the two normality tests. Each is pinned against the numbers the package it replaced gave,
+## in tests/testthat/test-itemMoments.R, test-corTests.R and test-mvnTests.R.
+
+## Mean, standard deviation, skewness and excess kurtosis of every item, as the moments
+## package computed them: the third and fourth central moments divided by the second, with
+## no small-sample correction. Missing values are dropped item by item.
+##
+## Takes the item columns and gives back one row per item, so the descriptives table can
+## show it as it stands. The excess kurtosis of a normal distribution is 0, hence the -3.
+itemMoments <- function(rows) {
+  t(apply(
+    rows,
+    MARGIN = 2,
+    FUN = function(col) {
+      col <- col[!is.na(col)]
+      n <- length(col)
+      colMean <- mean(col)
+      centered <- col - colMean
+
+      c(Mean = colMean,
+        SD = sqrt(sum(centered^2) / (n - 1)),
+        Skew = (sum(centered^3) / n) / (sum(centered^2) / n)^(3 / 2),
+        Excess = n * sum(centered^4) / sum(centered^2)^2 - 3)
+    }))
+}
+
+## The p-value and the confidence interval of every pair of items, as three matrices laid
+## out the same way as the correlation matrix they are shown beside.
+##
+##   items     : the item columns, as a data frame
+##   use       : how to treat missing values -> the same string stats::cor() is given,
+##               "pairwise.complete.obs" or "complete.obs"
+##   confLevel : the confidence level of the intervals, e.g. 0.95
+##
+## Returns list(p =, lowCI =, uppCI =), the three matrices makeCorrTableWithCIs() reads.
+corTestMatrices <- function(items, use, confLevel) {
+
+  # "complete.obs" -> throw the incomplete rows away once, up front, so every pair is
+  # tested on the same rows the correlations were computed from. cor.test() drops the
+  # incomplete pairs by itself, which is what "pairwise.complete.obs" means.
+  if (identical(use, "complete.obs")) items <- items[stats::complete.cases(items), ]
+
+  nItems <- ncol(items)
+
+  # Filled in pair by pair below. An item with itself sits on the diagonal: p = 0, and an
+  # interval of zero width at 1.
+  pMat <- lowMat <- uppMat <- matrix(
+    NA_real_, nItems, nItems, dimnames = list(colnames(items), colnames(items)))
+
+  diag(pMat) <- 0
+  diag(lowMat) <- diag(uppMat) <- 1
+
+  for (i in seq_len(nItems - 1)) {
+    for (j in (i + 1):nItems) {
+
+      thisTest <- stats::cor.test(items[, i], items[, j], conf.level = confLevel)
+
+      pMat[i, j] <- pMat[j, i] <- thisTest$p.value
+
+      # cor.test() reports no interval on fewer than four complete pairs.
+      if (!is.null(thisTest$conf.int)) {
+        lowMat[i, j] <- lowMat[j, i] <- thisTest$conf.int[1]
+        uppMat[i, j] <- uppMat[j, i] <- thisTest$conf.int[2]
+      }
+    }
+  }
+
+  list(p = pMat, lowCI = lowMat, uppCI = uppMat)
+}
 
 ## Mardia's two tests for multivariate normality, from Mardia (1970).
 ##
