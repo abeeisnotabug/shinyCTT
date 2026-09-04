@@ -53,6 +53,7 @@ spssSource  <- function(name = "mydata.sav") list(type = "SPSS", name = name)
 rdsSource   <- function(name = "mydata.rds") list(type = "RDS", name = name)
 rdataSource <- function(name = "mydata.RData") list(type = "RData", name = name,
                                                     object = "rtdata")
+suppliedSource <- function() list(type = "Supplied", object = "rtdata")
 
 ## Positional order: dataSource, groupCol, groups, modelCode, estimator, missingMethod,
 ## isSubset, model, isMg.
@@ -114,6 +115,12 @@ test_that("each data source produces its own loading call", {
   rdata <- rcode(rdataSource())
   expect_match(rdata, 'load("mydata.RData")', fixed = TRUE)
   expect_match(rdata, "rawData <- rtdata", fixed = TRUE)
+
+  # Data the app came with is in no file the reader has, so the script says where to put
+  # their own copy - as a comment, so the script still parses.
+  supplied <- rcode(suppliedSource())
+  expect_match(supplied, "# This data set came with the app", fixed = TRUE)
+  expect_match(supplied, "rawData <- rtdata", fixed = TRUE)
 })
 
 test_that("the generated script parses as valid R, from every source", {
@@ -122,7 +129,7 @@ test_that("the generated script parses as valid R, from every source", {
   # only by accident and breaks outright on a name containing a space.
   for (src in list(wsSource(), csvSource(), spssSource(), spssSource("my data.sav"),
                    rdsSource(), rdsSource("my data.rds"),
-                   rdataSource(), rdataSource("my data.RData"))) {
+                   rdataSource(), rdataSource("my data.RData"), suppliedSource())) {
     for (isMg in c(FALSE, TRUE)) {
       for (isSubset in c(FALSE, TRUE)) {
         code <- rcode(src, isSubset = isSubset, isMg = isMg)

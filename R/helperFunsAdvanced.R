@@ -50,6 +50,12 @@ makeRCode <- function(dataSource, groupCol, groups, modelCode, estimator, missin
 
     "Workspace" = sprintf("rawData <- %s", dataSource$object),
 
+    # The app came with this one, so the reader has to find their own copy of it.
+    "Supplied" = sprintf(
+"# This data set came with the app - put your own copy of it here.
+rawData <- %s",
+      dataSource$object),
+
     "CSV" = sprintf(
 "rawData <- read.csv(
   file = \"%s\",

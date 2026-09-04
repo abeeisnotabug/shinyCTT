@@ -51,16 +51,20 @@ screen should contain, and Shiny works out when to redraw it.
    and at least one numeric one. If not, it disables the Select button and posts a
    notification.
 
-   There are four sources. **Workspace** lists the objects lying around in R and is offered
-   only when the app was started from somebody's own console — `shinyCTTApp(workspace = )`,
-   which defaults to `interactive()`, and is FALSE on a server, where `globalenv()` holds
-   whatever was left there by whoever put the app up. **CSV** and **SPSS** are uploads.
-   **R data file** is an upload too, and takes both kinds: an `.RData` (or `.rda`) is loaded
-   into an environment of its own and the user picks one of its objects, an `.rds` holds one
-   object and is the data straight away. The object chooser under the file inputs serves the
-   workspace and the `.RData` and draws nothing for the rest — and an uploaded file with no
-   table in it at all says "No data set found in this file" rather than drawing an empty
-   chooser and leaving it at that.
+   There are five sources, and the first two only sometimes. **Supplied data** is whatever
+   `shinyCTTApp(data = list(scores = myData))` was given; when there is any it comes first, so
+   a visitor opens the app on it. **Workspace** lists the objects lying around in R and is
+   offered only when the app was started from somebody's own console —
+   `shinyCTTApp(workspace = )`, which defaults to `interactive()`, and is FALSE on a server,
+   where `globalenv()` holds whatever was left there by whoever put the app up. **CSV** and
+   **SPSS** are uploads. **R data file** is an upload too, and takes both kinds: an `.RData`
+   (or `.rda`) is loaded into an environment of its own and the user picks one of its objects,
+   an `.rds` holds one object and is the data straight away. An upload may be 50 MB.
+
+   The object chooser under the file inputs serves the supplied data, the workspace and the
+   `.RData`, and draws nothing for the rest — and an uploaded file with no table in it at all
+   says "No data set found in this file" rather than drawing an empty chooser and leaving it
+   at that.
 2. Pressing Select runs `observeEvent(input$dataSelectButton, ...)`, which does two things:
    copies the data into `userDataChosen()`, and calls `appStage("subset")`.
 3. `appStage("subset")` is what makes everything else happen — see section 4.

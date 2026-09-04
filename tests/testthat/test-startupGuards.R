@@ -111,3 +111,21 @@ test_that("an unreadable object empties the preview left by a readable one", {
       expect_null(raw())
     })
 })
+
+## What shinyCTTApp(data = ) refuses ----
+## The check is in the launcher and not in the module, so that whoever starts the app is told
+## in their own console rather than every visitor being shown a chooser with nothing in it.
+## The name matters: it is what the factor score downloads are called after and what the
+## exported script says, so a bare data frame - which has no name to take - is refused.
+
+test_that("shinyCTTApp(data = ) takes a named list of data frames and nothing else", {
+  expect_error(shinyCTTApp(data = rtdata), "named list of data frames")
+  expect_error(shinyCTTApp(data = list(rtdata)), "named list of data frames")
+  expect_error(shinyCTTApp(data = list(a = rtdata, rtdata)), "named list of data frames")
+  expect_error(shinyCTTApp(data = as.matrix(rtdata[-1])), "named list of data frames")
+  expect_error(shinyCTTApp(data = list(scores = 1:10)), "must be a data frame")
+
+  # shinyApp() only builds the app object, so this starts nothing.
+  expect_no_error(shinyCTTApp(data = list(scores = rtdata)))
+  expect_no_error(shinyCTTApp(data = NULL))
+})

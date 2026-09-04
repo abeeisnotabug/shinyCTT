@@ -10,11 +10,17 @@ dataSourceUI <- function(id) {
   # The names are what the user reads, the values what input$source is compared
   # against - so only the names are translated.
   sources <- stats::setNames(
-    c("Workspace", "CSV", "SPSS", "RData"),
-    c(tr("data.source.type.workspace"),
+    c("Supplied", "Workspace", "CSV", "SPSS", "RData"),
+    c(tr("data.source.type.supplied"),
+      tr("data.source.type.workspace"),
       tr("data.source.type.csv"),
       tr("data.source.type.spss"),
       tr("data.source.type.rdata")))
+
+  # The data the app was started with, if any. First on the list, so it is what a visitor
+  # sees when the page opens. shinyCTTApp(data = ) fills it.
+  if (is.null(getOption("shinyCTT.data")))
+    sources <- sources[sources != "Supplied"]
 
   # globalenv() is somebody's own workspace only when a person is sitting at the console
   # the app was started from. Hosted, it holds whatever was left there by whoever put the
@@ -104,6 +110,15 @@ dataSourceServer <- function(id, notifications, frozen) {
     # from. It cannot change while the app runs, so it is read once.
     workspaceOffered <- isTRUE(getOption("shinyCTT.workspace"))
 
+    # The data sets shinyCTTApp(data = ) was given, as an environment, so the chooser below
+    # reads them exactly as it reads the workspace and an uploaded .RData. The launcher has
+    # already checked that this is a named list of data frames.
+    suppliedObjects <- if (is.null(getOption("shinyCTT.data"))) {
+      NULL
+    } else {
+      list2env(getOption("shinyCTT.data"), envir = new.env())
+    }
+
     ## which kind of R data file was uploaded ----
     # An .rds holds one object and no name for it; an .RData (or .rda) holds any number of
     # them and gives their names.
@@ -137,8 +152,12 @@ dataSourceServer <- function(id, notifications, frozen) {
     # table, and the names otherwise.
     pickableObjects <- reactive({
 
-      # The console's workspace, or what an uploaded .RData holds.
-      objects <- if (identical(input$source, "Workspace") && workspaceOffered) {
+      # The data the app came with, the console's workspace, or what an uploaded .RData
+      # holds.
+      objects <- if (identical(input$source, "Supplied")) {
+        suppliedObjects
+
+      } else if (identical(input$source, "Workspace") && workspaceOffered) {
         globalenv()
 
       } else if (identical(input$source, "RData") && !isRds()) {
@@ -167,13 +186,13 @@ dataSourceServer <- function(id, notifications, frozen) {
       # so switching from the workspace to a CSV would keep the workspace's chooser.
       if (length(pickableObjects()) == 0) return(NULL)
 
-      # The workspace is picked from straight away, an uploaded .RData after the file, so
-      # the two labels number themselves 1b. and 1c.
-      label <- if (identical(input$source, "Workspace")) {
-        tr("data.source.workspace")
-      } else {
-        tr("data.source.rdata.object")
-      }
+      # The supplied data and the workspace are picked from straight away, an uploaded
+      # .RData after the file, so the labels number themselves 1b. and 1c.
+      label <- switch(
+        input$source,
+        "Supplied" = tr("data.source.supplied.object"),
+        "Workspace" = tr("data.source.workspace"),
+        tr("data.source.rdata.object"))
 
       selectInput(ns("chosenObject"), label, pickableObjects())
     })
@@ -233,6 +252,7 @@ dataSourceServer <- function(id, notifications, frozen) {
       # offering it.
       req(switch(
         input$source,
+        "Supplied" = input$chosenObject,
         "CSV" = input$CSVFile,
         "SPSS" = input$SPSSFile,
         "RData" = if (isRds()) input$RDataFile else input$chosenObject,
@@ -246,10 +266,11 @@ dataSourceServer <- function(id, notifications, frozen) {
       # data set is unusable.
       loadedData <- tryCatch({
 
-        # The same four names the req() above tests, so input$source is always one of
+        # The same five names the req() above tests, so input$source is always one of
         # them by the time this runs.
         userDataTmp <- switch(
           input$source,
+          "Supplied" = get(input$chosenObject, envir = suppliedObjects),
           "CSV" = utils::read.csv(
             file = input$CSVFile$datapath,
             header = input$header,
@@ -389,6 +410,7 @@ dataSourceServer <- function(id, notifications, frozen) {
       # objects taken, so the two are told apart here rather than in makeRCode().
       descriptor = reactive(switch(
         input$source,
+        "Supplied" = list(type = "Supplied", object = input$chosenObject),
         "Workspace" = list(type = "Workspace", object = input$chosenObject),
         "CSV" = list(type = "CSV",
                      name = input$CSVFile$name,
@@ -405,6 +427,7 @@ dataSourceServer <- function(id, notifications, frozen) {
       # An .rds has no name for what it holds, so the file's own name stands in.
       name = reactive(switch(
         input$source,
+        "Supplied" = input$chosenObject,
         "Workspace" = input$chosenObject,
         "CSV" = gsub("\\.csv", "", input$CSVFile$name),
         "SPSS" = gsub("\\.sav|\\.zsav|\\.por", "", input$SPSSFile$name),

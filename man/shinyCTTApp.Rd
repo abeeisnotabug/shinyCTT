@@ -4,7 +4,11 @@
 \alias{shinyCTTApp}
 \title{A wrapper function for the Shiny App. This is the function that should be called to run the app.}
 \usage{
-shinyCTTApp(language = systemLanguage(), workspace = interactive())
+shinyCTTApp(
+  language = systemLanguage(),
+  workspace = interactive(),
+  data = NULL
+)
 }
 \arguments{
 \item{language}{Which language to start the app in: "en", "de" or "fr". Defaults to the
@@ -27,6 +31,20 @@ shinyCTTApp(language = systemLanguage(), workspace = interactive())
 
   Uploading a .RData, .rda or .rds file is offered either way, and is the way in when
   the workspace is not on offer.}
+
+\item{data}{Data sets to start the app with, as a **named list of data frames** —
+  `data = list(scores = myData)`. NULL, the default, means the app comes with none.
+
+  They appear as their own entry at the top of the source list, "Supplied data", which is
+  the one selected when the app opens, and the names of the list are what the chooser
+  under it offers. This is how a hosted copy comes with its own data: the visitor sees it
+  ready to analyse and does not have to upload anything.
+
+  Everything else stays on offer beside it, so a visitor can still bring their own file.
+
+  A bare data frame is refused, because the name is what the factor score downloads are
+  called after and what the exported script says — pass it in a list, where you name it
+  yourself.}
 }
 \value{
 None. This function is called for its side effect of launching the Shiny app.
@@ -38,4 +56,5 @@ A wrapper function for the Shiny App. This is the function that should be called
 if (interactive()) shinyCTTApp()
 if (interactive()) shinyCTTApp(language = "de")
 if (interactive()) shinyCTTApp(workspace = FALSE)
+if (interactive()) shinyCTTApp(data = list(rtdata = rtdata))
 }

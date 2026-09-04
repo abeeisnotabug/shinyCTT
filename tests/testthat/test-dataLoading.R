@@ -188,6 +188,53 @@ test_that("an R data file that cannot be read is reported, not fatal", {
     })
 })
 
+## The data sets the app was started with ----
+## shinyCTTApp(data = ) puts a named list of data frames into options(shinyCTT.data), and step
+## 1 offers them as a source of their own, first on the list so a visitor opens the app on
+## them. The launcher checks the shape of the list; these check what step 1 does with it.
+
+test_that("a data set the app came with is read like any other", {
+  previous <- options(shinyCTT.data = list(scores = rtdata, half = rtdata[1:20, ]))
+  on.exit(options(previous))
+
+  shiny::testServer(
+    dataSourceServer,
+    args = list(notifications = shiny::reactiveValues(notList = list()),
+                frozen = shiny::reactiveVal(FALSE)),
+    {
+      session$setInputs(source = "Supplied", chosenObject = "half")
+
+      expect_equal(nrow(raw()), 20)
+      expect_equal(colnames(raw()), colnames(rtdata))
+      expect_equal(session$returned$name(), "half")
+      expect_equal(session$returned$descriptor()$type, "Supplied")
+      expect_equal(session$returned$descriptor()$object, "half")
+
+      # Both of them are on offer, and the other one can be picked.
+      expect_equal(pickableObjects(), c("half", "scores"))
+
+      session$setInputs(chosenObject = "scores")
+      expect_equal(nrow(raw()), nrow(rtdata))
+    })
+})
+
+test_that("the source list offers the supplied data first, and only when there is any", {
+  previous <- options(shinyCTT.data = NULL, shinyCTT.workspace = TRUE)
+  on.exit(options(previous))
+
+  without <- as.character(dataSourceUI("dataSource"))
+  expect_false(grepl("Supplied data", without, fixed = TRUE))
+
+  options(shinyCTT.data = list(scores = rtdata))
+  with <- as.character(dataSourceUI("dataSource"))
+
+  expect_true(grepl("Supplied data", with, fixed = TRUE))
+
+  # First on the list is what a visitor opens the app on.
+  expect_lt(regexpr("Supplied data", with, fixed = TRUE),
+            regexpr("Workspace", with, fixed = TRUE))
+})
+
 ## Hosting: the workspace is only offered when there is a console behind the app ----
 ## globalenv() is the visitor's own only when the app was started from their console. On a
 ## server it holds whatever the person who put the app up left there, so both halves of

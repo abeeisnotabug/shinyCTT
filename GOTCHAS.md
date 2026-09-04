@@ -147,6 +147,13 @@ Two more observers fire at startup and get away with it: `mod-corr-independence.
 from the first moment. They are harmless only because each does nothing unless `useFIML()` is
 TRUE. Invert either condition and the same bug is back in a second place.
 
+**"Hidden" includes "the browser window is too narrow."** shinydashboard's own CSS takes the
+content area away below about 750px, so every output in it is suspended and the page comes up
+with empty boxes — the data preview drawn as a bare `&nbsp;` and no error anywhere, on the
+server or in the console. Reproduced on 2026-09-04 against three different builds, including
+one from before any of that day's work, and it goes away at 1440x900. **Check the window width
+before believing a blank table.**
+
 ---
 
 ### An empty input can mean two different things
