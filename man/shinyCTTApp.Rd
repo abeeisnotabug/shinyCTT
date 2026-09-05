@@ -19,8 +19,9 @@ shinyCTTApp(
   tr(), out of the visitor's own session (see R/helpers-translations.R). So two people can have
   the app open in different languages at once, whatever this was set to.
 
-  Stored as options(shinyCTT.language = language) while the app runs. The four options
-  the app sets are put back the way they were when it closes.}
+  Stored as options(shinyCTT.language = language) while the app runs. Every option the
+  app sets is put back the way it was when it closes - see the onStart block below for
+  which ones.}
 
 \item{workspace}{Whether to offer the objects lying around in R as a data source.
 

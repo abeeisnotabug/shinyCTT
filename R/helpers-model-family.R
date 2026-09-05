@@ -43,7 +43,7 @@ nestedPairs <- function(models, hierarchy) {
     }
   }
 
-  # Named after themselves, so the app can look them up as possComps[["etetko"]].
+  # Named after themselves, so a pair can be looked up as family$comparable[["etetko"]].
   stats::setNames(nm = pairs)
 }
 

@@ -34,10 +34,13 @@ getPredictedScores <- function(fittedModel, groupVar = FALSE) {
 
 ## Writes out the user's analysis as a standalone R script, shown on the Model code tab.
 ##
-##   dataSource : where the data came from, as one of
+##   dataSource : where the data came from, as one of the six shapes step 1 builds
+##                list(type = "Supplied",  object = )
 ##                list(type = "Workspace", object = )
-##                list(type = "CSV", name = , header = , sep = , quote = )
-##                list(type = "SPSS", name = )
+##                list(type = "CSV",   name = , header = , sep = , quote = )
+##                list(type = "SPSS",  name = )
+##                list(type = "RDS",   name = )
+##                list(type = "RData", name = , object = )
 makeRCode <- function(dataSource, groupCol, groups, modelCode, estimator, missingMethod,
                       isSubset, model, isMg) {
   head <- "library(lavaan)"

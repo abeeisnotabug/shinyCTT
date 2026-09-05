@@ -47,8 +47,8 @@ screen should contain, and Shiny works out when to redraw it.
 ### "Select" on the data tab (`dataSelectButton`)
 
 1. An observer has already been watching the source dropdown and file inputs. Each time
-   they change it loads the data into `userDataRaw()` and checks it has more than one column
-   and at least one numeric one. If not, it disables the Select button and posts a
+   they change it loads the data into the box's `raw()` and checks it has more than one
+   column and at least one numeric one. If not, it disables the Select button and posts a
    notification.
 
    There are five sources, and the first two only sometimes. **Supplied data** is whatever
@@ -65,15 +65,21 @@ screen should contain, and Shiny works out when to redraw it.
    `.RData`, and draws nothing for the rest — and an uploaded file with no table in it at all
    says "No data set found in this file" rather than drawing an empty chooser and leaving it
    at that.
-2. Pressing Select runs `observeEvent(input$dataSelectButton, ...)`, which does two things:
-   copies the data into `userDataChosen()`, and calls `appStage("subset")`.
+2. Pressing Select runs `observeEvent(input$dataSelectButton, ...)` *inside*
+   `mod-data-source.R`, which copies the data into that box's `chosen()`. The box hands
+   `chosen` back, and `server.R` watches it — `observeEvent(dataSource$chosen(),
+   appStage("subset"))` at `server.R:143`. The Select button is the only thing that fills
+   `chosen()`, so watching the value is the same as watching the button, and `server.R`
+   never has to reach into the box.
 3. `appStage("subset")` is what makes everything else happen — see section 4.
 
 ### "Select" on the subset tab (`subsetSelectButton`)
 
-Sets `appStage("statistics")`, works out `userDataGroup()` (the data cut down to the chosen
-items and groups), decides whether the group column is usable (`validGroupsRV()`), and
-records whether FIML is in play (`fimlRV()`).
+Same shape. Inside `mod-data-subset.R` the button fills `data()` — the data cut down to the
+chosen items and groups — and `server.R` watches that (`observeEvent(subset$data(),
+appStage("statistics"))` at `server.R:157`). The box hands back seven answers in all:
+`data`, `itemCols`, `groupCol`, `groups`, `hasGroups` (whether the group column is usable),
+`useFIML` (whether FIML is in play) and `incompleteCases`.
 
 ### "Fit and compare models" (`goModels`)
 
@@ -176,7 +182,8 @@ So:
 
 **Every fit lands you on the model comparison tab**, the first one and every one after it.
 The first happens by itself, because the sidebar block being revealed comes up selected; the
-later ones are `updateTabItems()` at the end of the button's observer.
+later ones are `bslib::nav_select("dataMenu", selected = "modelTests")` at the end of the
+button's observer (`server.R:402`).
 
 **The button is switched off while there is nothing to fit.** It is live before the first run,
 and afterwards only while the chosen estimator differs from the one the models on screen were
@@ -213,7 +220,7 @@ names R expects.
 | `R/mod-testing-params.R` | The whole Testing Parameters tab: the estimator, the mean structure, the multigroup box, the two display settings, the model grid and the button. It fits nothing — it hands the settings back and `server.R` does the fitting. |
 | `R/mod-mvn.R` | The whole normality tab. It *reports* which estimator its test points to; `server.R` decides what to do about that. |
 | `R/mod-data-source.R` | Step 1: where the data comes from. |
-| `R/mod-data-subset.R` | Step 2: which items, which groups, missing values. Hands back the six answers the rest of the app works from. |
+| `R/mod-data-subset.R` | Step 2: which items, which groups, missing values. Hands back the seven answers the rest of the app works from. |
 | `R/mod-ctt-results.R` | Everything a model run produces: the comparison page, the parameter tables, the factor scores, the model code. Started twice — once for the whole sample, once for the groups. |
 | `R/helpers-extract.R` | Pulls fit indices and parameter estimates out of a fitted lavaan object. Contains the reliability confidence intervals. |
 | `R/helpers-tables.R` | Every table the app shows. They are `reactable`s: a table works out whether each cell is good, bad or neutral, and the colour is looked up from that. |
@@ -251,17 +258,20 @@ the rest of the app:
 ```r
   histogramServer(
     "histogram",
-    data = userDataGroup,
-    itemCols = reactive(input$itemCols),
-    groupCol = reactive(input$groupCol),
-    hasGroups = validGroupsRV,
+    data = subset$data,
+    itemCols = subset$itemCols,
+    groupCol = subset$groupCol,
+    hasGroups = subset$hasGroups,
     groupColors = groupColors)
 ```
 
-Note the arguments are handed over *unread* — `userDataGroup`, not `userDataGroup()`, and
-`reactive(input$itemCols)`, not `input$itemCols`. The box reads them itself, as `data()` and
-`itemCols()`, and re-draws when they change. Reading them here instead would freeze them at
-the value they had when the app started.
+Note the arguments are handed over *unread* — `subset$data`, not `subset$data()`. The box
+reads them itself, as `data()` and `itemCols()`, and re-draws when they change. Reading them
+here instead would freeze them at the value they had when the app started.
+
+`subset` is what `dataSubsetServer("subset", ...)` handed back, a few lines above. That is
+how every box gets what it needs: one box's answers passed into the next one's arguments,
+never a control read across a box boundary.
 
 **Inside such a file, every id the box creates goes through `ns()`** — `plotOutput(ns("x"))`,
 `selectInput(ns("y"), ...)`. That is what keeps two boxes from fighting over the same name.
@@ -278,7 +288,8 @@ table of contents. The number of `#` marks the nesting depth:
   ## dataSelectionTab objectChooser ----               <- one output within it
 ```
 
-**Keep adding these when you add code.** They are the only navigation aid in a 600-line file.
+**Keep adding these when you add code.** They are the only navigation aid in a 432-line file,
+and the same is true of every `mod-*.R` — `mod-ctt-results.R` is 674 lines.
 
 ---
 
@@ -338,8 +349,9 @@ have the same degrees of freedom — no comparison is offered and the grid print
 
 ### "I want to change how many items a model needs"
 
-`minItems` in `cttModelFamily()`, and nowhere else. The grid reads it to decide when to show
-"Too few items.", and `server.R` reads it to untick models the user cannot test.
+`minItems` in `cttModelFamily()`, and nowhere else. `comparisonGrid()` reads it to decide
+when to show "Too few items." (`fun-comparisonGrid.R:62` and `:128`), and
+`mod-testing-params.R:209` reads the same vector to untick models the user cannot test.
 
 There is one remaining copy of these numbers written out in prose — the notification text
 that says "Only three items selected. Unable to test the τ-kongeneric model." That is a

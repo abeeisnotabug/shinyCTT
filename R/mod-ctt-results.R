@@ -493,7 +493,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
     ## the three tab strips ----
     # Built whole from the models that fitted, rather than a tab being added per model:
     # the models can be fitted again, and adding to the strip would give two tabs per
-    # model the second time round. tabBox() takes its panels one by one, so do.call()
+    # model the second time round. cttTabCard() takes its panels one by one, so do.call()
     # hands it the list.
     output$parTabset <- renderUI({
       panels <- lapply(

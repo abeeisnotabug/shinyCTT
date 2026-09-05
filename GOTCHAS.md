@@ -630,11 +630,13 @@ reproduces the old vector exactly.
 
 ### Freezing controls only goes one way
 
-Each of the first two steps freezes its own controls, from a `frozen` reactive the app hands
-it. What is left of the stage lockout in `server.R` disables the controls of every stage
-already passed, and never enables anything. Some controls start disabled for their own reasons — the data Select button
-until the chosen data validates, the multigroup checkbox until the group column yields usable
-groups — so a blanket "enable everything for the current stage" would switch those on wrongly.
+All three boxes with controls freeze their own — `mod-data-source.R`, `mod-data-subset.R`
+and `mod-testing-params.R` — each from a `frozen` reactive the app hands it, and each only
+ever disables. Nothing is left of the stage lockout in `server.R`: its
+`observeEvent(appStage(), ...)` does one thing, the `nav_select()`. Some controls start
+disabled for their own reasons — the data Select button until the chosen data validates, the
+multigroup checkbox until the group column yields usable groups — so a blanket "enable
+everything for the current stage" would switch those on wrongly.
 
 The one backwards move, the failed-run handler, re-enables its two controls by name.
 

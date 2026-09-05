@@ -1,8 +1,8 @@
 ## The scatter plot box on the Correlations tab.
 ##
-## With a group column it is a tabBox with an "Overall" and a "Group-wise" tab; without one
-## it is a plain box holding the "Overall" half on its own. The controls for the whole
-## sample are written once and used in both places.
+## With a group column it is a cttTabCard() with an "Overall" and a "Group-wise" tab;
+## without one it is a plain cttCard() holding the "Overall" half on its own. The controls
+## for the whole sample are written once and used in both places.
 
 scatterUI <- function(id) {
   ns <- NS(id)
@@ -54,11 +54,11 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
             plotOutput(ns("singleScatter"))
           )) # box
 
-      ### the tabBox with one ----
+      ### the tab card with one ----
       cttTabCard(
         title = tr("stats.scatter.title"),
 
-        #### box tabBox overall panel ----
+        #### box tab card overall panel ----
         tabPanel(
           title = tr("common.overall"),
 
@@ -66,7 +66,7 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
 
           plotOutput(ns("singleScatter"))),
 
-        #### box tabBox group-wise panel ----
+        #### box tab card group-wise panel ----
         tabPanel(
           title = tr("common.groupwise"),
 

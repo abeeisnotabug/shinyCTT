@@ -1,7 +1,7 @@
 ## The covariance matrix box on the Statistics tab.
 ##
-## With a group column it is a tabBox with an "Overall" and a "Group-wise" tab; without one
-## it is a plain box holding just the overall table.
+## With a group column it is a cttTabCard() with an "Overall" and a "Group-wise" tab;
+## without one it is a plain cttCard() holding just the overall table.
 
 covMatrixUI <- function(id) {
   ns <- NS(id)

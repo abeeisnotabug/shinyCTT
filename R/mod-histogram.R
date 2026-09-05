@@ -1,8 +1,8 @@
 ## The histogram box on the Statistics tab.
 ##
-## With a group column it is a tabBox with an "Overall" and a "Group-wise" tab; without one
-## it is a plain box holding the "Overall" half on its own. The controls for the whole
-## sample are written once and used in both places.
+## With a group column it is a cttTabCard() with an "Overall" and a "Group-wise" tab;
+## without one it is a plain cttCard() holding the "Overall" half on its own. The controls
+## for the whole sample are written once and used in both places.
 ##
 ## Nothing in this file knows the five CTT models exist.
 
@@ -56,7 +56,7 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
       if (!isTRUE(hasGroups()))
         return(cttCard(title = tr("stats.hist.title"), overallContents))
 
-      ### the tabBox with one ----
+      ### the tab card with one ----
       cttTabCard(
         title = tr("stats.hist.title"),
 

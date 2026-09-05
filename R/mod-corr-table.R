@@ -117,7 +117,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
               itemCols()))
         })
 
-        # assemble in tabBox
+        # assemble in the tab card
         cttTabCard(
           title = tr("stats.corrtable.title"),
 
