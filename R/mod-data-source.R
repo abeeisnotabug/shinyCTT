@@ -33,12 +33,10 @@ dataSourceUI <- function(id) {
     column(
       width = 3,
 
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         selectInput(ns("source"), tr("data.source.label"), choices = sources)),
 
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         conditionalPanel(
           condition = "input.source == 'CSV'",
           fileInput(ns("CSVFile"), tr("data.source.csv"),
@@ -74,15 +72,13 @@ dataSourceUI <- function(id) {
         # rest.
         uiOutput(ns("objectChooser"))),
 
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         actionButton(ns("dataSelectButton"), tr("common.select"), width = "100%"))
 
     ), # column
     column(
       width = 9,
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         title = tr("data.preview.title"),
         DT::dataTableOutput(ns("dataOverview"))))
   ) # fluidRow
@@ -213,9 +209,9 @@ dataSourceServer <- function(id, notifications, frozen) {
 
       shinyjs::disable("dataSelectButton")
 
-      notifications$notList$noData <- shinydashboard::notificationItem(
+      notifications$notList$noData <- list(
         text = tr("data.preview.empty"),
-        icon = icon("times"),
+        icon = "times",
         status = "danger")
 
       ### an R data file holding no data set ----
@@ -226,9 +222,9 @@ dataSourceServer <- function(id, notifications, frozen) {
       if (identical(input$source, "RData") &&
           identical(pickableObjects(), character(0))) {
 
-        notifications$notList$noDataset <- shinydashboard::notificationItem(
+        notifications$notList$noDataset <- list(
           text = tr("data.error.no.dataset"),
-          icon = icon("times"),
+          icon = "times",
           status = "danger")
         showNotification(
           tr("data.error.no.dataset"),
@@ -297,9 +293,9 @@ dataSourceServer <- function(id, notifications, frozen) {
       # raw() and the Select button were already emptied and switched off at the top of this
       # observer, so saying so and stopping here leaves step 1 where it was.
       if (inherits(loadedData, "error")) {
-        notifications$notList$unreadable <- shinydashboard::notificationItem(
+        notifications$notList$unreadable <- list(
           text = tr("data.error.unreadable"),
-          icon = icon("times"),
+          icon = "times",
           status = "danger")
         showNotification(
           paste(tr("data.error.unreadable"), conditionMessage(loadedData)),
@@ -319,9 +315,9 @@ dataSourceServer <- function(id, notifications, frozen) {
 
       ### Test the data for problems ----
       if (!any(vapply(raw(), is.numeric, logical(1)))) {
-        notifications$notList$noNumeric <- shinydashboard::notificationItem(
+        notifications$notList$noNumeric <- list(
           text = tr("data.error.no.numeric"),
-          icon = icon("times"),
+          icon = "times",
           status = "danger")
         showNotification(
           tr("data.error.no.numeric"),
@@ -335,9 +331,9 @@ dataSourceServer <- function(id, notifications, frozen) {
       }
 
       if (length(raw()) <= 1) {
-        notifications$notList$oneCol <- shinydashboard::notificationItem(
+        notifications$notList$oneCol <- list(
           text = tr("data.error.one.column"),
-          icon = icon("times"),
+          icon = "times",
           status = "danger")
         showNotification(
           tr("data.error.one.column"),

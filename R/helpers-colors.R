@@ -32,6 +32,18 @@ cttColors <- function() {
     text = "#FFFFFF")
 }
 
+## The colours the three boxes at the top of step 2 are painted, keyed the way
+## shinydashboard named them. Two of the five are the app's own - the green of the header
+## and the blue ui.R used to set by hand - and the other three are the ones AdminLTE drew
+## them in, written down here because a bslib value box takes a colour rather than a name.
+valueBoxColors <- function() {
+  c(green = "#99CC00",
+    blue = "#003F8A",
+    red = "#DD4B39",
+    orange = "#FF851B",
+    yellow = "#F39C12")
+}
+
 ## What a rated cell looks like. Handed to a column's style, which reactable calls once per
 ## row. NA -> no colour at all, for a cell with nothing to rate (the empty upper triangle of
 ## the correlation table, the first row of the hierarchical table).

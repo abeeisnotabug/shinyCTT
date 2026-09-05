@@ -40,10 +40,8 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
         })
 
         # output if groups
-        shinydashboard::tabBox(
-          width = 12,
+        cttTabCard(
           title = tr("stats.covmatrix.title"),
-          side = "right",
 
           tabPanel(
             title = tr("common.overall"),
@@ -60,8 +58,7 @@ covMatrixServer <- function(id, data, itemCols, groupCol, hasGroups) {
       else {
 
         # output if NO groups
-        shinydashboard::box(
-          width = 12,
+        cttCard(
           title = tr("stats.covmatrix.title"),
 
           groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),

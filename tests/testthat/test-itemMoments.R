@@ -1,4 +1,4 @@
-## itemMoments() (R/helperFunsStats.R), written to replace the moments package.
+## itemMoments() (R/helpers-stats.R), written to replace the moments package.
 ##
 ## The numbers moments 0.14.1 produced are pinned here as literals, so a later change cannot
 ## quietly move the descriptive statistics without a test noticing.

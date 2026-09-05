@@ -46,9 +46,8 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
       ### the box without a group column ----
       if (!isTRUE(hasGroups()))
         return(
-          shinydashboard::box(
+          cttCard(
             title = tr("stats.scatter.title"),
-            width = NULL,
 
             overallContents,
 
@@ -56,10 +55,8 @@ scatterServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors) 
           )) # box
 
       ### the tabBox with one ----
-      shinydashboard::tabBox(
+      cttTabCard(
         title = tr("stats.scatter.title"),
-        width = NULL,
-        side = "right",
 
         #### box tabBox overall panel ----
         tabPanel(

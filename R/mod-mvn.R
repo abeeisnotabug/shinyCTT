@@ -11,8 +11,7 @@ mvnUI <- function(id) {
     column(
       width = 4,
 
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         title = tr("stats.mvn.normtests.title"),
         numericInput(
           ns("mvnSL"),
@@ -22,15 +21,13 @@ mvnUI <- function(id) {
           max = 1,
           step = 0.001)),
 
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         title = tr("stats.mvn.title"),
         uiOutput(ns("comment")),
         reactable::reactableOutput(ns("mvTable")),
         uiOutput(ns("recommendation"))),
 
-      shinydashboard::box(
-        width = NULL,
+      cttCard(
         title = tr("stats.mvn.univ.title"),
         reactable::reactableOutput(ns("table")),
         uiOutput(ns("tableNote")))
@@ -38,14 +35,18 @@ mvnUI <- function(id) {
 
     column(
       width = 8,
-      fluidRow(htmlOutput(ns("plotBox"))),
-      fluidRow(shinydashboard::infoBox(
+      htmlOutput(ns("plotBox")),
+
+      # The green hint box under the plot. cttHintBox keeps the sentence at reading size -
+      # a value box writes its value large, and here the value is a sentence.
+      bslib::value_box(
         title = tr("stats.mvn.hint.label"),
-        subtitle = tr("stats.mvn.app.hint"),
-        icon = icon("lightbulb"),
-        color = "green",
-        width = 12,
-        fill = TRUE)))
+        value = tr("stats.mvn.app.hint"),
+        showcase = icon("lightbulb"),
+        showcase_layout = "left center",
+        class = "cttHintBox",
+        theme = bslib::value_box_theme(
+          bg = valueBoxColors()[["green"]], fg = "#FFFFFF")))
   ) # fluidRow
 }
 
@@ -204,8 +205,7 @@ mvnServer <- function(id, data, itemCols) {
     ## the plot box ----
     output$plotBox <- renderUI({
 
-      shinydashboard::box(
-        width = 12,
+      cttCard(
         title = tr("stats.mvn.plot.title"),
 
         fluidRow(

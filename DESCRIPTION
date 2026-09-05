@@ -23,8 +23,7 @@ LazyData: true
 Depends: R (>= 4.1.0),
     shiny (>= 1.5.0)
 Imports: 
-    shinydashboard (>= 0.7.1),
-    dashboardthemes (>= 1.1.6),
+    bslib (>= 0.9.0),
     shinyjs (>= 1.0),
     reactable (>= 0.4.0),
     haven (>= 2.1.0),

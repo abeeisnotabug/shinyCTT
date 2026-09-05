@@ -1,0 +1,210 @@
+/* Everything about how the app looks that bslib's theme has no setting for.
+   R/helpers-look.R reads it and writes it into the page; R/helpers-cards.R and R/helpers-sidebar.R hand out
+   the ctt* class names it styles. WALKTHROUGH.md section 6b explains how to change it.
+
+   It is written into the page rather than compiled into the theme on purpose: bslib serves
+   its own components.css after the theme it builds, so a rule put in the theme loses to
+   bslib's own whenever the two name the same number of classes, with no error anywhere.
+   (See GOTCHAS.md, "Style rules go in tags$head()".) */
+
+/* ---- the green bar ---- */
+/* The colour is $navbar-bg; this is the rest of the shape - 50px tall, the grey shadow
+   under it, and a hairline of bslib's own taken off. */
+.navbar.navbar-static-top {
+  border-bottom: 0;
+  box-shadow: 2px 2px 2px #AAAAAA;
+  min-height: 50px;
+  margin-bottom: 0;
+  padding: 0;
+}
+.navbar.navbar-static-top > .container-fluid { padding: 0; }
+
+.cttHeader { display: flex; align-items: center; width: 100%; height: 50px; }
+
+/* 230px wide and centred, the width of the menu, so the name sits over it. */
+.cttBrand {
+  width: 230px;
+  text-align: center;
+  color: #FFFFFF;
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 50px;
+}
+
+.cttHeaderRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 12px;
+}
+.cttHeaderRight .form-group, .cttHeaderRight .shiny-input-container { margin-bottom: 0; }
+
+/* ---- the notification bell ---- */
+.cttBell {
+  position: relative;
+  color: #FFFFFF;
+  font-size: 17px;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+.cttBell:hover { color: #FFFFFF; background-color: #666666; }
+.cttBell::after { display: none; }        /* no caret beside the bell */
+.cttBell .badge { position: absolute; top: 0; right: 0; font-size: 9px; padding: 2px 4px; }
+
+.cttNotifications { width: 600px; max-width: 90vw; }
+.cttNotifications .dropdown-item { white-space: normal; }
+
+/* ---- the menu down the left ---- */
+.bslib-sidebar-layout > .sidebar { box-shadow: 3px 5px 5px #AAAAAA; }
+.bslib-sidebar-layout > .sidebar > .sidebar-content { padding: 0; gap: 0; }
+
+.cttMenu, .cttSubMenu { list-style: none; margin: 0; padding: 0; }
+
+.cttMenu a, .cttMenu summary {
+  display: block;
+  padding: 12px 5px 12px 15px;
+  color: #000000;
+  font-size: 13px;
+  text-decoration: none;
+  border-bottom: 1px solid #CCCCCC;
+  cursor: pointer;
+}
+.cttMenu a:hover, .cttMenu summary:hover, .cttMenu a.cttSelected { background-color: #EEEEEE; }
+.cttMenu a > svg, .cttMenu a > i, .cttMenu summary > svg, .cttMenu summary > i {
+  margin-right: 6px;
+}
+
+/* A group that folds open and shut. <details> does the folding itself, so no script. */
+.cttMenu summary { list-style: none; }
+.cttMenu summary::-webkit-details-marker { display: none; }
+.cttMenu summary::after {
+  content: '\276F';
+  float: right;
+  font-size: 11px;
+  display: inline-block;
+  transition: transform .15s;
+}
+.cttMenu details[open] > summary::after { transform: rotate(90deg); }
+
+/* The entries inside a group are shorter, and their icon does the indenting. */
+.cttSubMenu a { padding: 5px 5px 5px 15px; }
+
+/* The rules between the blocks: a thin grey line with air around it, as before. */
+.cttMenu hr {
+  border: 0;
+  border-top: 1px solid #D7D7D7;
+  margin: 20px 0;
+  opacity: 1;
+}
+
+/* ---- the page ---- */
+main.bslib-page-main { padding: 15px; background-color: #FFFFFF; }
+
+/* ---- boxes ---- */
+/* A shinydashboard box is white with a 3px line across the top in the box colour, a 5px
+   corner and a hairline shadow. A bslib card is a 1px grey outline instead, so the outline
+   comes off and the line goes on. */
+.card {
+  border: 0;
+  border-top: 3px solid #99CC00;
+  border-radius: 5px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .1);
+  margin-bottom: 20px;
+  background-color: #FFFFFF;
+}
+.card > .card-header {
+  background-color: #FFFFFF;
+  border-bottom: 0;
+  padding: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #000000;
+}
+.card > .card-body { padding: 10px; }
+
+/* A card scrolls its own contents; a box does not. Left alone, the list a dropdown opens
+   is drawn inside the card, which then grows a scrollbar and cuts the list off.
+   min-width: 0 goes with it: a flex item is allowed to grow past its container to fit its
+   contents, so without it a card holding a wide table pushes itself off the page instead
+   of letting the table scroll inside. */
+.card.bslib-card, .card.bslib-card > .card-body {
+  overflow: visible;
+  min-width: 0;
+}
+.card.bslib-card .tab-content, .card.bslib-card .tab-pane { min-width: 0; }
+
+/* Same reason, one level up: the page's own panel is a flex item too, so without this a
+   wide table stretches the whole page instead of scrolling inside its box. */
+main.bslib-page-main, main.bslib-page-main > .tab-content,
+main.bslib-page-main > .tab-content > .tab-pane, .row > * { min-width: 0; }
+
+/* A tab strip inside a box: the tabs sit in the header beside the title, and the strip
+   itself carries no second border. */
+/* The title at one end of the header and the tabs at the other, as the boxes had them. */
+.card > .card-header.bslib-navs-card-title {
+  padding: 5px 10px;
+  justify-content: space-between;
+}
+.card > .card-header .nav-tabs { border-bottom: 0; }
+.card > .card-header .nav-tabs > li > a { color: #000000; }
+.card > .card-header .nav-tabs > li.active > a,
+.card > .card-header .nav-tabs > li > a.active {
+  color: #000000;
+  border-color: transparent transparent #99CC00;
+  border-bottom-width: 2px;
+}
+
+/* Three of the strips put the title on the right of the tabs rather than the left. */
+.cttTitleRight .bslib-navs-card-title { flex-direction: row-reverse; }
+
+/* ---- the three boxes at the top of step 2 ---- */
+/* bslib writes the label above the number; shinydashboard put the number first. */
+.cttValueBox .value-box-area { flex-direction: column-reverse; }
+.cttValueBox .value-box-title { font-size: 14px; margin: 0; }
+.cttValueBox .value-box-value { font-size: 30px; font-weight: 700; margin: 0; }
+.cttValueBox .value-box-showcase { opacity: .25; }
+.cttValueBox.card { border-top: 0; }
+
+/* The green hint box under the plot on the normality tab. A value box writes its value
+   large; here the value is a sentence, so it is written at reading size. */
+.cttHintBox .value-box-value { font-size: 15px; font-weight: 400; }
+.cttHintBox .value-box-title { font-size: 15px; font-weight: 700; }
+.cttHintBox.card { border-top: 0; }
+
+/* ---- inputs ---- */
+.shiny-input-container > label, label.control-label {
+  font-weight: 700;
+  margin-bottom: 5px;
+  color: #000000;
+}
+.form-control, .form-select { border-color: #C8C8C8; border-radius: 5px; }
+/* bslib pads a button 11px by 30px; the original's is 6 by 12, which is also what leaves
+   room for the file name beside a Browse button. */
+.btn-default {
+  background-color: #FFFFFF;
+  color: #000000;
+  border: 1px solid #DDDDDD;
+  border-radius: 5px;
+  padding: 6px 12px;
+}
+.btn-default:hover {
+  background-color: #FFFFFF;
+  color: #000000;
+  border-color: #999999;
+}
+.checkbox-inline { margin: 0 !important; }
+
+/* ---- tables ---- */
+/* Bootstrap 5 tints a striped row with the page's own text colour; grey, as before. */
+table.dataTable { --bs-table-striped-bg: #F9F9F9; --bs-table-striped-color: #000000; }
+
+/* bslib strips the border off DT's own search box and length menu and leaves them a bare
+   underline. This puts the boxes back, and has to name the same three classes bslib does
+   or its rule wins. */
+.datatables .dataTables_wrapper .dataTables_filter input,
+.datatables .dataTables_wrapper .dataTables_length select {
+  border: 1px solid #C8C8C8;
+  border-radius: 5px;
+}
+.datatables .dataTables_wrapper .dataTables_filter input { padding: 2px 6px; }

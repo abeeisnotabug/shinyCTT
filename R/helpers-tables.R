@@ -1,6 +1,6 @@
 ## Everything the app builds a table out of: how a number is formatted, how a rating is
 ## turned into a header or a divider, and the tables themselves. The colours those ratings
-## stand for are in R/colors.R.
+## stand for are in R/helpers-colors.R.
 
 ## The words DT puts around a table of its own - the search box, the row count, the two
 ## paging buttons. DT ships them in English only, so they are handed to it as text like

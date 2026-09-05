@@ -15,7 +15,7 @@
 ## because comparing A with B is the same test as comparing B with A.
 ##
 ## Arguments
-##   family : the list built by cttModelFamily() in modelFamily.R. The caller passes it in;
+##   family : the list built by cttModelFamily() in helpers-model-family.R. The caller passes it in;
 ##            this function reads $names, $abbrev, $minItems and $comparable from it.
 ##   ns     : only does something when this table is placed inside a Shiny module, which it
 ##            is not yet. With the default it leaves every id unchanged.

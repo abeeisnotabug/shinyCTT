@@ -8,11 +8,11 @@
 ##
 ## Under devtools::test() the tests run in <package>/tests/testthat, so R/ is two levels up.
 ## Under R CMD check they run in a copy that only has the *installed* package, where there
-## are no .R files to look at - modelFamily.R is the marker for telling the two apart.
+## are no .R files to look at - helpers-model-family.R is the marker for telling the two apart.
 packageSourceDir <- function() {
   candidate <- test_path("..", "..", "R")
 
-  if (file.exists(file.path(candidate, "modelFamily.R"))) candidate else NA_character_
+  if (file.exists(file.path(candidate, "helpers-model-family.R"))) candidate else NA_character_
 }
 
 ## Every call to `functionName` anywhere inside `code`, as a list of calls.

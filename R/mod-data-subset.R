@@ -11,9 +11,9 @@ dataSubsetUI <- function(id) {
   tagList(
     #### first row info boxes ----
     fluidRow(
-      shinydashboard::valueBoxOutput(ns("itemInfoBox")),
-      shinydashboard::valueBoxOutput(ns("groupInfoBox")),
-      shinydashboard::valueBoxOutput(ns("naInfoBox"))),
+      column(width = 4, uiOutput(ns("itemInfoBox"))),
+      column(width = 4, uiOutput(ns("groupInfoBox"))),
+      column(width = 4, uiOutput(ns("naInfoBox")))),
 
     #### second row choosers ----
     fluidRow(
@@ -21,12 +21,10 @@ dataSubsetUI <- function(id) {
       column(
         width = 4,
 
-        shinydashboard::box(
-          width = NULL,
+        cttCard(
           uiOutput(ns("itemColsChooser"))),
 
-        shinydashboard::box(
-          width = NULL,
+        cttCard(
           uiOutput(ns("groupColChooser")),
           conditionalPanel(
             condition = "input.groupCol != 'noGroupSelected'",
@@ -36,8 +34,7 @@ dataSubsetUI <- function(id) {
         conditionalPanel(
           "output.incompleteCasesBoolRV",
 
-          shinydashboard::box(
-            width = NULL,
+          cttCard(
             tagList(
               strong(tr("subset.missing.label")),
               checkboxInput(
@@ -54,8 +51,7 @@ dataSubsetUI <- function(id) {
           ns = ns
         ), # conditionalPanel
 
-        shinydashboard::box(
-          width = NULL,
+        cttCard(
           # subset of items
           shinyjs::disabled(
             actionButton(ns("subsetSelectButton"), tr("common.select"), width = "100%")))
@@ -64,24 +60,21 @@ dataSubsetUI <- function(id) {
       column(
         width = 4,
 
-        shinydashboard::box(
-          width = NULL,
+        cttCard(
           title = tr("subset.obs.title"),
           reactable::reactableOutput(ns("obsTable"))),
 
         # The group counts are a table when there is a group column and a note when there
         # is not. renderReactable can only give back a table, so they are two outputs with
         # a guard on each - only one of them ever fills.
-        shinydashboard::box(
-          width = NULL,
+        cttCard(
           title = tr("subset.obs.pergroup.title"),
           reactable::reactableOutput(ns("obsPerGroupTable")),
           uiOutput(ns("obsPerGroupNote")))),
 
       column(
         width = 4,
-        shinydashboard::box(
-          width = NULL,
+        cttCard(
           title = tr("subset.na.percol.title"),
           reactable::reactableOutput(ns("naTable"))))
     ) # fluidRow
@@ -137,8 +130,10 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
           choices = possibleItemColumns(),
           selected = possibleItemColumns(),
           inline = TRUE),
-        fluidRow(actionLink(ns("selectall"), tr("common.select.all"), style = "margin-left: 15px"),
-                 actionLink(ns("deselectall"), tr("common.unselect.all"), style = "margin-left: 15px")))
+        # A plain div and not a fluidRow: Bootstrap 5 gives every direct child of a row
+        # the full width of it, so the two links would sit one under the other.
+        div(actionLink(ns("selectall"), tr("common.select.all"), style = "margin-left: 15px"),
+            actionLink(ns("deselectall"), tr("common.unselect.all"), style = "margin-left: 15px")))
     })
 
     ## groupColChooser ----
@@ -165,9 +160,9 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
           groupWarning <- tr("subset.groups.one.obs")
           possibleGroups <- NULL
 
-          notifications$notList$invalGroups <- shinydashboard::notificationItem(
+          notifications$notList$invalGroups <- list(
             text = tr("subset.groups.invalid"),
-            icon = icon("times"),
+            icon = "times",
             status = "danger")
           showNotification(
             tr("subset.groups.invalid"),
@@ -274,30 +269,33 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
 
       notifications$notList$numItems <- switch(
         as.character(length(input$itemCols)),
-        "0" = shinydashboard::notificationItem(
+        "0" = list(
           text = tr("subset.items.none"),
-          icon = icon("times"),
+          icon = "times",
           status = "danger"),
-        "1" = shinydashboard::notificationItem(
+        "1" = list(
           text = tr("subset.items.only.one"),
-          icon = icon("times"),
+          icon = "times",
           status = "danger"),
-        "2" = shinydashboard::notificationItem(
+        "2" = list(
           text = HTML(tr("subset.items.only.two")),
-          icon = icon("exclamation-triangle"),
+          icon = "exclamation-triangle",
           status = "warning"),
-        "3" = shinydashboard::notificationItem(
+        "3" = list(
           text = HTML(tr("subset.items.only.three")),
-          icon = icon("exclamation-triangle"),
+          icon = "exclamation-triangle",
           status = "warning"),
         NULL)
 
+      # The same message the bell gets, shown once as a pop-up. It used to be dug back out
+      # of the markup notificationItem() had built; the entry is the three pieces now, so
+      # both are read straight off it.
       if (!is.null(notifications$notList$numItems)) {
         showNotification(
-          ui = notifications$notList$numItems$children[[1]]$children[[2]],
+          ui = notifications$notList$numItems$text,
           duration = 5,
           id = "numItemsNot",
-          type = ifelse(notifications$notList$numItems$children[[1]]$children[[1]]$attribs[[4]] == "text-danger",
+          type = ifelse(notifications$notList$numItems$status == "danger",
                         yes = "error",
                         no = "warning"))
       } else {
@@ -306,27 +304,38 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     })
 
     ## itemInfoBox ----
-    output$itemInfoBox <- shinydashboard::renderValueBox({
-      shinydashboard::valueBox(
+    output$itemInfoBox <- renderUI({
+
+      # Red at one item or none, orange at two or three, green from four up: the counts
+      # the five models need, spelled out in cttModelFamily()'s minItems.
+      colorName <- switch(
+        as.character(itemColsRV()),
+        "0" = "red",
+        "1" = "red",
+        "2" = "orange",
+        "3" = "orange",
+        "green")
+
+      bslib::value_box(
+        title = tr("subset.items.count"),
         value = itemColsRV(),
-        color = switch(
-            as.character(itemColsRV()),
-            "0" = "red",
-            "1" = "red",
-            "2" = "orange",
-            "3" = "orange",
-            "green"),
-        subtitle = tr("subset.items.count"),
-        icon = icon("list"))
+        showcase = icon("list"),
+        showcase_layout = "top right",
+        class = "cttValueBox",
+        theme = bslib::value_box_theme(
+          bg = valueBoxColors()[[colorName]], fg = "#FFFFFF"))
     })
 
     ## groupInfoBox ----
-    output$groupInfoBox <- shinydashboard::renderValueBox({
-      shinydashboard::valueBox(
+    output$groupInfoBox <- renderUI({
+      bslib::value_box(
+        title = tr("subset.groupcol.count"),
         value = groupColRV(),
-        color = "blue",
-        subtitle = tr("subset.groupcol.count"),
-        icon = icon("users"))
+        showcase = icon("users"),
+        showcase_layout = "top right",
+        class = "cttValueBox",
+        theme = bslib::value_box_theme(
+          bg = valueBoxColors()[["blue"]], fg = "#FFFFFF"))
     })
 
     ## incomplete cases ----
@@ -341,12 +350,16 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
     outputOptions(output, "incompleteCasesBoolRV", suspendWhenHidden = FALSE)
 
     ## naInfoBox ----
-    output$naInfoBox <- shinydashboard::renderValueBox({
-      shinydashboard::valueBox(
+    output$naInfoBox <- renderUI({
+      bslib::value_box(
+        title = tr("subset.na.rows.note"),
         value = sum(incompleteCases()),
-        color = if (any(incompleteCases())) "yellow" else "green",
-        subtitle = tr("subset.na.rows.note"),
-        icon = icon("exclamation-triangle"))
+        showcase = icon("exclamation-triangle"),
+        showcase_layout = "top right",
+        class = "cttValueBox",
+        theme = bslib::value_box_theme(
+          bg = valueBoxColors()[[if (any(incompleteCases())) "yellow" else "green"]],
+          fg = "#FFFFFF"))
     })
 
     ## naTable ----
@@ -440,9 +453,9 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
           length(input$groups) > 1)
 
       if (any(incompleteCases())) {
-        notifications$notList$NAhand <- shinydashboard::notificationItem(
+        notifications$notList$NAhand <- list(
           text = HTML(tr("subset.na.removed.note")),
-          icon = icon("exclamation-triangle"),
+          icon = "exclamation-triangle",
           status = "warning")
 
         showNotification(

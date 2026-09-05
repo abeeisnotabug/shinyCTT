@@ -54,12 +54,11 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
 
       ### the box without a group column ----
       if (!isTRUE(hasGroups()))
-        return(shinydashboard::box(title = tr("stats.hist.title"), overallContents))
+        return(cttCard(title = tr("stats.hist.title"), overallContents))
 
       ### the tabBox with one ----
-      shinydashboard::tabBox(
+      cttTabCard(
         title = tr("stats.hist.title"),
-        side = "right",
 
         tabPanel(
           title = tr("common.overall"),

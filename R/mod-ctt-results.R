@@ -17,19 +17,19 @@ cttResultsUI <- function(id) {
 cttParTablesUI <- function(id) {
   ns <- NS(id)
 
-  fluidRow(uiOutput(ns("parTabset")))
+  uiOutput(ns("parTabset"))
 }
 
 cttFactorScoresUI <- function(id) {
   ns <- NS(id)
 
-  fluidRow(uiOutput(ns("fsTabset")))
+  uiOutput(ns("fsTabset"))
 }
 
 cttModelCodeUI <- function(id) {
   ns <- NS(id)
 
-  fluidRow(uiOutput(ns("mcTabset")))
+  uiOutput(ns("mcTabset"))
 }
 
 ## Arguments:
@@ -264,53 +264,43 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
 
         if (!is.null(lavStatus)) fluidRow(lavStatus),
 
-        fluidRow(
-          shinydashboard::box(
-            title = tr("results.hierplot.title"),
-            width = 12,
-            plotOutput(ns("hierPlot")))),
+        cttCard(
+          title = tr("results.hierplot.title"),
+          plotOutput(ns("hierPlot"))),
 
-        fluidRow(
-          shinydashboard::box(
-            title = tr("results.hiertable.title"),
-            width = 12,
-            htmlOutput(ns("hierTable")),
-            actionLink(ns("showLegendHierTable"), tr("results.legend.toggle")),
-            conditionalPanel("input.showLegendHierTable % 2 == 1",
-                             htmlOutput(ns("hierTableLegend")),
-                             ns = ns))),
+        cttCard(
+          title = tr("results.hiertable.title"),
+          htmlOutput(ns("hierTable")),
+          actionLink(ns("showLegendHierTable"), tr("results.legend.toggle")),
+          conditionalPanel("input.showLegendHierTable % 2 == 1",
+                           htmlOutput(ns("hierTableLegend")),
+                           ns = ns)),
 
-        fluidRow(
-          shinydashboard::box(
-            title = tr("results.fitindex.title"),
-            width = 12,
-            reactable::reactableOutput(ns("fitsTable")),
-            br(),
-            actionLink(ns("showLegendFitIndexTable"), tr("results.legend.toggle")),
-            conditionalPanel("input.showLegendFitIndexTable % 2 == 1",
-                             htmlOutput(ns("fitsTableLegend")),
-                             ns = ns))),
+        cttCard(
+          title = tr("results.fitindex.title"),
+          reactable::reactableOutput(ns("fitsTable")),
+          br(),
+          actionLink(ns("showLegendFitIndexTable"), tr("results.legend.toggle")),
+          conditionalPanel("input.showLegendFitIndexTable % 2 == 1",
+                           htmlOutput(ns("fitsTableLegend")),
+                           ns = ns)),
 
-        fluidRow(
-          shinydashboard::box(
-            title = HTML(tr("results.chi2comp.title")),
-            width = 12,
-            reactable::reactableOutput(ns("combCompTable")),
-            br(),
-            actionLink(ns("showLegendCombCompTable"), tr("results.legend.toggle")),
-            conditionalPanel("input.showLegendCombCompTable % 2 == 1",
-                             htmlOutput(ns("combCompTableLegend")),
-                             ns = ns))),
+        cttCard(
+          title = HTML(tr("results.chi2comp.title")),
+          reactable::reactableOutput(ns("combCompTable")),
+          br(),
+          actionLink(ns("showLegendCombCompTable"), tr("results.legend.toggle")),
+          conditionalPanel("input.showLegendCombCompTable % 2 == 1",
+                           htmlOutput(ns("combCompTableLegend")),
+                           ns = ns)),
 
-        fluidRow(
-          shinydashboard::box(
-            title = tr("results.aicbiccomp.title"),
-            width = 12,
-            htmlOutput(ns("infCompTable")),
-            actionLink(ns("showLegendInfCompTable"), tr("results.legend.toggle")),
-            conditionalPanel("input.showLegendInfCompTable % 2 == 1",
-                             htmlOutput(ns("infCompTableLegend")),
-                             ns = ns)))
+        cttCard(
+          title = tr("results.aicbiccomp.title"),
+          htmlOutput(ns("infCompTable")),
+          actionLink(ns("showLegendInfCompTable"), tr("results.legend.toggle")),
+          conditionalPanel("input.showLegendInfCompTable % 2 == 1",
+                           htmlOutput(ns("infCompTableLegend")),
+                           ns = ns))
 
       ) # fluidPage
     })
@@ -513,10 +503,10 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
           htmlOutput(ns(paste0(thisModel, "ParTable")))))
 
       do.call(
-        shinydashboard::tabBox,
+        cttTabCard,
         c(list(id = ns("parTabsetTab"),
                title = tr("results.partables.title"),
-               width = 12),
+               titleRight = TRUE),
           unname(panels)))
     })
 
@@ -570,10 +560,10 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
         )) # tabPanel, lapply
 
       do.call(
-        shinydashboard::tabBox,
+        cttTabCard,
         c(list(id = ns("fsTabsetTab"),
                title = HTML(tr("results.scores.title")),
-               width = 12),
+               titleRight = TRUE),
           unname(panels)))
     })
 
@@ -586,10 +576,10 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
           verbatimTextOutput(ns(paste0(thisModel, "Code")))))
 
       do.call(
-        shinydashboard::tabBox,
+        cttTabCard,
         c(list(id = ns("mcTabsetTab"),
                title = tr("results.modelcode.title"),
-               width = 12),
+               titleRight = TRUE),
           unname(panels)))
     })
 

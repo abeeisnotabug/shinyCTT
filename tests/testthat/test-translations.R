@@ -1,5 +1,5 @@
 ## The text system: inst/translations.csv holds every piece of text the app shows, one row
-## per piece, named by a short key. R/translations.R turns a key into text with tr().
+## per piece, named by a short key. R/helpers-translations.R turns a key into text with tr().
 ##
 ## Two kinds of test here.
 ##
@@ -186,7 +186,7 @@ test_that("tr() says so when no text has been read", {
 ## tr() call takes one plain string - checked by the test below - so the argument can be
 ## read straight out of the parsed call.
 keysUsedInSource <- function() {
-  # translations.R is scanned too. Defining tr() there is an assignment rather than a call
+  # helpers-translations.R is scanned too. Defining tr() there is an assignment rather than a call
   # to it, so the definition is not picked up, and languageLabels() does ask for two keys.
   files <- list.files(packageSourceDir(), pattern = "[.]R$", full.names = TRUE)
 

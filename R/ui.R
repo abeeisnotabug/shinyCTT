@@ -1,103 +1,6 @@
-makeFUdashboardtheme <- function() {
-  dashboardthemes::shinyDashboardThemeDIY(
-
-    ### general
-    appFontFamily = "Arial"
-    ,appFontColor = "#000000"
-    ,bodyBackColor = "#FFFFFF"
-
-    ### header
-    ,logoBackColor = "#99CC00"
-
-    ,headerButtonBackColor = "#99CC00"
-    ,headerButtonIconColor = "#FFFFFF"
-    ,headerButtonBackColorHover = "#666666"
-    ,headerButtonIconColorHover = "#FFFFFF"
-
-    ,headerBackColor = "#99CC00"
-    ,headerBoxShadowColor = "#AAAAAA"
-    ,headerBoxShadowSize = "2px 2px 2px"
-
-    ### sidebar
-    ,sidebarBackColor = "#FFFFFF"
-    ,sidebarPadding = 0
-
-    ,sidebarMenuBackColor = "transparent"
-    ,sidebarMenuPadding = 0
-    ,sidebarMenuBorderRadius = 0
-
-    ,sidebarShadowRadius = "3px 5px 5px"
-    ,sidebarShadowColor = "#AAAAAA"
-
-    ,sidebarUserTextColor = "#000000"
-
-    ,sidebarSearchBackColor = "rgb(55,72,80)"
-    ,sidebarSearchIconColor = "rgb(153,153,153)"
-    ,sidebarSearchBorderColor = "#CCCCCC"
-
-    ,sidebarTabTextColor = "#000000"
-    ,sidebarTabTextSize = 13
-    ,sidebarTabBorderStyle = "none none solid none"
-    ,sidebarTabBorderColor = "#CCCCCC"
-    ,sidebarTabBorderWidth = 1
-
-    ,sidebarTabBackColorSelected = "#EEEEEE"
-    ,sidebarTabTextColorSelected = "#000000"
-    ,sidebarTabRadiusSelected = "0px 0px 0px 0px"
-
-    ,sidebarTabBackColorHover = "#EEEEEE"
-    ,sidebarTabTextColorHover = "#000000"
-    ,sidebarTabBorderStyleHover = "none none solid none"
-    ,sidebarTabBorderColorHover = "#CCCCCC"
-    ,sidebarTabBorderWidthHover = 1
-    ,sidebarTabRadiusHover = "0px 0px 0px 0px"
-
-    ### boxes
-    ,boxBackColor = "#FFFFFF"
-    ,boxBorderRadius = 5
-    ,boxShadowSize = "0px 1px 1px"
-    ,boxShadowColor = "rgba(0,0,0,.1)"
-    ,boxTitleSize = 16
-    ,boxDefaultColor = "#99CC00"
-
-    ,boxPrimaryColor = "rgba(44,222,235,1)"
-    ,boxInfoColor = "rgb(210,214,220)"
-    ,boxSuccessColor = "rgba(0,255,213,1)"
-    ,boxWarningColor = "rgb(244,156,104)"
-    ,boxDangerColor = "rgb(255,88,55)"
-
-    ,tabBoxTabColor = "#FFFFFF"
-    ,tabBoxTabTextSize = 14
-    ,tabBoxTabTextColor = "#000000"
-    ,tabBoxTabTextColorSelected = "#000000"
-    ,tabBoxBackColor = "#FFFFFF"
-    ,tabBoxHighlightColor = "#99CC00"
-    ,tabBoxBorderRadius = 5
-
-    ### inputs
-    ,buttonBackColor = "#FFFFFF"
-    ,buttonTextColor = "#000000"
-    ,buttonBorderColor = "#DDDDDD"
-    ,buttonBorderRadius = 5
-
-    ,buttonBackColorHover = "#FFFFFF"
-    ,buttonTextColorHover = "#000000"
-    ,buttonBorderColorHover = "#999999"
-
-    ,textboxBackColor = "rgb(255,255,255)"
-    ,textboxBorderColor = "rgb(200,200,200)"
-    ,textboxBorderRadius = 5
-    ,textboxBackColorSelect = "rgb(245,245,245)"
-    ,textboxBorderColorSelect = "rgb(200,200,200)"
-
-    ### tables
-    ,tableBackColor = "rgb(255,255,255)"
-    ,tableBorderColor = "rgb(240,240,240)"
-    ,tableBorderTopSize = 1
-    ,tableBorderRowSize = 1
-
-  ) # shinyDashboardThemeDIY
-}
+## The page: the green bar, the menu down the left, and one panel per tab.
+##
+## How it all looks is helpers-look.R (fuTheme, fuStyle) and inst/styles.css.
 
 ui <- function(request) {
 
@@ -107,244 +10,122 @@ ui <- function(request) {
   # shinyCTTApp(language = ) was given.
   setUiLanguage(parseQueryString(request$QUERY_STRING)$lang)
 
-  shinydashboard::dashboardPage(
-    # dashboardHeader ----
-    shinydashboard::dashboardHeader(
-      title = "shinyCTT",
-      shinydashboard::dropdownMenuOutput("infoMenu"),
+  bslib::page_sidebar(
 
-      # The language chooser. shinydashboard puts anything else in the header inside a
-      # <li class="dropdown">, so that is what it is wrapped in.
-      tags$li(
-        class = "dropdown",
-        style = "padding: 8px 12px 0 0;",
+    theme = fuTheme(),
+
+    # fillable = FALSE: a card is as tall as what is in it and the page scrolls, which is
+    # how the boxes behaved. Left TRUE they stretch to fill the window.
+    fillable = FALSE,
+
+    window_title = "shinyCTT",
+
+    # the green bar ----
+    # page_sidebar() takes any tag as its title and drops it into the bar unchanged, so the
+    # whole bar - the name on the left, the language chooser and the bell on the right - is
+    # written here.
+    title = div(
+      class = "cttHeader",
+
+      span(class = "cttBrand", "shinyCTT"),
+
+      div(
+        class = "cttHeaderRight",
+
         selectInput(
           "language",
           label = NULL,
           width = "150px",
           selected = currentLanguage(),
-          choices = stats::setNames(appLanguages, languageLabels()[appLanguages])))),
+          choices = stats::setNames(appLanguages, languageLabels()[appLanguages])),
 
-    # dashboardSidebar ----
-    shinydashboard::dashboardSidebar(
-      shinydashboard::sidebarMenuOutput("dataMenuOut")),
+        uiOutput("infoMenu"))),
 
-    # dashboardBody ----
-    shinydashboard::dashboardBody(
+    # the menu ----
+    sidebar = bslib::sidebar(
+      width = 230,
+      bg = "#FFFFFF",
+      padding = 0,
+      gap = 0,
+      uiOutput("dataMenuOut")),
 
-      makeFUdashboardtheme(),
+    fuStyle(),
 
-      ## modify box look ----
-      tags$head(
-        tags$style(".checkbox-inline {margin: 0 !important;}"),
-        tags$style(HTML(".navbar-custom-menu>.navbar-nav>li>.dropdown-menu {width:600px;}")),
-        tags$style(".bg-green { background-color: #99CC00 !important; color: #FFFFFF !important; }"),
-        tags$style(".bg-blue { background-color: #003F8A !important; color: #FFFFFF !important; }"),
+    shinyjs::useShinyjs(),
 
-        # AdminLTE puts white-space: nowrap on an entry in the notification bell, so a long
-        # message was cut off with a horizontal ellipsis. Two of them used to exist twice in
-        # the text file, once with a <br/> in the middle, to work round this - and markup
-        # does not belong in text a translator is handed.
-        tags$style(HTML(
-          ".navbar-nav > .notifications-menu > .dropdown-menu > li .menu > li > a
-             {white-space: normal;}"))),
+    ## the panels ----
+    # One per tab, all built at startup and hidden until the menu picks one. server.R does
+    # the picking with bslib::nav_select("dataMenu", ...); the menu itself only reports
+    # which link was clicked.
+    bslib::navset_hidden(
+      id = "dataMenu",
 
-      shinyjs::useShinyjs(),
+      ### dataSelectionTab ----
+      bslib::nav_panel_hidden("dataSelectionTab", dataSourceUI("dataSource")),
 
-      ## tabItems parent ----
-      shinydashboard::tabItems(
+      ### subsetSelectionTab ----
+      bslib::nav_panel_hidden("subsetSelectionTab", dataSubsetUI("subset")),
 
-        ### tabItem dataSelectionTab ----
-        shinydashboard::tabItem(
-          tabName = "dataSelectionTab",
-          dataSourceUI("dataSource")
-        ), # tabItem
+      ### statisticsTab ----
+      # A card has no width of its own, so the widths live here rather than inside the
+      # modules: the top two boxes are half a row each, the covariance matrix the whole of
+      # one. Every box sits in a column, even a full-width one - a card put straight into a
+      # fluidRow() is the row's own child and takes its negative margins (see GOTCHAS.md).
+      bslib::nav_panel_hidden(
+        "statisticsTab",
+        fluidRow(
+          column(width = 6, descriptivesUI("descriptives")),
+          column(width = 6, histogramUI("histogram"))),
 
-        ### tabItem subsetSelectionTab ----
-        shinydashboard::tabItem(
-          tabName = "subsetSelectionTab",
-          dataSubsetUI("subset")
-        ), # tabItem
+        fluidRow(
+          column(width = 12, covMatrixUI("covmatrix")))), # bslib::nav_panel_hidden
 
-        ### tabItem statisticsTab ----
-        shinydashboard::tabItem(
-          tabName = "statisticsTab",
-          fluidRow(
-            descriptivesUI("descriptives"),
-            histogramUI("histogram")),
-          fluidRow(
-            covMatrixUI("covmatrix"))),
+      ### corrTab ----
+      bslib::nav_panel_hidden(
+        "corrTab",
+        fluidRow(
+          column(
+            width = 4,
+            corrIndependenceUI("corrIndependence"),
+            corrTableControlsUI("corrTable")), # column
 
-        ### tabItem corrTab ----
-        shinydashboard::tabItem(
-          tabName = "corrTab",
-          fluidRow(
-            column(
-              width = 4,
+          column(
+            width = 8,
+            scatterUI("scatter"))), # fluidRow
 
-              corrIndependenceUI("corrIndependence"),
+        fluidRow(
+          column(width = 12, corrTableUI("corrTable")))), # bslib::nav_panel_hidden
 
-              corrTableControlsUI("corrTable")
-            ), # column
+      ### mvnTab ----
+      bslib::nav_panel_hidden("mvnTab", mvnUI("mvn")),
 
-            column(
-              width = 8,
-              scatterUI("scatter"))
-          ), # fluidRow
+      ### testParamTab ----
+      bslib::nav_panel_hidden("testParamTab", testingParamsUI("params")),
 
-          fluidRow(
-            corrTableUI("corrTable"))
-        ), # tabItem
+      ### modelTests ----
+      bslib::nav_panel_hidden("modelTests", cttResultsUI("single")),
 
-        ### tabItem mvnTab ----
-        shinydashboard::tabItem(
-          tabName = "mvnTab",
-          mvnUI("mvn")
-        ), # tabItem
+      ### modelTestsMg ----
+      bslib::nav_panel_hidden("modelTestsMg", cttResultsUI("multigroup")),
 
-        ### tabItem testParamTab ----
-        shinydashboard::tabItem(
-          tabName = "testParamTab",
-          fluidRow(
+      ### parTables ----
+      bslib::nav_panel_hidden("parTables", cttParTablesUI("single")),
 
-            #### testParamTab left col ----
-            column(
-              width = 5,
+      ### parTablesMg ----
+      bslib::nav_panel_hidden("parTablesMg", cttParTablesUI("multigroup")),
 
-              ##### testParamTab left col how to fit ----
-              shinydashboard::box(
-                width = NULL,
-                title = tr("params.fit.box.title"),
-                fluidRow(
+      ### facScores ----
+      bslib::nav_panel_hidden("facScores", cttFactorScoresUI("single")),
 
-                  column(
-                    width = 6,
-                    radioButtons(
-                      "estimator",
-                      tr("params.estimator.label"),
-                      choiceNames = list(
-                        tr("common.estimator.ml"),
-                        tr("common.estimator.mlr")),
-                      choiceValues = c("ML", "MLR"),
-                      selected = "ML")),
+      ### facScoresMg ----
+      bslib::nav_panel_hidden("facScoresMg", cttFactorScoresUI("multigroup")),
 
-                  column(
-                    width = 6,
-                    radioButtons(
-                      "etaIntFree",
-                      tr("params.parameterization.label"),
-                      choiceNames = list(
-                        HTML(sprintf(tr("params.parameterization.mean"),
-                                     tr("sym.mu.eta"))),
-                        HTML(sprintf(tr("params.parameterization.intercept"),
-                                     tr("sym.alpha.1")))),
-                      choiceValues = c(FALSE, TRUE)))
-                ), # fluidRow
+      ### modelCode ----
+      bslib::nav_panel_hidden("modelCode", cttModelCodeUI("single")),
 
-                # Full width rather than under the estimator buttons: in half a column this
-                # is four words per line.
-                htmlOutput("estimatorNote"),
+      ### modelCodeMg ----
+      bslib::nav_panel_hidden("modelCodeMg", cttModelCodeUI("multigroup"))
 
-                hr(),
-
-                shinyjs::disabled(
-                  checkboxInput(
-                    "doMg",
-                    tr("params.multigroup.checkbox"),
-                    value = FALSE))
-              ), # box
-
-              ##### testParamTab left col what the tables show ----
-              # Stacked rather than side by side: the two labels are different lengths, and
-              # in a column this narrow they would sit at different heights and look cramped.
-              shinydashboard::box(
-                width = NULL,
-                title = tr("params.tables.box.title"),
-                helpText(tr("params.tables.hint")),
-
-                numericInput(
-                  "sigLvl",
-                  tr("params.siglvl.label"),
-                  value = 0.05,
-                  min = 0.001,
-                  max = 1,
-                  step = 0.001),
-                htmlOutput("sigLvlNote"),
-
-                # A confidence level, not a significance level, and set on its own.
-                # 0.90 is the interval lavaan reports by default.
-                numericInput(
-                  "rmseaCiLvl",
-                  tr("params.rmsea.ci.label"),
-                  value = 0.90,
-                  min = 0.5,
-                  max = 0.999,
-                  step = 0.01),
-                htmlOutput("rmseaCiLvlNote")
-              ), # box
-
-              ##### testParamTab left col goModels ----
-              shinydashboard::box(
-                width = NULL,
-                actionButton("goModels", tr("params.go.button"), width = "100%"),
-                htmlOutput("goModelsError"),
-                htmlOutput("refitPendingNote"))
-            ), # column
-
-            #### testParamTab right col (model test checkbox table) ----
-            column(
-              width = 7,
-              shinydashboard::box(
-                width = NULL,
-                title = tr("params.grid.box.title"),
-
-                comparisonGrid(cttModelFamily())
-              ) # box
-            ) # column
-          ) # fluidRow
-        ), # tabItem
-
-        ### tabItem modelTests ----
-        shinydashboard::tabItem(
-          tabName = "modelTests",
-          cttResultsUI("single")),
-
-        ### tabItem modelTestsMg ----
-        shinydashboard::tabItem(
-          tabName = "modelTestsMg",
-          cttResultsUI("multigroup")),
-
-        ### tabItem parTables ----
-        shinydashboard::tabItem(
-          tabName = "parTables",
-          cttParTablesUI("single")),
-
-        ### tabItem parTablesMg ----
-        shinydashboard::tabItem(
-          tabName = "parTablesMg",
-          cttParTablesUI("multigroup")),
-
-        ### tabItem facScores ----
-        shinydashboard::tabItem(
-          tabName = "facScores",
-          cttFactorScoresUI("single")),
-
-        ### tabItem facScoresMg ----
-        shinydashboard::tabItem(
-          tabName = "facScoresMg",
-          cttFactorScoresUI("multigroup")),
-
-        ### tabItem modelCode ----
-        shinydashboard::tabItem(
-          tabName = "modelCode",
-          cttModelCodeUI("single")),
-
-        ### tabItem modelCodeMg ----
-        shinydashboard::tabItem(
-          tabName = "modelCodeMg",
-          cttModelCodeUI("multigroup"))
-
-      ) # tabItems
-    ) # dashboardBody
-  ) # dashboardPage
+    ) # navset_hidden
+  ) # page_sidebar
 }

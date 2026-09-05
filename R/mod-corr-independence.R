@@ -7,8 +7,7 @@
 corrIndependenceUI <- function(id) {
   ns <- NS(id)
 
-  shinydashboard::box(
-    width = NULL,
+  cttCard(
     title = tr("stats.corrind.title"),
     radioButtons(
       ns("corrIndEst"),

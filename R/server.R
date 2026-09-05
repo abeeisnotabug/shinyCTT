@@ -24,22 +24,9 @@ server <- function(input, output, session) {
     session$reload()
   })
 
-  # Preparation ----
-
-  # Everything about the five models comes from one place: cttModelFamily(), defined in
-  # R/modelFamily.R. Read that file to see what each of these contains.
-  family <- cttModelFamily()
-
-  models       <- family$names     # c(tko = "tko", ete = "ete", ...)
-  modelsLong   <- family$long      # "&tau;-kongeneric", ... - for tab titles
-  modelsAbbrev <- family$abbrev    # "&#964;-kong.", ...     - for table headers
-  minItems     <- family$minItems  # c(tko = 4, ete = 3, ...) - fewest testable items
-  possComps    <- family$comparable # "etetko", "teqtko", ... - the 9 valid comparisons
-
-  # Model labels plus the coordinates the hierarchical plot draws them at.
-  modelTestDF <- family$plot
-
   ## Reactive values ----
+  # Each entry is list(text = , icon = , status = ). The boxes put those three pieces in
+  # the list; output$infoMenu below writes the markup, in one place.
   notifications <- reactiveValues(notList = list())
 
 
@@ -47,52 +34,15 @@ server <- function(input, output, session) {
 
   # "ML" or "MLR", with "FI" in front when the fits use full information maximum
   # likelihood. Shown in table headers and legends.
-  estimatorName <- reactive(paste0(if (subset$useFIML()) "FI", input$estimator))
+  estimatorName <- reactive(paste0(if (subset$useFIML()) "FI", params$estimator()))
 
   # The fitted models, written by "Test the models" and read by everything on the results
   # tabs. NULL until the button has been pressed.
   modelFitsRV <- reactiveVal(NULL)
 
-  ## The two display settings ----
-  # The significance level and the confidence level of the RMSEA interval. Neither is used to
-  # fit anything, so both stay live after a run and the tables follow them.
-  #
-  # What the user typed is never written over: an empty box, or a number out of range, simply
-  # is not taken. The tables go on showing the last usable value and a red note appears under
-  # the box. (Writing the box back would rewrite it mid-keystroke - see GOTCHAS.md.)
-  sigLvlRV <- reactiveVal(0.05)
-  rmseaCiLvlRV <- reactiveVal(0.90)
-
-  # An emptied box sends NA, and a box that has not been drawn yet sends NULL.
-  sigLvlUsable <- reactive(
-    isTRUE(is.numeric(input$sigLvl) && !is.na(input$sigLvl) &&
-             input$sigLvl >= 0.001 && input$sigLvl <= 1))
-
-  rmseaCiLvlUsable <- reactive(
-    isTRUE(is.numeric(input$rmseaCiLvl) && !is.na(input$rmseaCiLvl) &&
-             input$rmseaCiLvl >= 0.5 && input$rmseaCiLvl <= 0.999))
-
-  observeEvent(input$sigLvl, if (sigLvlUsable()) sigLvlRV(input$sigLvl))
-
-  observeEvent(input$rmseaCiLvl, if (rmseaCiLvlUsable()) rmseaCiLvlRV(input$rmseaCiLvl))
-
-  output$sigLvlNote <- renderUI({
-    if (sigLvlUsable()) return(NULL)
-
-    sprintf(tr("params.siglvl.hint"), sigLvlRV()) |>
-      div(style = "color:red")
-  })
-
-  output$rmseaCiLvlNote <- renderUI({
-    if (rmseaCiLvlUsable()) return(NULL)
-
-    sprintf(tr("params.rmsea.ci.hint"), rmseaCiLvlRV()) |>
-      div(style = "color:red")
-  })
-
-  # The estimator the models are fitted with. It mirrors the radio buttons; the normality
-  # test reaches it by moving those, not by writing here.
-  estimatorRV <- reactiveVal("ML")
+  # What a failed run has to say, and nothing when the last one worked. The Testing
+  # Parameters box draws it under its button.
+  fitErrorRV <- reactiveVal(NULL)
 
   ## Workflow stage ----
 
@@ -101,22 +51,13 @@ server <- function(input, output, session) {
   # Frozen at the transition to "results" so the sidebar re-renders only on stage changes.
   doMgRV <- reactiveVal(FALSE)
 
-
-  # Which controls belong to which stage: live while that stage is current, frozen once
-  # the user moves past it.
-  stageControls <- list(statistics = c("doMg", "etaIntFree"))
-
+  # The stage does one thing here now. Each of the three boxes with controls freezes its
+  # own, from a `frozen` reactive it is handed below.
   observeEvent(appStage(), {
 
-    # Every stage before the current one. seq_len(... - 1) stops one short, so the stage the
-    # user is actually on keeps its own controls live.
-    stagesAlreadyPassed <- stages[seq_len(match(appStage(), stages) - 1)]
-
-    # stageControls[stagesAlreadyPassed] is a list of character vectors, one per stage;
-    # unlist() runs them together into a single vector of input ids to freeze.
-    controlsToFreeze <- unlist(stageControls[stagesAlreadyPassed], use.names = FALSE)
-
-    for (controlId in controlsToFreeze) shinyjs::disable(controlId)
+    # The block a stage reveals is the one the user is moved onto. sidebarGroups() paints
+    # that entry; this is what actually shows the panel.
+    bslib::nav_select("dataMenu", selected = stageTabs[[appStage()]])
   })
 
   ## Group colours ----
@@ -129,28 +70,64 @@ server <- function(input, output, session) {
     groupPalette(sort(unique(subset$data()[, subset$groupCol()]))))
 
   ## Notifications ----
-  output$infoMenu <- shinydashboard::renderMenu({
-    if (any(vapply(notifications$notList, grepl, logical(1), pattern = "danger"))) {
-      status <- "danger"
-    } else {
-      status <- "primary"
-    }
+  # The bell in the green bar. There is no bslib dropdownMenu(), so this is Bootstrap 5's
+  # own dropdown markup: a link that opens the list beneath it.
+  output$infoMenu <- renderUI({
 
-    shinydashboard::dropdownMenu(
-      type = "notifications",
-      .list = notifications$notList,
-      badgeStatus = status)
+    entries <- notifications$notList
+
+    # Nothing to report -> the bell alone, with no list to open and no count on it.
+    if (length(entries) == 0)
+      return(tags$span(class = "cttBell", icon("bell")))
+
+    anyDanger <- any(vapply(
+      entries,
+      function(entry) identical(entry$status, "danger"),
+      logical(1)))
+
+    # unname(), because a named list handed to a tag turns its names into HTML attributes
+    # instead of children and the entries vanish.
+    items <- unname(lapply(entries, function(entry) tags$li(
+      tags$span(
+        class = "dropdown-item",
+        tags$span(class = paste0("text-", entry$status), icon(entry$icon)),
+        " ",
+        entry$text))))
+
+    tags$div(
+      class = "dropdown",
+
+      tags$a(
+        class = "cttBell dropdown-toggle",
+        href = "#",
+        `data-bs-toggle` = "dropdown",
+        icon("bell"),
+        tags$span(
+          class = paste("badge rounded-pill", if (anyDanger) "bg-danger" else "bg-primary"),
+          length(entries))),
+
+      tags$ul(class = "dropdown-menu dropdown-menu-end cttNotifications", items))
   })
 
-  output$dataMenuOut <- shinydashboard::renderMenu({
-    shinydashboard::sidebarMenu(
-      id = "dataMenu",
-      .list = sidebarGroups(appStage(), doMgRV()))})
+  output$dataMenuOut <- renderUI(sidebarGroups(appStage(), doMgRV()))
 
-  ## observeEvent reload button ----
-  observeEvent(input$dataMenu, {
-    if (input$dataMenu == "reloadTab")
-      shinyjs::runjs("location.reload()")
+  ## which tab the menu is asking for ----
+  # One link per name in tabNames, all of them built by sidebarGroups(). A click switches
+  # the panel and moves the highlight; the reload link switches nothing and reloads the
+  # page instead.
+  lapply(tabNames, function(thisTab) {
+    observeEvent(input[[paste0("nav_", thisTab)]], {
+
+      if (identical(thisTab, "reloadTab")) {
+        shinyjs::runjs("location.reload()")
+        return()
+      }
+
+      bslib::nav_select("dataMenu", selected = thisTab)
+
+      shinyjs::removeClass(selector = ".cttMenu a", class = "cttSelected")
+      shinyjs::addClass(paste0("nav_", thisTab), "cttSelected")
+    })
   })
 
   # dataSelectionTab ----
@@ -175,60 +152,9 @@ server <- function(input, output, session) {
     frozen = reactive(atLeastStage(appStage(), "statistics")))
 
   # Pressing Select is the only thing that fills subset$data(), so this is where step 2
-  # ends and step 3 begins. The three controls switched on here live on later tabs, which
-  # is why they are not the subset box's own business.
-  observeEvent(subset$data(), {
-    appStage("statistics")
-
-    if (isTRUE(subset$hasGroups())) {
-      shinyjs::enable("doMg")
-
-      updateCheckboxInput(
-        session,
-        "doMg",
-        value = TRUE)
-    }
-
-    # The two boxes on the Correlations tab relabel their own controls; this is the one on
-    # the Testing Parameters tab.
-    if (subset$useFIML()) {
-      updateRadioButtons(
-        inputId = "estimator",
-        choiceNames = list(
-          tr("common.estimator.fiml"),
-          tr("common.estimator.fimlr")),
-        choiceValues = c("ML", "MLR"))
-    }
-  })
-
-  ## how many items are ticked, for the model grid ----
-  # ui.R draws the grid, so its conditions cannot see input$itemCols any more - that tick
-  # box lives inside the subset box and its id carries that box's name. The count goes out
-  # as a value instead. suspendWhenHidden = FALSE because the grid's conditions have to be
-  # answerable while the Testing Parameters tab is still hidden.
-  output$nItemsChosen <- reactive(length(subset$itemCols()))
-  outputOptions(output, "nItemsChosen", suspendWhenHidden = FALSE)
-
-  ## keep the model selection in step with the item count ----
-  # The checkboxes are on the Testing Parameters tab, so this is the app's job rather than
-  # the subset box's.
-  observeEvent(subset$itemCols(), {
-    req(identical(appStage(), "subset"))
-
-    # TRUE for each model the current item count is enough to test.
-    enoughItems <- minItems <= length(subset$itemCols())
-
-    for (thisModel in models) {
-      updateCheckboxInput(session, thisModel, value = unname(enoughItems[thisModel]))
-    }
-
-    for (thisComp in possComps) {
-      updateCheckboxInput(
-        session,
-        thisComp,
-        value = enoughItems[substr(thisComp, 1, 3)] && enoughItems[substr(thisComp, 4, 6)])
-    }
-  })
+  # ends and step 3 begins. The controls it unlocks are on the Testing Parameters tab and
+  # are that box's own business; it is handed subset$data() as the signal.
+  observeEvent(subset$data(), appStage("statistics"))
 
   # statisticsTab ----
   ## statisticsTab descriptive statistics ----
@@ -287,108 +213,51 @@ server <- function(input, output, session) {
     groupCol = reactive(subset$groupCol()),
     hasGroups = subset$hasGroups,
     estimatorName = estimatorName,
-    sigLvl = sigLvlRV,
+    sigLvl = params$sigLvl,
     useFIML = subset$useFIML)
-
-  # observeEvent input$estimator ----
-  observeEvent(input$estimator, estimatorRV(input$estimator))
-
-  # The button ----
-  # TRUE when the models on screen were fitted with a different estimator from the one now
-  # chosen, so they no longer match it.
-  refitPending <- reactive(
-    !is.null(modelFitsRV()) &&
-      !identical(modelFitsRV()$single$estimator, estimatorRV()))
-
-  # Live before the first run, and after it only while a refit would change something.
-  # Pressing it with the same settings would give the same results, so it is switched off.
-  observe({
-    if (is.null(modelFitsRV()) || refitPending()) {
-      shinyjs::enable("goModels")
-    } else {
-      shinyjs::disable("goModels")
-    }
-
-    updateActionButton(
-      session,
-      "goModels",
-      label = paste0(tr("params.go.button"), if (refitPending()) "*"))
-  })
-
-  output$refitPendingNote <- renderUI({
-    if (!refitPending()) return(NULL)
-
-    tagList(
-      br(),
-      sprintf(tr("params.refit.pending"),
-              paste0("<b>", tr("params.go.button"), "*</b>")) |>
-        HTML() |>
-        div(style = "color:orange"))
-  })
 
   # mvnTab ----
   # The whole tab lives in R/mod-mvn.R. It reports which estimator the normality test points
-  # to; moving the radio buttons and saying so is done here.
+  # to and nothing more; the Testing Parameters box is handed that and moves its own radio
+  # buttons.
   recommendedEstimator <- mvnServer(
     "mvn",
     data = subset$data,
     itemCols = reactive(subset$itemCols()))
 
-  ## act on what the normality test found ----
-  # An observer, not an output, so the test runs as soon as the data is ready rather than
-  # waiting for the tab to be opened.
-  observeEvent(recommendedEstimator(), {
+  # testParamTab ----
+  # The whole tab lives in R/mod-testing-params.R: the estimator, the mean structure, the
+  # multigroup box, the two display settings, the 5x5 grid and the button. It fits nothing
+  # and hands all of it back.
+  params <- testingParamsServer(
+    "params",
+    nItems = reactive(length(subset$itemCols())),
+    subsetChosen = subset$data,
+    hasGroups = subset$hasGroups,
+    useFIML = subset$useFIML,
+    recommended = recommendedEstimator,
+    modelFits = modelFitsRV,
+    fitError = fitErrorRV,
+    notifications = notifications,
+    frozen = reactive(atLeastStage(appStage(), "results")))
 
-    updateRadioButtons(session, "estimator", selected = recommendedEstimator())
-
-    notifications$notList$estUpdate <- shinydashboard::notificationItem(
-      text = tr("params.estimator.updated"),
-      icon = icon("wrench"),
-      status = "warning")
-
-    showNotification(
-      ui = tr("params.estimator.updated"),
-      duration = 5,
-      id = "estUpdateNot",
-      type = "warning")
-
-    notifications$notList$mvnApp <- shinydashboard::notificationItem(
-      text = HTML(tr("stats.mvn.app.hint")),
-      icon = icon("lightbulb"),
-      status = "success")
-  })
-
-  ## the recommendation, next to the estimator buttons ----
-  output$estimatorNote <- renderUI({
-
-    req(recommendedEstimator())
-
-    estimatorLongName <- c(ML = tr("common.estimator.ml"),
-                           MLR = tr("common.estimator.mlr"))[recommendedEstimator()]
-
-    sprintf(tr("params.estimator.mvn.note"),
-            estimatorLongName,
-            paste0("<i>", tr("stats.nav"), "</i>"),
-            paste0("<i>", tr("stats.mvn.title"), "</i>")) |>
-      HTML() |>
-      div(style = "color:orange; font-size: 90%")
-  })
-
-  # observeEvent input$goModels ----
+  # the run ----
   # Pressing "Test the models" fits the models and stores them, and does nothing else.
-  # Everything drawn from them is built under "Results" below and redraws on its own.
-  observeEvent(input$goModels, tryCatch({
-    output$goModelsError <- renderUI(NULL)
+  # Everything drawn from them is built under "Results" below and redraws on its own. The
+  # button and every setting it reads are the Testing Parameters box's; the fitting is
+  # here, because it reads steps 1 and 2 just as much.
+  observeEvent(params$goModels(), tryCatch({
+    fitErrorRV(NULL)
 
     # Whatever is on screen was fitted with the settings as they were before this press.
     modelFitsRV(NULL)
 
     # Freeze the multigroup choice, then reveal the results entries in the sidebar.
-    doMgRV(isTRUE(input$doMg))
+    doMgRV(isTRUE(params$doMg()))
     appStage("results")
 
-    modelsToTest <- models[vapply(models, function(thisModel) input[[thisModel]], logical(1))]
-    comps <- possComps[vapply(possComps, function(thisComp) input[[thisComp]], logical(1))]
+    modelsToTest <- params$modelsToTest()
+    comps <- params$comps()
 
 
     # TRUE when the user left some of the groups out, so the exported script has to
@@ -410,7 +279,7 @@ server <- function(input, output, session) {
     # One pass over the whole sample, plus one fitting the groups separately if the user
     # asked for that.
     passes <- list(single = FALSE)
-    if (isTRUE(input$doMg)) passes$multigroup <- subset$groupCol()
+    if (isTRUE(params$doMg())) passes$multigroup <- subset$groupCol()
 
     modelFitsRV(lapply(passes, function(groupName) {
 
@@ -418,7 +287,7 @@ server <- function(input, output, session) {
       modelCodes <- makeModelCodes(inputData = subset$data(),
                                               itemCols = subset$itemCols(),
                                               group = groupName,
-                                              etaIntFree = as.logical(input$etaIntFree))
+                                              etaIntFree = as.logical(params$etaIntFree()))
 
       #### fit each model once, keeping both a warning and the completed fit ----
       # Fit each chosen model:
@@ -435,10 +304,10 @@ server <- function(input, output, session) {
                                     meanstructure = TRUE,
                                     group = if (isFALSE(groupName)) NULL else groupName,
                                     group.equal = if (isFALSE(groupName)) NULL else c("loadings", "intercepts"),
-                                    estimator = estimatorRV(),
+                                    estimator = params$estimator(),
                                     missing = ifelse(subset$useFIML(), "fiml", "listwise"),
                                     int.ov.free = TRUE,
-                                    int.lv.free = as.logical(input$etaIntFree),
+                                    int.lv.free = as.logical(params$etaIntFree()),
                                     auto.fix.first = TRUE,
                                     auto.fix.single = TRUE,
                                     auto.var = TRUE,
@@ -515,7 +384,7 @@ server <- function(input, output, session) {
         warnModels    = warnModels,
         comps         = comps,
         succTable     = succTable,
-        estimator     = estimatorRV(),
+        estimator     = params$estimator(),
         estimatorName = estimatorName(),
         missingMethod = ifelse(subset$useFIML(), "fiml", "listwise"),
         itemCols      = subset$itemCols(),
@@ -530,30 +399,20 @@ server <- function(input, output, session) {
     # Land on the model comparison tests, the same as after the first run. On the first run
     # the sidebar does this by itself, because the block it has just revealed comes up
     # selected; on a later one the sidebar does not change, so say it here.
-    shinydashboard::updateTabItems(session, "dataMenu", selected = "modelTests")
+    bslib::nav_select("dataMenu", selected = "modelTests")
 
   },
 
-  ## observeEvent input$goModels error handler ----
-  # Anything goes wrong above -> show the message under the button, go back one stage.
+  ## the run failed ----
+  # Anything goes wrong above -> go back one stage and hand the message to the Testing
+  # Parameters box, which draws it under its button and switches its own controls back on.
   error = function(e) {
     # Back to "statistics", so the results entries disappear from the sidebar again.
     appStage("statistics")
     doMgRV(FALSE)
 
-    # The lockout only ever disables, so switch these back on by hand. The multigroup box
-    # only if there is a usable group column.
-    shinyjs::enable("etaIntFree")
-    if (isTRUE(subset$hasGroups())) shinyjs::enable("doMg")
-
-    output$goModelsError <- renderUI(
-      tagList(
-        br(),
-        strong(tr("params.error.tests.failed")),
-        paste(tr("params.error.prefix"), conditionMessage(e)) |>
-          HTML() |>
-          div(style = "color:red")))
-  })) # observeEvent(input$goModels, {
+    fitErrorRV(conditionMessage(e))
+  })) # observeEvent(params$goModels(), {
 
   # Results ----
   # Everything the run produces is drawn by R/mod-ctt-results.R, once per pass: the whole
@@ -562,12 +421,12 @@ server <- function(input, output, session) {
   cttResultsServer(
     "single",
     fit = reactive(req(modelFitsRV()$single)),
-    sigLvl = sigLvlRV,
-    rmseaCiLvl = rmseaCiLvlRV)
+    sigLvl = params$sigLvl,
+    rmseaCiLvl = params$rmseaCiLvl)
 
   cttResultsServer(
     "multigroup",
     fit = reactive(req(modelFitsRV()$multigroup)),
-    sigLvl = sigLvlRV,
-    rmseaCiLvl = rmseaCiLvlRV)
+    sigLvl = params$sigLvl,
+    rmseaCiLvl = params$rmseaCiLvl)
 }

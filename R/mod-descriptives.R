@@ -43,10 +43,8 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
         })
 
         # output if groups
-        shinydashboard::tabBox(
-          width = 6,
+        cttTabCard(
           title = tr("stats.desc.title"),
-          side = "right",
 
           tabPanel(
             tr("common.overall"),
@@ -61,8 +59,7 @@ descriptivesServer <- function(id, data, itemCols, groupCol, hasGroups) {
       } ### the box without a group column ----
       else {
 
-        shinydashboard::box(
-          width = 6,
+        cttCard(
           title = tr("stats.desc.title"),
           overallTable)
       }

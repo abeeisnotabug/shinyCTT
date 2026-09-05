@@ -16,7 +16,7 @@ shinyCTTApp(
 
   This is only the starting point. Each visitor picks their own from the chooser in the
   header, which puts ?lang= into the address; that is what every screen reads through
-  tr(), out of the visitor's own session (see R/translations.R). So two people can have
+  tr(), out of the visitor's own session (see R/helpers-translations.R). So two people can have
   the app open in different languages at once, whatever this was set to.
 
   Stored as options(shinyCTT.language = language) while the app runs. The four options

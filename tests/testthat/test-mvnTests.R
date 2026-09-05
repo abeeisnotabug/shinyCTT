@@ -1,4 +1,4 @@
-## mardiaTests() and andersonDarlingTests() (R/helperFunsStats.R), written to replace the
+## mardiaTests() and andersonDarlingTests() (R/helpers-stats.R), written to replace the
 ## MVN package.
 ##
 ## The numbers MVN 6.3 printed on rtdata are pinned here as literals, so a later change

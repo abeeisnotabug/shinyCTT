@@ -6,8 +6,7 @@
 corrTableControlsUI <- function(id) {
   ns <- NS(id)
 
-  shinydashboard::box(
-    width = NULL,
+  cttCard(
     title = tr("stats.corrtable.title"),
     shinyjs::hidden(
       radioButtons(
@@ -119,10 +118,8 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
         })
 
         # assemble in tabBox
-        shinydashboard::tabBox(
-          width = 12,
+        cttTabCard(
           title = tr("stats.corrtable.title"),
-          side = "right",
 
           tabPanel(
               tr("common.overall"),
@@ -141,8 +138,7 @@ corrTableServer <- function(id, data, itemCols, groupCol, hasGroups, estimatorNa
       } ## box if no groups ----
       else {
 
-        shinydashboard::box(
-            width = 12,
+        cttCard(
             title = tr("stats.corrtable.title"),
 
             groupHeading(sprintf(tr("common.overall.n"), nrow(data()))),

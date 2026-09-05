@@ -46,7 +46,7 @@ test_that("the walker sees the real conditionalPanels in comparisonGrid()", {
   # with calls built inside for() blocks. Every one of them is already namespaced.
   skip_if(is.na(packageSourceDir()), "R/ sources are not available here")
 
-  panels <- findCalls(parse(file.path(packageSourceDir(), "comparisonGrid.R")),
+  panels <- findCalls(parse(file.path(packageSourceDir(), "fun-comparisonGrid.R")),
                       "conditionalPanel")
 
   expect_gt(length(panels), 0)

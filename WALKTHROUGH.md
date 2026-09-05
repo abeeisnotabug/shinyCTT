@@ -103,7 +103,7 @@ appStage <- reactiveVal("data")          # then "subset", "statistics", "results
 
 **Two things read it, and nothing else records workflow position.**
 
-**The sidebar.** `sidebarGroups(stage, doMg)` in `R/sidebar.R` builds the entire menu from
+**The sidebar.** `sidebarGroups(stage, doMg)` in `R/helpers-sidebar.R` builds the entire menu from
 scratch for a given stage. It collects blocks of menu entries into a list, then joins them with `hr()` lines:
 
 ```r
@@ -198,24 +198,34 @@ setting redraws the table *inside* the open tab and leaves the user where they w
 
 ## 5. Where things live
 
+**Three prefixes, and the prefix says what the file is.** `mod-*` is a Shiny module (a box:
+its controls and everything that reacts to them). `fun-*` is one function, and the file is
+named after it. `helpers-*` is several functions on one subject. `ui.R`, `server.R`,
+`shinyCTTApp.R`, `zzz.R` and `data.R` keep their own names — they are the app itself, or
+names R expects.
+
 | File | What's in it |
 | --- | --- |
-| `R/modelFamily.R` | The five models: names, labels, how many items each needs, how they nest. **Start here** if you want to change anything about the models themselves. |
-| `R/makeModelCodes.R` | Turns the chosen item columns into five lavaan syntax strings. The models differ only in which parameter labels they re-use. |
-| `R/comparisonGrid.R` | Draws the 5×5 table of checkboxes on the Testing Parameters tab. |
+| `R/helpers-model-family.R` | The five models: names, labels, how many items each needs, how they nest. **Start here** if you want to change anything about the models themselves. |
+| `R/fun-makeModelCodes.R` | Turns the chosen item columns into five lavaan syntax strings. The models differ only in which parameter labels they re-use. |
+| `R/fun-comparisonGrid.R` | Draws the 5×5 table of checkboxes on the Testing Parameters tab. |
 | `R/mod-*.R` | One box each, moved out of `server.R` and `ui.R` — see section 5b. |
+| `R/mod-testing-params.R` | The whole Testing Parameters tab: the estimator, the mean structure, the multigroup box, the two display settings, the model grid and the button. It fits nothing — it hands the settings back and `server.R` does the fitting. |
 | `R/mod-mvn.R` | The whole normality tab. It *reports* which estimator its test points to; `server.R` decides what to do about that. |
 | `R/mod-data-source.R` | Step 1: where the data comes from. |
 | `R/mod-data-subset.R` | Step 2: which items, which groups, missing values. Hands back the six answers the rest of the app works from. |
 | `R/mod-ctt-results.R` | Everything a model run produces: the comparison page, the parameter tables, the factor scores, the model code. Started twice — once for the whole sample, once for the groups. |
-| `R/helperFunsExtract.R` | Pulls fit indices and parameter estimates out of a fitted lavaan object. Contains the reliability confidence intervals. |
-| `R/helperFunsTables.R` | Every table the app shows. They are `reactable`s: a table works out whether each cell is good, bad or neutral, and the colour is looked up from that. |
-| `R/colors.R` | **Every colour the app draws with, and nothing else names one.** The plots' green, the three the tables rate a cell with, and the palette for group-wise plots. |
-| `R/translations.R` | `tr()`, which turns a short name like `common.select` into the words on screen, in whichever language the visitor is reading. |
+| `R/helpers-extract.R` | Pulls fit indices and parameter estimates out of a fitted lavaan object. Contains the reliability confidence intervals. |
+| `R/helpers-tables.R` | Every table the app shows. They are `reactable`s: a table works out whether each cell is good, bad or neutral, and the colour is looked up from that. |
+| `R/helpers-colors.R` | **Every colour the app draws with, and nothing else names one.** The plots' green, the three the tables rate a cell with, and the palette for group-wise plots. |
+| `R/helpers-translations.R` | `tr()`, which turns a short name like `common.select` into the words on screen, in whichever language the visitor is reading. |
 | `inst/translations.csv` | **All the text.** One row per piece, one column per language. This is the file to edit to change a word. |
-| `R/helperFunsAdvanced.R` | Factor scores, and the copy-pasteable R script shown on the Model Code tab. |
-| `R/ui.R` | The page layout: which boxes sit on which tab. Also the FU Berlin green theme. |
-| `R/sidebar.R` | The left-hand menu, and the four stages the app steps through. |
+| `inst/styles.css` | **How everything looks** that bslib has no setting for: the green bar, the menu, the boxes. This is the file to edit to change a size or a colour — see section 6b. |
+| `R/helpers-cards.R` | The two shapes of box the app draws with. Change how a box behaves here and it changes everywhere. |
+| `R/helpers-advanced.R` | Factor scores, and the copy-pasteable R script shown on the Model Code tab. |
+| `R/ui.R` | The page layout: which boxes sit on which tab. |
+| `R/helpers-look.R` | `fuTheme()`, the settings bslib has names for, and `fuStyle()`, the two lines that read `inst/styles.css` into the page. |
+| `R/helpers-sidebar.R` | The left-hand menu, and the four stages the app steps through. |
 | `R/server.R` | Everything that computes or reacts. Long, but sectioned — see below. |
 
 ### 5b. The `mod-*.R` files
@@ -301,7 +311,7 @@ plot, which cannot use HTML and needs R's plotmath instead (a `~` there means a 
 ### "I want to add a language"
 
 1. A new column in `inst/translations.csv`, headed with its two-letter code.
-2. That code added to `appLanguages` in `R/translations.R`.
+2. That code added to `appLanguages` in `R/helpers-translations.R`.
 3. A `sym.lang.<code>` row holding its flag and its own name for itself.
 4. One line in `languageLabels()`, next to `appLanguages`.
 
@@ -315,7 +325,7 @@ looking for `tr("...")` and cannot see a name that is assembled while the app ru
 2. `cttModelFamily()` — add its short name to `models`, add one `tr()` line to each of
    `long`, `abbrev` and `plot$name`, one number to `minItems`, its nesting edges to
    `hierarchy`, and a row to `plot` saying where to draw it.
-3. `makeModelCodes.R` — say which parameters it constrains.
+3. `fun-makeModelCodes.R` — say which parameters it constrains.
 
 That is all. The comparison grid, the list of valid comparisons, the item-count limits and
 the checkbox ids all follow from step 1.
@@ -337,11 +347,187 @@ sentence, not logic, so it does not follow automatically. Update it by hand.
 
 ### "I want to add a tab"
 
-1. Add a `tabItem(tabName = "myTab", ...)` to `ui.R`.
-2. Add a `menuItem(..., tabName = "myTab")` to the right block in `sidebarGroups()`.
+1. Write the tab as a module, `R/mod-my-thing.R` — every tab is one. Copy the smallest,
+   `mod-covmatrix.R`, and start from that.
+2. Add the panel to the `navset_hidden()` in `ui.R`, and a `myThingServer("myThing", ...)`
+   in `server.R`. Put the box in a column, even when it is the only one on the tab and takes
+   the whole width:
 
-The two `tabName`s must match exactly — that string is how the browser connects the menu
-entry to the panel. There is no error if they disagree; the tab simply never opens.
+   ```r
+   bslib::nav_panel_hidden(
+     "myTab",
+     fluidRow(
+       column(width = 12, myThingUI("myThing"))))
+   ```
+
+   `width` is in twelfths, so two boxes side by side are `column(width = 6, ...)` twice.
+   Without the column the box hangs 12px past the edge of the page — see GOTCHAS.md,
+   "Bootstrap 5 gives every child of a row the full width of it".
+3. Add `"myTab"` to `tabNames` in `helpers-sidebar.R`. That is what makes `server.R` listen
+   for the link.
+4. Add a `navEntry("myTab", ...)` to the right block in `sidebarGroups()`.
+
+The three `"myTab"`s must match exactly — that string is how the click on the menu entry
+finds the panel. There is no error if they disagree: with step 3 missing the entry is drawn
+and does nothing, and with step 2 missing the click switches to a panel that is not there.
+
+---
+
+## 6b. Changing how it looks
+
+Written for someone who does not speak CSS. Nothing here is hard; it is one idea repeated.
+
+### The two files, and which one you want
+
+| where | what belongs there | how to spot it |
+| --- | --- | --- |
+| `fuTheme()` in `R/helpers-look.R` | sizes and colours **Bootstrap already has a name for** | `"font-size-base" = "0.8125rem"` |
+| `inst/styles.css` | everything else | `.cttBrand { font-size: 20px; }` |
+
+Bootstrap is the set of ready-made looks bslib builds on. It keeps a few dozen settings —
+the base text size, the main colour, the corner radius — and works nearly everything else out
+from them. When what you want to change is one of those, `fuTheme()` is the place: one line,
+and every label, button and table cell moves together. When it is not, you write a rule
+yourself, and that goes in the style sheet.
+
+There is no third place, and putting a rule in the wrong one fails **silently** — see
+"Where a rule can lose" below.
+
+### What a rule looks like
+
+Three parts. From `inst/styles.css`:
+
+```css
+.cttBrand {
+  font-size: 20px;
+  color: #FFFFFF;
+}
+```
+
+- `.cttBrand` is the **selector**: which things on the page this applies to. The dot means
+  "anything carrying the name `cttBrand`". `R/ui.R` puts that name on the app's title with
+  `span(class = "cttBrand", "shinyCTT")`.
+- `font-size` and `color` are **properties**: what about them to change.
+- `20px` and `#FFFFFF` are the **values**.
+
+Everything in the file is that shape. The `/* ... */` blocks are comments.
+
+### Finding the name of the thing you want to change
+
+You do not have to guess, and you should not.
+
+1. Run the app, right-click the thing, choose **Inspect** (Chrome, Firefox and Safari all
+   have it; Safari needs Develop mode switched on first).
+2. The panel that opens shows the page's own markup with your thing highlighted. Read its
+   `class="..."` — those are the names it answers to.
+3. Beside it, a **Styles** panel lists every rule that reached it, in the order they won,
+   with the losing ones struck through. That tells you what you are up against.
+4. You can type a change straight into that panel and watch it happen. Nothing is saved —
+   it is a sketch pad. When it looks right, copy the rule into `inst/styles.css`.
+
+Step 3 is the one that saves the most time. A change that "does nothing" is almost always
+a rule that lost, and the panel says so.
+
+### The four selectors this file uses
+
+- `.cttMenu` — anything carrying that name.
+- `.card .nav-tabs` (a space) — a `nav-tabs` **anywhere inside** a `card`, however deep.
+- `.card > .card-header` (a `>`) — a `card-header` that is a **direct child** of a `card`,
+  one level down and no further.
+- `.cttMenu a, .cttMenu summary` (a comma) — two selectors sharing one set of properties.
+  Nothing more than shorthand.
+
+There is one more you will see: `.card.bslib-card`, two names with no space, meaning
+something carrying **both** names at once. That is not the same as `.card .bslib-card`.
+
+### Where a rule can lose
+
+When two rules set the same property on the same thing, one wins. The ordering, simplified
+to what this file actually uses:
+
+1. Count the names in each selector. **More names win.** `.card.bslib-card` (two) beats
+   `.bslib-card` (one). `.card > .card-header .nav-tabs > li > a` (four) beats almost
+   anything.
+2. On a tie, **whichever the browser read last wins.**
+
+Both halves matter here, because bslib serves two style sheets and **its own comes second**:
+the theme it compiles from `fuTheme()`, and then its `components.css`. So a rule you put in
+the theme loses every tie against bslib's own. `inst/styles.css` is written into the page
+after both, which is why it lives there and not in `bslib::bs_add_rules()`. Three things
+that looked broken during the migration were all this one cause — GOTCHAS.md, "bslib", has
+them.
+
+The practical rule: **if your change does nothing, add one more name to the front of your
+selector** and look again. There is a blunt instrument, `!important`, which wins outright;
+the file uses it once, on `.checkbox-inline`, and it should stay that rare, because a page
+where several rules all shout has no ordering left to reason about.
+
+### px and rem, and what follows the text size
+
+`16px` is sixteen dots. `1rem` is "whatever the page's base text size is", so `0.8125rem`
+is 13/16 of it. The difference decides what moves when you change `font-size-base`:
+
+- Anything written in `rem`, and anything with no size of its own, **follows**. That is most
+  of the app: form labels, buttons, table cells, the DT furniture.
+- Anything written in `px` in `inst/styles.css` **stays put**. Today that is the title in the
+  green bar (20px), the bell, the menu entries (13px), the box headings (16px), the three
+  boxes at the top of step 2, and the green hint box.
+
+That is why dropping the base size to `0.8125rem` left the box headings where they were and
+made them stand out more — the headings never followed it in the first place.
+
+### The app's own names
+
+Everything the package names itself starts `ctt`, so a search for `ctt` in
+`inst/styles.css` finds all of them. Where each gets put on:
+
+| name | what it marks | set in |
+| --- | --- | --- |
+| `cttHeader`, `cttBrand`, `cttHeaderRight` | the green bar, its title, the right-hand end | `R/ui.R` |
+| `cttBell`, `cttNotifications` | the bell and the list it opens | `R/server.R` |
+| `cttMenu`, `cttSubMenu`, `cttSelected` | the menu, a folding block, the current entry | `R/helpers-sidebar.R` |
+| `cttTitleRight` | a tab strip with its title on the right | `R/helpers-cards.R` |
+| `cttValueBox` | the three boxes at the top of step 2 | `R/mod-data-subset.R` |
+| `cttHintBox` | the green hint under the normality plot | `R/mod-mvn.R` |
+
+Everything else in the file — `.card`, `.navbar`, `.form-control`, `.nav-tabs` — is
+Bootstrap's or bslib's, not ours, so changing those rules changes every one of them at once.
+
+### A worked example
+
+Say the box headings should be bigger and in a serif face. They are `.card > .card-header`
+in `inst/styles.css`:
+
+```css
+.card > .card-header {
+  background-color: #FFFFFF;
+  border-bottom: 0;
+  padding: 10px;
+  font-size: 16px;             /* <- raise this */
+  font-weight: 500;            /* 400 plain, 500 semi-bold, 700 bold */
+  color: #000000;
+  font-family: Georgia, serif; /* <- and add this */
+}
+```
+
+One catch, and the inspector would have shown it: the tab strips sit in that same header, so
+the tab labels inherit whatever you set and grow with the headings. If you want them left
+alone, give them their own size in the rule below it,
+`.card > .card-header .nav-tabs > li > a`.
+
+### Seeing the change
+
+Editing the style sheet is not enough on its own. Stop the app, then:
+
+```r
+devtools::load_all(".")
+shinyCTTApp()
+```
+
+`load_all()` is what re-reads the file, and the app has to be started again because the one
+you stopped had already built its page. If a change still is not there, open the inspector
+and look at the Styles panel — either your rule is not in the list at all (the file was not
+re-read) or it is struck through (it lost).
 
 ---
 

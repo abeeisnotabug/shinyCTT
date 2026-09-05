@@ -45,7 +45,7 @@ same checkboxes.
 
 ### `do.call()` on a named list makes children into attributes
 
-`fluidRow()`, `tagList()` and `shinydashboard::menuItem()` all accept a plain list of children
+`fluidRow()`, `tagList()` and `bslib::navset_card_tab()` all accept a plain list of children
 and unpack it themselves, so `do.call()` is never needed for them.
 
 It is also actively dangerous. `family$names` is a *named* vector, so `lapply()` over it returns
@@ -57,7 +57,7 @@ a named list, and `do.call(fluidRow, cells)` turns those names into HTML attribu
 
 The cells vanish with no error. Pass the list directly instead.
 
-*Where:* `comparisonGrid.R`, `sidebar.R`.
+*Where:* `fun-comparisonGrid.R`, `helpers-sidebar.R`.
 
 ### `conditionalPanel` conditions are JavaScript
 
@@ -147,12 +147,14 @@ Two more observers fire at startup and get away with it: `mod-corr-independence.
 from the first moment. They are harmless only because each does nothing unless `useFIML()` is
 TRUE. Invert either condition and the same bug is back in a second place.
 
-**"Hidden" includes "the browser window is too narrow."** shinydashboard's own CSS takes the
-content area away below about 750px, so every output in it is suspended and the page comes up
-with empty boxes — the data preview drawn as a bare `&nbsp;` and no error anywhere, on the
-server or in the console. Reproduced on 2026-09-04 against three different builds, including
-one from before any of that day's work, and it goes away at 1440x900. **Check the window width
-before believing a blank table.**
+**"Hidden" includes "the browser window is too narrow."** Recorded 2026-09-04 against
+shinydashboard, whose CSS took the content area away below about 750px: every output in it was
+suspended and the page came up with empty boxes — the data preview drawn as a bare `&nbsp;` and
+no error anywhere, on the server or in the console. Reproduced against three different builds
+and it went away at 1440x900. bslib's sidebar layout folds the sidebar away instead of the
+content: driven at 700x800 on 2026-09-05, every table and plot on the normality tab was still
+drawn, cramped but there. So this particular cause is gone — but **check the window width
+before believing a blank table** anyway.
 
 ---
 
@@ -224,6 +226,123 @@ it. A control that should start off is wrapped in `shinyjs::disabled()` where it
 and the observer only ever changes it from there.
 
 ---
+
+## bslib
+
+### Style rules go in `tags$head()`, never in `bs_add_rules()`
+
+**This is the one to know.** bslib serves *two* style sheets: the theme it compiles from
+`bs_theme()`, and then its own `components.css` **after** it. A rule written into the theme
+therefore loses to bslib's own whenever the two name the same number of classes — with no
+error, nothing in the console, and nothing in the page to suggest the rule was even read.
+
+The rules live in `inst/styles.css` and `fuStyle()` in `helpers-look.R` puts them in the head
+for exactly this reason: that is written after both sheets. Measured on a bare
+`page_sidebar`: `components.css` comes in at line 23 of `<head>` and a `tags$head` style at
+line 26.
+
+Three separate things that looked broken during the migration were all this one cause:
+
+| what it looked like | bslib's rule that was winning |
+| --- | --- |
+| the bar across the top stayed white | `.bslib-page-sidebar > .navbar { background-color: … }` |
+| a dropdown opened inside its own box, which grew a scrollbar | `.bslib-card { overflow: auto }` |
+| DT's search box was a bare underline | `.datatables .dataTables_wrapper .dataTables_filter input { border: none }` |
+
+Source order only breaks ties, so a rule that names *fewer* classes than bslib's still loses.
+The DT one names three classes, so ours has to as well.
+
+### The green bar is `$navbar-bg`, and nothing else
+
+`page_sidebar()` paints its title bar with `$navbar-bg` and falls back to the colour of the
+page only when that is unset — `bslib/components/scss/page_sidebar.scss:1`, and the fallback
+is `builtin/bs5/shiny/_rules.scss:199`, guarded by `@if not $navbar-bg`. So
+`bs_theme("navbar-bg" = "#99CC00")` is the whole of it. A 2026-09-02 attempt concluded the
+header had to be white with dark text; it had simply not set the variable.
+
+### A card scrolls its contents, and grows past the page to fit them
+
+Two opposite problems, and both need a rule:
+
+- `.bslib-card { overflow: auto }` means the list a `selectInput` opens is drawn *inside* the
+  card, cut off at its edge, with a scrollbar down the side. `overflow: visible` fixes it.
+- With that, a card holding a wide table pushes itself off the page instead of letting the
+  table scroll inside, because a flex item's `min-width` is `auto` and it is allowed to grow to
+  its contents. Measured: the parameter table made its card 1572px wide inside a 1440px page,
+  and the title in its header ended up off-screen. `min-width: 0` on the card, on the panel
+  chain above it and on `.row > *` is what holds it at the width of the page.
+
+### `card_body(fillable = FALSE)`, or a table comes out cut in half
+
+Left at bslib's default a `card_body()` is a fill container and hands its own height to what is
+inside it. The data preview came out showing eight rows of ten with no pager and no error.
+`cttCard()` and `cttTabCard()` (`R/helpers-cards.R`) pass `fillable = FALSE`, so every box in the app is
+as tall as its contents, the way a `shinydashboard::box()` was.
+
+### Bootstrap 5 gives every child of a row the full width of it
+
+`.row > *` carries `width: 100%` in Bootstrap 5, so `fluidRow(linkA, linkB)` puts the two links
+one under the other rather than side by side. Under Bootstrap 3 they floated. Use a plain
+`div()` for anything that is not a `column()`. This bit "Select all / Unselect all" in
+`mod-data-subset.R`.
+
+It is also why the widths moved out of the boxes: `shinydashboard::box(width = 6)` wrapped
+itself in a `col-sm-6`, and two of those inside plain output `div`s happened to sit side by
+side under Bootstrap 3's floats. Under Bootstrap 5 they stack. The `column(width = 6, …)` is
+in `ui.R` now, around the module's output, where it can be seen.
+
+**A full-width box needs its `column(width = 12, …)` too.** A `.row` carries
+`margin-left: -12px` and `margin-right: -12px` (`bslib/lib/bs5/scss/mixins/_grid.scss:14`),
+and Bootstrap cancels that with 12px of padding on each *column*. With no column in between,
+the card itself becomes the row's child: the padding lands inside its own border, so the
+green top line, the border and the shadow all move outward while the contents stay put.
+Measured on the Statistics tab, 1132px wide, with the covariance box wrapped three ways:
+
+| | left | right | width |
+| --- | --- | --- | --- |
+| the tab panel, and the descriptives card's left edge | 269 | 1401 | 1132 |
+| `covMatrixUI("covmatrix")` on its own | 269 | 1401 | 1132 |
+| `fluidRow(covMatrixUI("covmatrix"))` | **257** | **739** | **482** |
+| `fluidRow(column(width = 12, covMatrixUI("covmatrix")))` | 269 | 1401 | 1132 |
+
+The bare row is wrong twice over: 12px past the panel on the left, and then the card stops
+filling the row at all — `.card` is an `html-fill-item`, so as a flex item it takes its
+contents' width instead of the `width: 100%` that `.row > *` asks for.
+
+**A module's `uiOutput()` wrapper does not save you from this.** `covMatrixUI()` and
+`corrTableUI()` return `uiOutput(ns("box"))`, and one might expect that `div` to play the
+column's part. It cannot: bslib gives it `display: contents`, so it forms no box at all and
+the card inside it is the row's child for every purpose. Verified in the browser —
+`getComputedStyle(document.querySelector("#covmatrix-box")).display` is `"contents"`.
+
+### A value box writes the label above the number
+
+`bslib::value_box()` puts `title` above `value`; `shinydashboard::valueBox()` put the number
+first. One rule flips it back — `.cttValueBox .value-box-area { flex-direction: column-reverse }`
+— and `showcase_layout = "top right"` puts the icon where AdminLTE had it.
+
+### The menu is not a bslib component
+
+There is no bslib equivalent of `sidebarMenu()`/`menuItem()`, and none of
+`dropdownMenu()`/`notificationItem()` either. Both are written out in the package:
+
+- `helpers-sidebar.R` builds the menu from `actionLink()`s. A click reports itself, `server.R` calls
+  `bslib::nav_select("dataMenu", …)` to switch the panel and moves the `cttSelected` class with
+  `shinyjs`. **`nav_select()` is what actually shows a panel** — marking an entry selected in
+  `sidebarGroups()` only paints it, so a stage change has to call both.
+- A block that folds open and shut is a `<details>`/`<summary>` pair, which needs no script.
+- The bell is Bootstrap 5's own dropdown markup, built once in `output$infoMenu`. The boxes
+  raising a message write `list(text = , icon = , status = )` into `notifications$notList` and
+  no markup at all.
+
+**A notification entry is three pieces now, not markup, and one place used to read it as
+markup.** The item-count pop-up in `mod-data-subset.R` fetched its text and its severity out
+of what `notificationItem()` had built —
+`notifications$notList$numItems$children[[1]]$children[[2]]` and an `attribs[[4]]` beside it.
+Against a plain list both are `NULL`, `showNotification(type = NULL)` throws inside
+`match.arg`, the observer dies and **every output on the page stops mid-recalculation and
+greys out**, with the error only in the R console. It reads `$text` and `$status` now. If
+anything else ever needs a notification's text, read the fields.
 
 ## lavaan
 
@@ -318,7 +437,7 @@ in half of an 1180px page: 95px is what "ess. τ-equiv." needs, so the table is 
 box and scrolls sideways at a 1440px window, though not at 1500 or wider. Narrowing them
 further only moves the wrap into the header.
 
-*Where:* `shinyCTTApp.R`, the `reactable.theme` in `onStart`; `helperFunsTables.R`,
+*Where:* `shinyCTTApp.R`, the `reactable.theme` in `onStart`; `helpers-tables.R`,
 `makeHierTable()`, `makeFitsTable()` and `makeParTableWithCIs()`; `mod-ctt-results.R`,
 `drawCompTable()` and its three call sites; `mod-covmatrix.R`, `mod-descriptives.R`,
 `mod-data-subset.R`, `mod-mvn.R`.
@@ -382,7 +501,7 @@ second row name was the word `CI`. As a matrix that is fine; `as.data.frame()` r
 Row labels that repeat therefore have to be a column of their own, with
 `colDef(name = "")` for a blank header, rather than row names.
 
-*Where:* `helperFunsTables.R`, `makeCorrTableWithCIs()`'s `rowLabel` column.
+*Where:* `helpers-tables.R`, `makeCorrTableWithCIs()`'s `rowLabel` column.
 
 ### A row name carrying an HTML entity needs `html = TRUE` on `.rownames`
 
@@ -479,10 +598,10 @@ because the button disabled itself after one run: a second run would have given 
 "τ-kongeneric" tabs, then three. The three strips are now built whole in a `renderUI()` from
 the models that fitted, so a rerun replaces them. Never go back to `appendTab()` here.
 
-`shinydashboard::tabBox()` takes its panels one at a time and does *not* accept a list of
-them — `tabsetPanel(listOfPanels)` errors with "Navigation containers expect a collection of
-...". Hence the `do.call()` at those three call sites, on an unnamed list. (An unnamed one:
-see the `do.call()` gotcha above.)
+`cttTabCard()` — `bslib::navset_card_tab()` under it — takes its panels one at a time and does
+*not* accept a list of them: `tabsetPanel(listOfPanels)` errors with "Navigation containers
+expect a collection of ...". Hence the `do.call()` at those three call sites, on an unnamed
+list. (An unnamed one: see the `do.call()` gotcha above.)
 
 ### Anything the results tabs read must be frozen at fit time
 
