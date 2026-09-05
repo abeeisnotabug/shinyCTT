@@ -33,9 +33,8 @@ nestedPairs <- function(models, hierarchy) {
       descendants <- union(descendants, childrenOfWhatWeHave)
     }
 
-    # Write out one pair name per descendant. Looping over `models` rather than over
-    # `descendants` keeps the pairs in the family's own order, so the comparison tables
-    # always list them the same way round.
+    # One pair name per descendant. Looping over `models` keeps them in the family's own
+    # order, so the comparison tables always list them the same way round.
     for (childModel in models) {
       if (childModel %in% descendants) {
         pairs <- c(pairs, paste0(childModel, parentModel))

@@ -1,23 +1,8 @@
-## Every piece of text the user reads goes through tr(). The text itself is not in this
-## file any more - it lives in inst/translations.csv, one row per piece, named by a short
-## key, with one column per language:
+## Every piece of text the user reads goes through tr(). The text is in
+## inst/translations.csv: one row per piece, named by a short key, one column per language.
+## So the code says tr("common.select") and never holds the sentence itself.
 ##
-##     key,en,de
-##     common.select,Select,Auswaehlen
-##     subset.items.label,2a. Select the item columns:,
-##
-## So the code says tr("common.select") and never holds the English sentence itself. Three
-## reasons that beat writing the English into the code:
-##
-##   1. R CMD check warns about any non-ASCII character in R/, so the sigma-squared of an
-##      error variance cannot be written in an R file - only as the HTML entity for it. A
-##      .csv is not R code, so the real characters are fine there.
-##   2. The long warning sentences made lines of 250 characters.
-##   3. Two rows of the old table held the same sentence, one of them with a <br/> in it.
-##      Markup does not belong in text a translator is handed.
-##
-## Symbols live in the same file under sym.*. They are not translated - a sigma is a sigma
-## in German - but they are text, so they belong outside R/ for reason 1.
+## Symbols are rows too, under sym.*, and are the same in every language.
 
 ## The languages on offer, in the order the chooser lists them. The first is the fallback:
 ## an entry with no translation yet comes back in it. Adding one means a column of the same
@@ -25,9 +10,8 @@
 appLanguages <- c("en", "de", "fr")
 
 ## What the chooser in the header calls each language: its flag, and its own name for
-## itself. Written out one by one rather than built with paste0(), because
-## test-translations.R reads the source for tr("...") and cannot see a key that is
-## assembled at run time.
+## itself. Every key is written out in full - test-translations.R reads this file as text
+## and cannot see one built at run time.
 languageLabels <- function() {
   c(en = tr("sym.lang.en"),
     de = tr("sym.lang.de"),
@@ -35,10 +19,6 @@ languageLabels <- function() {
 }
 
 ## Read the text into an option. Called once, by .onLoad() in zzz.R.
-##
-## An option rather than a variable of this file, for the same reason the app's other
-## settings are options: it is one place, and nothing that reloads the package's code can
-## quietly leave an empty copy behind.
 loadTranslations <- function(path) {
   # na.strings = character(0) because one row's text is the word "NA" - the hierarchical
   # table prints it in a cell when lavaan drops the RMSEA column under FIML. read.csv would
@@ -88,10 +68,8 @@ resolveLanguage <- function(asked) {
 ## Remember the language the next page is being built in. Called at the top of ui(), from
 ## the ?lang= part of the address the browser asked for.
 ##
-## One value for the whole app rather than one per visitor, which is safe only because R
-## runs one thing at a time: ui() is called, builds the page and returns before the next
-## visitor's ui() starts. The language of a visitor whose page is already open is a
-## different value and lives in their own session - see tr() below.
+## One value for the whole app, which is safe because R builds one page at a time. A
+## visitor whose page is already open has their own, in their session - see tr() below.
 setUiLanguage <- function(asked) {
   options(shinyCTT.uiLanguage = resolveLanguage(asked))
 }

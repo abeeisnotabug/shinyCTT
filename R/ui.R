@@ -67,10 +67,9 @@ ui <- function(request) {
       bslib::nav_panel_hidden("subsetSelectionTab", dataSubsetUI("subset")),
 
       ### statisticsTab ----
-      # A card has no width of its own, so the widths live here rather than inside the
-      # modules: the top two boxes are half a row each, the covariance matrix the whole of
-      # one. Every box sits in a column, even a full-width one - a card put straight into a
-      # fluidRow() is the row's own child and takes its negative margins (see GOTCHAS.md).
+      # A card has no width, so the widths are here: the top two boxes half a row each,
+      # the covariance matrix a whole one. Every box sits in a column, a full-width one
+      # included (see GOTCHAS.md).
       bslib::nav_panel_hidden(
         "statisticsTab",
         fluidRow(

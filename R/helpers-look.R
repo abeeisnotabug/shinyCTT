@@ -1,14 +1,11 @@
-## How the app looks, in two halves, and which half a rule goes in is not a matter of taste.
+## How the app looks, in two halves:
 ##
-##   fuTheme()  - the settings Bootstrap already has a name for: the colours, the font, the
-##                base text size, the green bar. bslib compiles these into a style sheet.
+##   fuTheme()  - the settings Bootstrap has a name for: the colours, the font, the base
+##                text size, the green bar. bslib compiles these into a style sheet.
 ##   fuStyle()  - everything else, out of inst/styles.css and into the page's head.
 ##
-## The rules are in the page and not in the theme because bslib serves its own
-## components.css AFTER the theme it compiles: a rule written into the theme loses to
-## bslib's own whenever the two name the same number of classes, and does so silently.
-## What goes in the page is read after both. (See GOTCHAS.md, and WALKTHROUGH.md 6b, which
-## is the primer.)
+## A rule goes in the style sheet, never in the theme - bslib serves its own CSS after the
+## theme and silently wins (see GOTCHAS.md, and WALKTHROUGH.md 6b).
 
 ## ---- the FU look ----
 fuTheme <- function() {

@@ -61,11 +61,9 @@ server <- function(input, output, session) {
   })
 
   ## Group colours ----
-  # ggplot2's default discrete palette, but pinned to the group *by name*: a discrete
-  # scale hands out its palette to whichever levels are still in the data, so
-  # de-selecting a group in a plot tab used to recolour the ones that remain. The light
-  # variants - the same colours mixed 40% toward white - are for the density curves,
-  # which are drawn on top of bars in the solid colour.
+  # One colour per group, pinned by name so de-selecting a group does not recolour the
+  # rest (see GOTCHAS.md). The light variants - mixed 40% toward white - are for the
+  # density curves drawn over the bars.
   groupColors <- reactive(
     groupPalette(sort(unique(subset$data()[, subset$groupCol()]))))
 
@@ -85,8 +83,7 @@ server <- function(input, output, session) {
       function(entry) identical(entry$status, "danger"),
       logical(1)))
 
-    # unname(), because a named list handed to a tag turns its names into HTML attributes
-    # instead of children and the entries vanish.
+    # unname(), or the names become HTML attributes and the entries vanish.
     items <- unname(lapply(entries, function(entry) tags$li(
       tags$span(
         class = "dropdown-item",
@@ -242,10 +239,10 @@ server <- function(input, output, session) {
     frozen = reactive(atLeastStage(appStage(), "results")))
 
   # the run ----
-  # Pressing "Test the models" fits the models and stores them, and does nothing else.
-  # Everything drawn from them is built under "Results" below and redraws on its own. The
-  # button and every setting it reads are the Testing Parameters box's; the fitting is
-  # here, because it reads steps 1 and 2 just as much.
+  # Pressing "Test the models" fits them and stores them, and draws nothing. Everything
+  # made from them is under "Results" below and redraws on its own. The button and its
+  # settings belong to the Testing Parameters box; the fitting is here because it reads
+  # steps 1 and 2 as well.
   observeEvent(params$goModels(), tryCatch({
     fitErrorRV(NULL)
 

@@ -2,10 +2,6 @@
 ## a colour.
 
 ## The plots' colours.
-##
-## The old ones were a blue that appeared nowhere else in the app, and, for the group-wise
-## plots, ggplot2's own defaults - hcl() spaced evenly round the colour wheel, which put a
-## magenta and a cyan next to the FU green of the header.
 fuColors <- function() {
   list(
     # The Freie Universitaet's green, the header bar's colour: what a filled area - the
@@ -32,10 +28,8 @@ cttColors <- function() {
     text = "#FFFFFF")
 }
 
-## The colours the three boxes at the top of step 2 are painted, keyed the way
-## shinydashboard named them. Two of the five are the app's own - the green of the header
-## and the blue ui.R used to set by hand - and the other three are the ones AdminLTE drew
-## them in, written down here because a bslib value box takes a colour rather than a name.
+## The colours the three boxes at the top of step 2 are painted. Written out because a
+## bslib value box takes a colour, not a name.
 valueBoxColors <- function() {
   c(green = "#99CC00",
     blue = "#003F8A",
@@ -56,8 +50,7 @@ ratingStyle <- function(rating) {
 ## The colour each group is drawn in, and a paler version of each for the density curves
 ## drawn over the histogram bars.
 ##
-## Named by group on purpose: a discrete ggplot2 scale hands its palette to whichever
-## levels are still in the data, so de-selecting a group used to recolour the ones left
+## Named by group, so de-selecting one in a plot tab does not recolour the rest
 ## (see GOTCHAS.md).
 groupPalette <- function(groups) {
   palette <- fuColors()$groups

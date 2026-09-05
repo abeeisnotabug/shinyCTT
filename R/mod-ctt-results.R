@@ -491,10 +491,8 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
       makeLegend("infCompTable", fit()$estimatorName, sigLvl()))
 
     ## the three tab strips ----
-    # Built whole from the models that fitted, rather than a tab being added per model:
-    # the models can be fitted again, and adding to the strip would give two tabs per
-    # model the second time round. cttTabCard() takes its panels one by one, so do.call()
-    # hands it the list.
+    # Built whole each time, so a second run does not leave two tabs per model.
+    # cttTabCard() takes its panels one by one, so do.call() hands it the list.
     output$parTabset <- renderUI({
       panels <- lapply(
         fit()$goodModels,

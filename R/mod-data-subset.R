@@ -194,12 +194,9 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
            input$groups,
            input$itemCols), {
 
-      # Nothing to build until step 1 has handed over a data set and the two choosers below
-      # have reported what they are set to. input$groupCol is the one to wait for: its list
-      # always starts with the hard-coded "No group column selected" = "noGroupSelected",
-      # so it holds a value even when the data offers no group column at all. An empty
-      # input$itemCols next to it therefore means the user unticked every item, not that the
-      # tick boxes have yet to be drawn.
+      # Wait on input$groupCol, not on input$itemCols: groupCol always holds a value, so
+      # an empty itemCols beside it means the user unticked every item rather than the
+      # boxes not being drawn yet (see GOTCHAS.md).
       req(chosenData(), input$groupCol)
 
       if (input$groupCol != "noGroupSelected") {
@@ -287,9 +284,7 @@ dataSubsetServer <- function(id, chosenData, notifications, frozen) {
           status = "warning"),
         NULL)
 
-      # The same message the bell gets, shown once as a pop-up. It used to be dug back out
-      # of the markup notificationItem() had built; the entry is the three pieces now, so
-      # both are read straight off it.
+      # The same message the bell gets, shown once as a pop-up.
       if (!is.null(notifications$notList$numItems)) {
         showNotification(
           ui = notifications$notList$numItems$text,

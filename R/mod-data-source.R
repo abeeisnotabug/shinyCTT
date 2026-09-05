@@ -125,13 +125,9 @@ dataSourceServer <- function(id, notifications, frozen) {
     })
 
     ## what an uploaded .RData holds ----
-    # A reactive of its own, so the file is read once per upload rather than once per pick:
-    # read inside the observer below, it would be read again every time the user chose
-    # another object out of it, and the rebuilt chooser would snap back to the first name.
-    #
-    # The objects go into an environment of their own, never into the app's own workspace,
-    # which one R process shares between every visitor. Nothing points at that environment
-    # once the visit ends, so R frees it.
+    # A reactive of its own, so the file is read once per upload, not once per pick (see
+    # GOTCHAS.md). The objects go into an environment of their own, never into the app's
+    # workspace, which every visitor shares.
     uploadedObjects <- reactive({
       req(input$RDataFile, !isRds())
 
@@ -239,13 +235,10 @@ dataSourceServer <- function(id, notifications, frozen) {
       removeNotification("noDatasetNot")
 
       ### choose data source ----
-      # Nothing to read until the control that goes with the chosen source has something in
-      # it. This stays outside the tryCatch below, because req() stops the observer by
-      # raising an error of its own and would otherwise be reported as a failed read.
-      #
-      # An .rds is the one object it holds, so the file is enough; an .RData needs a pick
-      # as well. So does the workspace, which is not readable at all when the app is not
-      # offering it.
+      # Nothing to read until the source's own control is filled in: an .rds needs only the
+      # file, an .RData needs a pick as well, and the workspace is unreadable when the app
+      # is not offering it. Outside the tryCatch, because req() raises an error of its own
+      # (see GOTCHAS.md).
       req(switch(
         input$source,
         "Supplied" = input$chosenObject,
@@ -254,12 +247,9 @@ dataSourceServer <- function(id, notifications, frozen) {
         "RData" = if (isRds()) input$RDataFile else input$chosenObject,
         "Workspace" = if (workspaceOffered) input$chosenObject))
 
-      # Reading is caught, because it fails on plenty of things a user can point at: a
-      # malformed CSV, a corrupt SPSS file, an R data file that is neither, or a workspace
-      # object that gets past the chooser's filter without being something data.frame() can
-      # make a table of - a sparse Matrix, for one. An error let out of an observer ends
-      # the session on the spot, so the user would lose the app rather than be told the
-      # data set is unusable.
+      # Reading is caught: a malformed CSV, a corrupt SPSS file, or an object data.frame()
+      # cannot make a table of all fail here, and an error let out of an observer ends the
+      # visitor's session (see GOTCHAS.md).
       loadedData <- tryCatch({
 
         # The same five names the req() above tests, so input$source is always one of
@@ -356,18 +346,12 @@ dataSourceServer <- function(id, notifications, frozen) {
     })
 
     ## the raw data, as a table ----
-    # An output of its own rather than one written from inside an observer: picking a new
-    # source empties raw(), and the table has to empty with it instead of going on showing
-    # the last data set that could be read.
+    # An output of its own, so that emptying raw() empties the table with it.
     output$dataOverview <- DT::renderDataTable({
 
-      # No data -> one empty column, which draws as an empty table. Neither NULL nor a
-      # data.frame() with no columns at all will do: both reach the browser with nothing
-      # for DT to draw, and the error DT throws there stops shiny applying the rest of
-      # that batch of outputs - the workspace chooser among them (see GOTCHAS.md).
-      # dom = "t" leaves out the search box, the length menu and the row count, so an
-      # empty preview is a blank panel rather than the furniture of a table with nothing
-      # in it.
+      # No data -> one empty column. NULL and a table with no columns both break DT and
+      # take the rest of the page's outputs with them (see GOTCHAS.md). dom = "t" drops
+      # the search box, the length menu and the row count.
       if (is.null(raw()))
         return(DT::datatable(
           stats::setNames(data.frame(character(0)), " "),
@@ -402,8 +386,7 @@ dataSourceServer <- function(id, notifications, frozen) {
 
       # Where the data came from, so makeRCode() can write the matching
       # read.csv() / read_spss() / readRDS() / load() line into the exported script. An
-      # .rds is read straight into one object and an .RData is loaded and one of its
-      # objects taken, so the two are told apart here rather than in makeRCode().
+      # .rds holds one object and an .RData holds several, so they are separate types.
       descriptor = reactive(switch(
         input$source,
         "Supplied" = list(type = "Supplied", object = input$chosenObject),

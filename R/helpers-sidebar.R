@@ -34,10 +34,8 @@ atLeastStage <- function(stage, atLeast) {
 }
 
 # One entry: a link that asks server.R to switch to `tabName`. The id is what server.R
-# watches, and `selected` only paints it - the switch itself is nav_select().
-#
-# shinydashboard::menuItem() wrote AdminLTE's own markup, which bslib knows nothing about
-# and would leave unstyled; the .cttMenu rules in ui.R give this its look.
+# watches, and `selected` only paints it - the switch itself is nav_select(). The
+# .cttMenu rules in inst/styles.css give it its look.
 navEntry <- function(tabName, label, icon, selected = FALSE) {
   tags$li(actionLink(
     paste0("nav_", tabName),

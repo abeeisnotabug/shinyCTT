@@ -132,12 +132,9 @@ testingParamsServer <- function(id, nItems, subsetChosen, hasGroups, useFIML, re
 
     ## the two display settings ----
     # Neither is used to fit anything, so both stay live after a run and the tables follow
-    # them.
-    #
-    # What the user typed is never written over: an empty box, or a number out of range,
-    # simply is not taken. The tables go on showing the last usable value and a red note
-    # appears under the box. (Writing the box back would rewrite it mid-keystroke - see
-    # GOTCHAS.md.)
+    # them. An empty box, or a number out of range, is simply not taken: the tables keep
+    # the last usable value and a red note appears under the box. The box itself is never
+    # written back to (see GOTCHAS.md).
     sigLvlRV <- reactiveVal(0.05)
     rmseaCiLvlRV <- reactiveVal(0.90)
 
@@ -198,10 +195,7 @@ testingParamsServer <- function(id, nItems, subsetChosen, hasGroups, useFIML, re
     outputOptions(output, "nItemsChosen", suspendWhenHidden = FALSE)
 
     ## keep the model selection in step with the item count ----
-    # The guard was req(identical(appStage(), "subset")) while this lived in server.R, which
-    # this box has no stage to read. !frozen() is wider and still enough: what it has to
-    # stop is re-ticking the grid after a run, and step 2's item boxes are dead from the
-    # moment its Select is pressed, so nItems() cannot change in between either way.
+    # !frozen(), so a run cannot be followed by the grid re-ticking itself.
     observeEvent(nItems(), {
       req(!frozen())
 
@@ -319,8 +313,8 @@ testingParamsServer <- function(id, nItems, subsetChosen, hasGroups, useFIML, re
       req(frozen())
 
       # shinyjs adds this box's name to the id itself (see GOTCHAS.md), so these are plain.
-      # The two display settings and the button are deliberately not here: they are meant
-      # to stay usable after a run.
+      # The two display settings and the button stay usable after a run, so they are not
+      # in this list.
       for (controlId in c("doMg", "etaIntFree")) shinyjs::disable(controlId)
     })
 

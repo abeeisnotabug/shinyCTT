@@ -5,8 +5,7 @@
 extractFitIndices <- function(fittedModel, rmseaCiLevel = 0.90) {
   scaledAddon <- switch(length(fittedModel@test), "", ".scaled")
 
-  # fitMeasures() rather than lavInspect(fittedModel, "fit"): same numbers under both ML
-  # and MLR, but it takes the confidence level for the RMSEA interval.
+  # fitMeasures(), because it takes the confidence level for the RMSEA interval.
   rawParams <- lavaan::fitMeasures(
     fittedModel,
     fm.args = list(rmsea.ci.level = rmseaCiLevel))
@@ -85,16 +84,13 @@ extractParameters <- function(fittedModel, alpha = 0.05, display = TRUE) {
   rels <- df$est[grep("rel_", df$label)]
   relsSE <- df$se[grep("rel_", df$label)]
 
-  # rels > 1 or < 0 (a Heywood case, see below) makes rels / (1 - rels) negative, and log() of
-  # that is NaN - correctly, since the logit isn't defined out there. The ifelse() clamp below
-  # discards it before it's ever used, so the NaN is harmless; suppress the console warning it
-  # would otherwise print for a value nobody keeps.
+  # A reliability outside [0, 1] - a Heywood case - makes this log() a NaN. The clamp
+  # below throws it away, so muffle the warning.
   relsLogit <- suppressWarnings(log(rels / (1 - rels)))
   relsLogitSE <- relsSE / (rels * (1 - rels))
 
-  # At a Heywood boundary (rel <= 0 or rel >= 1) the logit is +-Inf and its SE blows up too,
-  # so the formula below divides Inf by Inf and returns NaN on one side. Report a zero-width
-  # CI pinned to the boundary there instead, rather than let a valid bound sit next to a NaN.
+  # rel <= 0 or rel >= 1 -> the logit interval is NaN, so pin both bounds to the boundary
+  # (see GOTCHAS.md).
   relsCiL <- ifelse(rels <= 0, 0, ifelse(rels >= 1, 1,
     1 / (1 + exp(-relsLogit + stats::qnorm(1 - alpha / 2) * relsLogitSE))))
   relsCiU <- ifelse(rels <= 0, 0, ifelse(rels >= 1, 1,

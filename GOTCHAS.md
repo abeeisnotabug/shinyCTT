@@ -200,6 +200,39 @@ return(NULL)` clears it — verified in a browser, the slot's HTML goes empty on
 
 ---
 
+### An empty `DT` widget breaks the whole batch of outputs
+
+The other half of the one above, and it points the opposite way for `DT`. A
+`DT::renderDataTable()` that gives back `NULL` - or a `data.frame()` with no columns at all -
+reaches the browser as a widget whose `x` is null. `DT`'s own `renderValue()` reads
+`.lazyRender` off that and throws, and the error lands **part way through the batch of output
+values shiny is applying and stops the rest of it**. On 2026-09-02 that took the workspace
+chooser down with it: no data could be selected and nothing else on the page could be reached.
+
+The empty state has to be a real table with at least one column. `mod-data-source.R` uses one
+column named `" "`, with `dom = "t"` so the search box, the length menu and the row count are
+left out and the panel reads as blank.
+
+So: to clear a `DT` table that is already drawn, give back an empty *table*, not `NULL` and
+not `req()`. An output that renders on page load has to be looked at in a browser on page
+load - `testServer()` renders the chooser correctly, the suite was green and
+`R CMD check --as-cran` was 0/0/0 while this was broken.
+
+---
+
+### Read an uploaded file in a reactive, not in the observer that acts on it
+
+An uploaded `.RData` holds several objects and the user picks one of them. Read the file
+inside the observer that responds to the pick, and it is read again on every pick; the object
+chooser is rebuilt from the fresh read each time and snaps back to the first name, so the
+user can never select the second object.
+
+`uploadedObjects()` in `mod-data-source.R` is a reactive of its own for that reason: it
+depends on the file input alone, so it re-runs once per upload and the chooser is built from
+a value that does not change while the user is picking.
+
+---
+
 ### An error inside an observer ends the session
 
 An error in a `render*()` shows up in the box that output draws into and the app carries on.

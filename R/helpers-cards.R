@@ -1,15 +1,11 @@
 ## The two shapes of box the app draws with. Every box on every tab is one of these, so
-## how a box behaves is changed here and nowhere else.
-##
-## They were shinydashboard::box() and shinydashboard::tabBox(), which took a `width` in
-## twelfths and wrapped themselves in a column. A bslib card has no width of its own, so
-## the widths moved out to the call sites - ui.R and the modules' own layouts.
+## how a box behaves is changed here and nowhere else. Neither takes a width: a card has
+## none, so ui.R and the modules put each box in a column.
 
-## A box: a card with the title in its header, as tall as what is in it.
+## A box: a card with the title in its header.
 ##
-## fillable = FALSE is what makes it as tall as its contents. Left at bslib's default a
-## card hands its own height to what is inside it, and a table comes out cut off half way
-## down with no pager (see GOTCHAS.md).
+## fillable = FALSE keeps it as tall as its contents; bslib's default cuts a table in half
+## (see GOTCHAS.md).
 cttCard <- function(..., title = NULL) {
   bslib::card(
     if (!is.null(title)) bslib::card_header(title),

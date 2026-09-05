@@ -142,10 +142,8 @@ mvnServer <- function(id, data, itemCols) {
 
       reactable::reactable(
         multivariateTable(),
-        # These two boxes are a third of the page wide, so the columns are given the room
-        # their own contents need rather than reactable's even 100px each: "Mardia
-        # Skewness" wrapped onto two lines while "Signif." was cut short. Measured in a
-        # browser against the widest text in each column, plus the theme's cell padding.
+        # How narrow each column may be, in pixels. This box is a third of the page wide,
+        # so each column gets what its own widest text needs (see GOTCHAS.md).
         columns = list(
           Test = reactable::colDef(name = tr("stats.mvn.col.test"), minWidth = 127),
           Statistic = reactable::colDef(name = tr("stats.mvn.col.statistic"), minWidth = 67,
@@ -177,8 +175,7 @@ mvnServer <- function(id, data, itemCols) {
 
       reactable::reactable(
         univariateTable(),
-        # Same measurement as the box above: "Anderson-Darling" needs the room, the
-        # single-character p and the star in Signif. do not.
+        # Same measurement as the box above.
         columns = list(
           Test = reactable::colDef(name = tr("stats.mvn.col.test"), minWidth = 125),
           Item = reactable::colDef(name = tr("common.col.item"), minWidth = 59),

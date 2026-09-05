@@ -61,19 +61,13 @@ comparisonGrid <- function(family, ns = shiny::NS(NULL)) {
         # The fewest items this model can be tested with, straight out of the family.
         fewestItems <- family$minItems[[rowModel]]
 
-        # The strings below are JavaScript, which the browser evaluates to decide which
-        # part of the cell to show. Reading them:
-        #   output.nItemsChosen     how many item columns the user has ticked. A value the
-        #                           server sends rather than an input, because the tick
-        #                           boxes live inside the subset box and their id carries
-        #                           that box's name (see GOTCHAS.md). Undefined before any
-        #                           data is chosen, which is why every condition tests it
-        #                           first - without that guard the browser throws roughly
-        #                           18 errors per walkthrough.
-        #   input.goModels          how often "Test the models" has been pressed, so 0
-        #                           means the run has not happened yet.
-        #   input.tko               whether the tau-congeneric checkbox is ticked, and so on
-        #                           for each model.
+        # The strings below are JavaScript the browser evaluates to pick which part of the
+        # cell to show:
+        #   output.nItemsChosen  how many items are ticked. An output, not an input, and
+        #                        undefined until data is chosen, so every condition tests
+        #                        it first (see GOTCHAS.md).
+        #   input.goModels       how often "Test the models" was pressed; 0 means never.
+        #   input.tko            whether the tau-congeneric box is ticked, and so on.
         enoughItems <- paste0("output.nItemsChosen > ", fewestItems - 1)
         tooFewItems <- paste0("output.nItemsChosen <= ", fewestItems - 1)
         modelIsTicked <- paste0("input.", rowModel)

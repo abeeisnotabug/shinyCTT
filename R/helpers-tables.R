@@ -258,10 +258,8 @@ makeHierTable <- function(succTable, CFIs, estimatorName, sigLvl, modelsAbbrev) 
     aic = tr("results.col.aic"),
     bic = tr("results.col.bic"))
 
-  # How narrow each column may be, in pixels: enough for the widest thing it can hold, at
-  # the 14px Arial the tables are drawn in. Without these every column is reactable's own
-  # 100px, and eight of those do not fit beside a second copy of the table (see GOTCHAS.md).
-  # The header is the widest thing in the first four; the number is, in the last three.
+  # How narrow each column may be, in pixels: enough for the widest thing it holds. The
+  # header is widest in the first four, the number in the last three (see GOTCHAS.md).
   minWidths <- c(
     deltaDf = 46,      # three digits and the plus sign
     deltaChisq = 85,   # the header at its longest estimator name, FIML with robust errors
@@ -472,8 +470,8 @@ makeParTableWithCIs <- function(fitObject, estimatorName, sigLvl, itemCols, grou
     relLabel = tr("sym.reliability.i"),
     relEst = tr("results.col.est"), relSe = seName, relCi = ciName)
 
-  # The estimates and standard errors are real numbers - makeKable() used to round them to
-  # three places for the whole table. Everything else is already text.
+  # The estimates and standard errors are real numbers, rounded below. Everything else is
+  # already text.
   roundedColumns <- c("lambdaEst", "lambdaSe", "stdEst", "stdSe", "alphaEst", "alphaSe",
                       "errorEst", "errorSe", "relEst", "relSe")
 
