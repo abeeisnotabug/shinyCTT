@@ -9,7 +9,7 @@ mvnUI <- function(id) {
 
   fluidRow(
     column(
-      width = 4,
+      width = 5,
 
       cttCard(
         title = tr("stats.mvn.normtests.title"),
@@ -34,7 +34,7 @@ mvnUI <- function(id) {
     ), # column
 
     column(
-      width = 8,
+      width = 7,
       htmlOutput(ns("plotBox")),
 
       # The green hint box under the plot. cttHintBox keeps the sentence at reading size -
@@ -43,7 +43,7 @@ mvnUI <- function(id) {
         title = tr("stats.mvn.hint.label"),
         value = tr("stats.mvn.app.hint"),
         showcase = icon("lightbulb"),
-        showcase_layout = "left center",
+        showcase_layout = bslib::showcase_left_center(width = .2),
         class = "cttHintBox",
         theme = bslib::value_box_theme(
           bg = valueBoxColors()[["green"]], fg = "#FFFFFF")))
