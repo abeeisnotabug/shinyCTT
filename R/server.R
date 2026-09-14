@@ -100,10 +100,10 @@ server <- function(input, output, session) {
         `data-bs-toggle` = "dropdown",
         icon("bell"),
         tags$span(
-          class = paste("badge rounded-pill", if (anyDanger) "bg-danger" else "bg-primary"),
+          class = paste("badge rounded-pill", if (anyDanger) "bg-danger" else "bg-light text-dark"),
           length(entries))),
 
-      tags$ul(class = "dropdown-menu dropdown-menu-end cttNotifications", items))
+      tags$ul(class = "dropdown-menu dropdown-menu-start cttNotifications", items))
   })
 
   output$dataMenuOut <- renderUI(sidebarGroups(appStage(), doMgRV()))

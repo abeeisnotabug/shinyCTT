@@ -27,7 +27,7 @@ ui <- function(request) {
     title = div(
       class = "cttHeader",
 
-      span(class = "cttBrand", "shinyCTT"),
+      span(class = "cttBrand", "shinyCTT", uiOutput("infoMenu")),
 
       div(
         class = "cttHeaderRight",
@@ -37,9 +37,7 @@ ui <- function(request) {
           label = NULL,
           width = "150px",
           selected = currentLanguage(),
-          choices = stats::setNames(appLanguages, languageLabels()[appLanguages])),
-
-        uiOutput("infoMenu"))),
+          choices = stats::setNames(appLanguages, languageLabels()[appLanguages])))),
 
     # the menu ----
     sidebar = bslib::sidebar(

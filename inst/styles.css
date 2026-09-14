@@ -52,6 +52,16 @@
 .cttBell::after { display: none; }        /* no caret beside the bell */
 .cttBell .badge { position: absolute; top: 0; right: 0; font-size: 9px; padding: 2px 4px; }
 
+/* The count pulses once each time the bell is redrawn - unless the visitor has switched
+   animations off in their system settings. */
+@media (prefers-reduced-motion: no-preference) {
+  .cttBell .badge { animation: cttPulse 0.6s ease-out; }
+  @keyframes cttPulse {
+    50% { transform: scale(1.5); }
+  }
+}
+.cttBrand .dropdown { display: inline-block; }   /* keeps the bell beside the name */
+
 .cttNotifications { width: 600px; max-width: 90vw; }
 .cttNotifications .dropdown-item { white-space: normal; }
 
