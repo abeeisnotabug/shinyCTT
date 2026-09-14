@@ -36,7 +36,7 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
             width = 6,
             selectInput(ns("histItem"), tr("stats.hist.item.label"), choices = itemCols()))),
 
-        plotOutput(ns("singleHist")),
+        plotOutput(ns("singleHist"), height = "300px"),
 
         fluidRow(
           column(
@@ -83,7 +83,7 @@ histogramServer <- function(id, data, itemCols, groupCol, hasGroups, groupColors
                 selected = unique(data()[, groupCol()]),
                 inline = TRUE))),
 
-          plotOutput(ns("groupHist")),
+          plotOutput(ns("groupHist"), height = "300px"),
 
           fluidRow(
             column(
