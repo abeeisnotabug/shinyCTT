@@ -73,7 +73,7 @@ test_that("the family reproduces every label vector it replaced", {
   # family reads the right rows, not the text itself.
   expect_equal(unname(family$long)[1], tr("model.tko.long"))
   expect_equal(unname(family$abbrev)[1], tr("model.tko.abbrev"))
-  expect_match(unname(family$long)[1], "kongeneric", fixed = TRUE)
+  expect_match(unname(family$long)[1], "congeneric", fixed = TRUE)
   expect_equal(unname(family$minItems), c(4, 3, 2, 2, 2))
 
   # Every vector is keyed by model name, which is what lets the rest of the app index them.

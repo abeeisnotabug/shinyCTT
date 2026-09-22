@@ -6,7 +6,7 @@
 \alias{shinyCTT-package}
 \title{shinyCTT: Easy to use analysis tools for psychometric tests in the CTT framework}
 \description{
-The package provides a Shiny App to analyze datasets in the framework of classical test theory based on the lavaan package. Most importantly, the model assumptions of the 5 CTT models are checked in decreasing order of complexity (tau-kongeneric, essentially tau-equivalent, tau-equivalent and essentially tau-parallel, and tau-parallel) and the reliability estimators are adjusted accordingly. Moreover, it provides standard errors and confidence intervals for all parameters, including item reliabilities and error variances.
+The package provides a Shiny App to analyze datasets in the framework of classical test theory based on the lavaan package. Most importantly, the model assumptions of the 5 CTT models are checked in decreasing order of complexity (tau-congeneric, essentially tau-equivalent, tau-equivalent and essentially tau-parallel, and tau-parallel) and the reliability estimators are adjusted accordingly. Moreover, it provides standard errors and confidence intervals for all parameters, including item reliabilities and error variances.
 }
 \seealso{
 Useful links:

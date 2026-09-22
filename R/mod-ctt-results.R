@@ -503,8 +503,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
       do.call(
         cttTabCard,
         c(list(id = ns("parTabsetTab"),
-               title = tr("results.partables.title"),
-               titleRight = TRUE),
+               title = tr("results.partables.title")),
           unname(panels)))
     })
 
@@ -560,8 +559,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
       do.call(
         cttTabCard,
         c(list(id = ns("fsTabsetTab"),
-               title = HTML(tr("results.scores.title")),
-               titleRight = TRUE),
+               title = HTML(sprintf(tr("results.scores.title"), tr("sym.eta.hat")))),
           unname(panels)))
     })
 
@@ -576,8 +574,7 @@ cttResultsServer <- function(id, fit, sigLvl, rmseaCiLvl) {
       do.call(
         cttTabCard,
         c(list(id = ns("mcTabsetTab"),
-               title = tr("results.modelcode.title"),
-               titleRight = TRUE),
+               title = tr("results.modelcode.title")),
           unname(panels)))
     })
 

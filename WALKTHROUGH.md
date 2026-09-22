@@ -198,7 +198,7 @@ them.
 
 **The three tab strips are rebuilt whole**, from `renderUI()`, rather than a tab being added
 per model. A tab that is *added* would be added again on the next run, giving two
-"τ-kongeneric" tabs, then three. Each strip depends only on the fits, so changing a display
+"τ-congeneric" tabs, then three. Each strip depends only on the fits, so changing a display
 setting redraws the table *inside* the open tab and leaves the user where they were.
 
 ---
@@ -303,13 +303,17 @@ Each row is one piece of text: a short name, then one column per language. The c
 `tr("subset.items.label")`; the row says what that is in English, German and French. To find
 the row, search the file for the English words.
 
-Three things to know while you are in there:
+Four things to know while you are in there:
 
 - **Leave the `%s`, `%i` and `_TOTAL_` alone.** The code fills those in, by position. A
   translation that drops one either loses a number or stops the app on that screen —
   `devtools::test()` checks for it, so you will be told.
 - **Do not put `<b>` or `<i>` in.** Where a sentence needs them, the code puts them around a
   `%s`, so that German and French can put the emphasised words in a different place.
+- **A box title carries no colon.** `cttCard()` and `cttTabCard()` put one on the end of
+  every title they are given (`common.colon`, which is `" :"` in French and `":"` in the
+  other two), so the row holds the words alone. Add a box and its title gets its colon by
+  itself.
 - **The `sym.*` rows are symbols**, not sentences — a sigma is a sigma in every language, so
   they are left untranslated and may carry `<sub>`. They are also where the real Greek
   characters live: `R CMD check` refuses non-ASCII characters in `R/`, which is half of why
@@ -354,7 +358,7 @@ when to show "Too few items." (`fun-comparisonGrid.R:62` and `:128`), and
 `mod-testing-params.R:209` reads the same vector to untick models the user cannot test.
 
 There is one remaining copy of these numbers written out in prose — the notification text
-that says "Only three items selected. Unable to test the τ-kongeneric model." That is a
+that says "Only three items selected. Unable to test the τ-congeneric model." That is a
 sentence, not logic, so it does not follow automatically. Update it by hand.
 
 ### "I want to add a tab"
@@ -498,7 +502,7 @@ Everything the package names itself starts `ctt`, so a search for `ctt` in
 | `cttHeader`, `cttBrand`, `cttHeaderRight` | the green bar, its title, the right-hand end | `R/ui.R` |
 | `cttBell`, `cttNotifications` | the bell and the list it opens | `R/server.R` |
 | `cttMenu`, `cttSubMenu`, `cttSelected` | the menu, a folding block, the current entry | `R/helpers-sidebar.R` |
-| `cttTitleRight` | a tab strip with its title on the right | `R/helpers-cards.R` |
+| `cttHat` | the circumflex over the eta in the factor-scores title | `inst/translations.csv` |
 | `cttValueBox` | the three boxes at the top of step 2 | `R/mod-data-subset.R` |
 | `cttHintBox` | the green hint under the normality plot | `R/mod-mvn.R` |
 

@@ -151,10 +151,16 @@ main.bslib-page-main > .tab-content > .tab-pane, .row > * { min-width: 0; }
 
 /* A tab strip inside a box: the tabs sit in the header beside the title, and the strip
    itself carries no second border. */
-/* The title at one end of the header and the tabs at the other, as the boxes had them. */
 .card > .card-header.bslib-navs-card-title {
   padding: 5px 10px;
-  justify-content: space-between;
+}
+/* The strip is only as wide as its tabs and hugs the right of the header, so the title is
+   at one end and the tabs at the other. bslib 0.9.0 does this by itself and 0.10.0 stretches
+   the strip instead; written out here, both draw it the same way (see GOTCHAS.md). */
+.card > .card-header.bslib-navs-card-title > .nav {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
 }
 .card > .card-header .nav-tabs { border-bottom: 0; }
 .card > .card-header .nav-tabs > li > a { color: #000000; }
@@ -165,8 +171,20 @@ main.bslib-page-main > .tab-content > .tab-pane, .row > * { min-width: 0; }
   border-bottom-width: 2px;
 }
 
-/* Three of the strips put the title on the right of the tabs rather than the left. */
-.cttTitleRight .bslib-navs-card-title { flex-direction: row-reverse; }
+/* Arial puts a combining circumflex over the right stem of an eta, so the caret is drawn
+   separately and centred over the letter (sym.eta.hat). It keeps the line height it
+   inherits, which puts it on the same line as the letter, at the height Arial draws a
+   circumflex over a Latin n - so no offset is needed and none has to be retuned when the
+   text size changes. */
+.cttHat { display: inline-block; position: relative; }
+.cttHat > i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  text-align: center;
+  font-style: normal;
+}
 
 /* ---- the three boxes at the top of step 2 ---- */
 /* bslib writes the label above the number; shinydashboard put the number first. */

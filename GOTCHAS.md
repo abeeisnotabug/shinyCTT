@@ -354,6 +354,37 @@ the card inside it is the row's child for every purpose. Verified in the browser
 first. One rule flips it back — `.cttValueBox .value-box-area { flex-direction: column-reverse }`
 — and `showcase_layout = "top right"` puts the icon where AdminLTE had it.
 
+### Where a tab strip sits in its header changed in bslib 0.10.0
+
+bslib gives the strip in a card header two instructions, and only one of them is in every
+version:
+
+- `.bslib-navs-card-title .nav { margin-left: auto }` — hug the right-hand end. All versions.
+- `.bslib-card .card-header > .nav { flex: 1; min-width: 0 }` — take the rest of the header.
+  **Only from 0.10.0 on.**
+
+The second wins where it exists, so on 0.10.0 and later the tabs start beside the title and on
+0.9.0 they sit at the far right of the box. `DESCRIPTION` allows `bslib (>= 0.9.0)`, so both
+are versions the package says it supports, and the same page looked different on two machines:
+reported 2026-09-22 against 0.9.0, where three of the strips had the title on the right and the
+tabs were shoved up against it.
+
+Those three used to be wrapped in `.cttTitleRight`, which set `flex-direction: row-reverse` on
+the header to move the title across. Reversing the header also reverses which end
+`margin-left: auto` means, so on 0.9.0 the tabs hugged the title instead of the far edge. The
+wrapper is gone — every strip has its title on the left now — and `inst/styles.css` sets the
+strip's width and its auto margin itself, so neither version's default decides it. **What was checked
+under 0.9.0 was a copy of the header markup on its own, with 0.9.0's rules pasted in, not the
+app** — nobody here has a 0.9.0 to run it against. Verified in the app under 0.12.0: every
+strip's tab list ends 2px from the right edge of its header.
+
+**The header wraps below about 900px**, and the whole tab list goes to a second line under the
+title rather than the tabs wrapping among themselves. That is `flex-wrap: wrap` on
+`.bslib-navs-card-title` doing its job, and it only happens on the narrow window.
+
+**Check a header change against `flex-wrap: wrap` as well**: `.bslib-navs-card-title` carries
+it, so a narrow window puts the title on a line of its own rather than clipping anything.
+
 ### The menu is not a bslib component
 
 There is no bslib equivalent of `sidebarMenu()`/`menuItem()`, and none of
@@ -583,9 +614,23 @@ safe for the second, which is the whole reason the language moved out of
 
 The app starts in whatever language R is running in, so on a German machine `tr()` gives back
 German. Tests are written against the English words — `test-modelVocabulary.R` asserts
-`"kongeneric"`, which German spells `kongenerisch`. `tests/testthat/helper-language.R` pins
+`"congeneric"`, which German spells `kongenerisch`. `tests/testthat/helper-language.R` pins
 English for the run. Check any change to the language code under `LANGUAGE=fr_FR.UTF-8` as
 well as unset.
+
+### Arial draws a combining circumflex over an eta's right stem
+
+`η` followed by U+0302 comes out as `η̂` — the caret over the letter's right leg, not over the
+middle. Arial has no rule for that pair; over a Latin `n` it places the same accent correctly,
+which is why the mistake is easy to miss. The factor-scores title is the only place the app
+needs one, and the parameter table's hats were dropped over the same complaint.
+
+`sym.eta.hat` writes the caret as its own piece — `<span class='cttHat'>η<i>ˆ</i></span>`, with
+U+02C6 rather than the combining accent — and `inst/styles.css` centres it over the letter. It
+keeps the line height it inherits, so its baseline is the letter's baseline and the caret lands
+where Arial would draw one over an `n`. **No offset, on purpose**: an offset in `em` would have
+to be retuned for every text size it is ever used at, and `-0.30em` (tried first) already sat
+visibly too high at 16px.
 
 ### selectize hides the options you are looking for
 
@@ -628,7 +673,7 @@ the telling apart and the ids inside it are plain. Only the `tabName`s in `ui.R`
 
 The results tabs used to be added one per model with `appendTab()`. That only looked right
 because the button disabled itself after one run: a second run would have given two
-"τ-kongeneric" tabs, then three. The three strips are now built whole in a `renderUI()` from
+"τ-congeneric" tabs, then three. The three strips are now built whole in a `renderUI()` from
 the models that fitted, so a rerun replaces them. Never go back to `appendTab()` here.
 
 `cttTabCard()` — `bslib::navset_card_tab()` under it — takes its panels one at a time and does
